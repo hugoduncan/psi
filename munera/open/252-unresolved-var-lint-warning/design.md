@@ -133,26 +133,36 @@ is the chosen implementation, confined to the http-kit import directory.
 
 ## Acceptance
 
-- **AC1 — executable proof surface (repo-wide lint, local-only; design-step 9).**
+- **AC1 — executable proof surface (repo-wide lint; design-step 9).**
   `bb lint` (i.e. `clojure -M:lint`) reports zero `Unresolved var` warnings for
   `extensions/dev-http/test/extensions/dev_http_test.clj` — covering **both**
   `http-client/get` (line 572) and `http-client/post` (line 737) — with
   `errors: 0` and no new warnings elsewhere. Before the fix this command reports
   exactly those two warnings; after the fix it must be clean for the file with
-  the repo-wide warning count not increased. AC1 verification is **local-only**:
-  it depends on the slice-2 cache rebuild (gitignored `.clj-kondo/.cache`), so CI
-  `bb lint` (no cache, no `--dependencies` → the http-kit jar is never analyzed)
-  is trivially clean with or without the fix and cannot exercise the
-  registration. Same for the pre-commit surface
+  the repo-wide warning count not increased. The **lint surface itself is
+  cache-dependent and local-only**: AC1 via `bb lint` depends on the slice-2
+  cache rebuild (gitignored `.clj-kondo/.cache`), so CI `bb lint` (no cache, no
+  `--dependencies` → the http-kit jar is never analyzed) is trivially clean
+  with or without the fix and cannot exercise the registration through the lint
+  surface. Same for the pre-commit surface
   (`.pre-commit-hooks/clj-kondo-lint.sh`, verified 2026-08-15): it lints
   individual staged files with the native (unpinned) clj-kondo binary,
   `--cache false`, and no `--dependencies`, so the http-kit jar is never
   analyzed there either — the dev-http test file lints clean with **and**
   without the `:lint-as` config, i.e. pre-commit can neither exercise the fix
-  nor regress it. The negative-control probe (analysis-level proof) is inherently a
-  temporary local source edit, never run in CI. This local-only scope is accepted
-  because the committed registration keeps local dev lint clean and guards local
-  cache regressions; the pinned JVM clj-kondo 2025.09.19 is the effective gate.
+  nor regress it. However, the regression surface is **CI-enforceable via a
+  committed test vehicle** — design-step 9 option (a) realized in slices 7-16:
+  `http-kit-defreq-analysis-level-resolution-test` (analysis-level proof:
+  hermetic temp cache, real dev-http test file resolves `get`/`post`, no-reg
+  cache reproduces the two warnings, bogus vars still warn) and
+  `gitignore-http-kit-tracking-ground-truth-test` (git index/ignore ground
+  truth) in `components/shared-config/test/psi/shared_config/lint_config_test.clj`
+  are `^:integration` and run in CI via `bb clojure:test:integration` (ci.yml).
+  The negative-control probe is no longer an uncommitted temporary local edit:
+  it is committed as `^:integration`, and its skip (jar/clojure/git absent) is
+  visible in runner output. Local-only scope remains for the `bb lint` surface
+  itself (cache-dependent); the analysis-level proof is CI-runnable, and the
+  pinned JVM clj-kondo 2025.09.19 is the effective gate for both.
 - **AC2 — localization.** The lint-config change is confined to
   `.clj-kondo/imports/http-kit/http-kit/` (config.edn and the `httpkit/`
   export dir beneath it). The `.gitignore` negation edit that enables tracking

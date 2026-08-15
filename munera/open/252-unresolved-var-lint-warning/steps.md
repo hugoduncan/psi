@@ -626,7 +626,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 17 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Amend design.md AC1/Context's CI-scope framing (design-step 9 doc drift,
+- [x] Amend design.md AC1/Context's CI-scope framing (design-step 9 doc drift,
       found 2026-08-15): AC1 still documents option (b) — "AC1 verification is
       **local-only**", "the negative-control probe (analysis-level proof) is
       inherently a temporary local source edit, **never run in CI**", "CI …
@@ -642,10 +642,25 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       correct the blanket local-only / never-in-CI / cannot-exercise statements
       and reference the committed integration proof as the CI-enforceable
       regression surface
-- [ ] Reconcile plan.md decision 3 / R3's CI-scope note with the amended
+      — done: design.md AC1 rewritten — header drops "local-only"; the
+      cache-dependent lint-surface nuance is retained and scoped to the `bb
+      lint`/pre-commit surfaces only; the "temporary local source edit, never
+      run in CI" and blanket "cannot exercise the registration" claims are
+      corrected with the committed `^:integration` test vehicle
+      (`http-kit-defreq-analysis-level-resolution-test` +
+      `gitignore-http-kit-tracking-ground-truth-test`, run via
+      `bb clojure:test:integration` in CI) named as the CI-enforceable
+      regression surface
+- [x] Reconcile plan.md decision 3 / R3's CI-scope note with the amended
       design.md: R3 currently says "AC1 is local-only — CI `bb lint` has no
       cache and never analyzes the jar, so it is trivially clean … (option (b)
       chosen; committed config + local verification, no CI workflow change)" —
       the same drift as design.md AC1. Update to record the test-vehicle option
       (a) (CI runs the analysis-level proof via `bb clojure:test:integration`)
       while keeping the `bb lint`-surface claim intact
+      — done: plan.md decision 3 + R3 amended — both now scope the
+      local/cache-dependent claim to the `bb lint` surface itself and record
+      the committed `^:integration` test vehicle (option (a) via tests, slices
+      7-16, run via `bb clojure:test:integration`) as the CI-enforceable
+      regression surface; the "option (b) chosen" / "no CI workflow change
+      … local verification" framing is replaced

@@ -60,9 +60,14 @@ jar analysis never macroexpands them, so they are absent from the namespace anal
    the config change, regenerate the http-kit cache entry:
    `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar --dependencies`
    (from repo root; findings suppressed, cache written with `get`/`post`). Then
-   `bb lint` is clean. CI runs `bb lint` with no cache → the ns is not analyzed →
-   trivially clean; the pinned JVM clj-kondo 2025.09.19 is the effective gate
-   (consistent with implementation.md).
+   `bb lint` is clean. For the lint surface itself, CI runs `bb lint` with no cache →
+   the ns is not analyzed → trivially clean; the pinned JVM clj-kondo 2025.09.19 is the
+   effective gate (consistent with implementation.md). The CI-enforceable regression
+   surface is the committed test vehicle (design-step 9 option (a) via tests, slices
+   7-16): `http-kit-defreq-analysis-level-resolution-test` +
+   `gitignore-http-kit-tracking-ground-truth-test` (`^:integration` in
+   `components/shared-config/test/psi/shared_config/lint_config_test.clj`) run via
+   `bb clojure:test:integration`.
 
 4. **No suppression, no CHANGELOG.** AC1 is analysis-level resolution; the negative
    control (bogus `http-client/…` var still flagged) is part of verification. Root
@@ -83,10 +88,13 @@ jar analysis never macroexpands them, so they are absent from the namespace anal
   two warnings locally. Rebuild is a local, gitignored step; must be repeated on
   version bumps. Provenance (design-step 8): the pre-fix cache was analyzed from the
   non-pinned `http-kit-2.9.0-beta1.jar` (built 2026-06-29), not 2.8.0; the slice-2
-  rebuild re-lints the pinned 2.8.0 jar explicitly. CI scope (design-step 9): AC1 is
-  local-only — CI `bb lint` has no cache and never analyzes the jar, so it is trivially
-  clean with or without the fix (option (b) chosen; committed config + local verification,
-  no CI workflow change).
+  rebuild re-lints the pinned 2.8.0 jar explicitly. CI scope (design-step 9): the `bb
+  lint` surface itself is local/cache-dependent — CI `bb lint` has no cache and never
+  analyzes the jar, so it is trivially clean with or without the fix. The analysis-level
+  proof is committed as `^:integration` tests (slices 7-16, option (a) via a test
+  vehicle) run in CI via `bb clojure:test:integration` — no CI workflow change, but the
+  regression surface is CI-enforceable (committed config + committed integration proof,
+  not merely local verification).
 - R4 — **Version bumps.** http-kit (2.8.0) or clj-kondo (2025.09.19) changes require
   re-verifying the registration + cache (standing design note).
 - R5 — **`--copy-configs` regeneration** would overwrite the committed http-kit

@@ -258,3 +258,10 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   clear ex-info error; `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean.
 
 - implementation review 2026-08-15: added 2 steps to be addressed
+
+- addressed 2 review steps (slice 17): (1) design.md AC1 CI-scope framing
+  amended — dropped "local-only" header, scoped cache-dependence to the
+  `bb lint`/pre-commit surfaces, corrected "never run in CI"/"cannot exercise"
+  with the committed `^:integration` test vehicle as the CI-enforceable
+  regression surface; (2) plan.md decision 3 + R3 reconciled — same
+  test-vehicle option (a) recorded while keeping the `bb lint`-surface claim.
