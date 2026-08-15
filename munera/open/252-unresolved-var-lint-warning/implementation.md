@@ -265,3 +265,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   with the committed `^:integration` test vehicle as the CI-enforceable
   regression surface; (2) plan.md decision 3 + R3 reconciled — same
   test-vehicle option (a) recorded while keeping the `bb lint`-surface claim.
+
+- implementation review 2026-08-15: added 2 steps to be addressed

@@ -664,3 +664,38 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       7-16, run via `bb clojure:test:integration`) as the CI-enforceable
       regression surface; the "option (b) chosen" / "no CI workflow change
       … local verification" framing is replaced
+
+## Slice 18 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Reconcile design.md Context's "used in exactly one repo file (rg over
+      components/ + extensions/)" claim (Context, "used in exactly one repo
+      file" bullet) with the committed test file: slices 7-16 committed
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+      which references `org.httpkit.client` symbols (`:lint-as` registration
+      assertion, the `http-client-entries` EDN-walk predicate, the probe ns) —
+      within the claim's own stated rg scope there are now TWO files
+      referencing the ns (verified 2026-08-15: rg over components/ +
+      extensions/ matches dev-http test + lint_config_test). The claim's
+      intent (the dev-http test file is the only *usage* of the http-kit
+      client) still holds, but the literal "exactly one repo file" wording is
+      stale doc drift introduced by the test additions, never reconciled.
+      Amend to scope the claim to call sites / runtime usage, noting the
+      committed test file references the symbols as config-assertion data,
+      not usage
+- [ ] Guard the with-channel hook's transformation SEMANTICS, not just its
+      existence/signature: `with-channel-hook-impl-guard-test` (slice 11)
+      asserts the impl file exists and carries `(ns httpkit.with-channel)` +
+      `(defn with-channel …)`, but a semantically-changed transformation body
+      (still a valid ns/defn — e.g. a no-op rewrite returning the node
+      unchanged) passes every guard while silently mis-analyzing with-channel
+      calls; the repo has zero with-channel call sites (slice-11 fact), so
+      nothing exercises the hook and the drift is undetectable. Add a
+      whitespace/indentation-normalized compare of the tracked impl against
+      the pinned 2.8.0 jar's `clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj`
+      — the `^:integration` analysis-level proof already has the jar path +
+      read machinery (strip whitespace/indentation so the documented cljfmt
+      indentation drift, slice 5, stays green; jar-absent → visible SKIP via
+      `report-skip!`, mirroring the existing skip arms). Verified 2026-08-15:
+      the current tracked impl is semantically identical to the jar export
+      modulo whitespace (whitespace-stripped diff clean), so the guard passes
+      today
