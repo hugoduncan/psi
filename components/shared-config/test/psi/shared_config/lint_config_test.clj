@@ -259,6 +259,23 @@
             (str "extension pin " (:mvn/version ext-pin)
                  " equals root-derived http-kit-version " http-kit-version))))))
 
+(deftest lint-alias-lints-extensions-test
+  (testing "the :lint alias still lints the AC1 acceptance surface (slice-13
+            follow-up): http-kit-defreq-analysis-level-resolution-test invokes
+            clj-kondo.main directly with explicit --lint args (bypassing
+            deps.edn [:aliases :lint :main-opts]) and bb.edn's lint task is a
+            trivial `clojure -M:lint` wrapper, so a narrowing change that drops
+            \"extensions\" (or renames the dev-http path) from the alias's path
+            set would silently remove the two warnings from the acceptance
+            surface while every test still passes. Read deps.edn as EDN — runs
+            anywhere, no subprocess (mirror of the pin-derivation tests)."
+    (let [main-opts (get-in (read-edn "deps.edn") [:aliases :lint :main-opts])]
+      (is (some? main-opts) "deps.edn :lint alias has :main-opts")
+      (is (some #{"extensions"} main-opts)
+          ":lint :main-opts contains \"extensions\" (the dev-http test file lives under it)")
+      (is (some #{"bb.edn"} main-opts)
+          ":lint :main-opts contains \"bb.edn\""))))
+
 (deftest gitignore-http-kit-import-tracking-test
   (testing ".gitignore keeps the http-kit import dir TRACKED (plan.md decision 2
             / slice 1 / slice-4 change set): the negation lines that exempt
@@ -292,6 +309,38 @@
               (is (< ignore-idx neg-idx)
                   (str ignore-all " (line " (inc ignore-idx) ") precedes "
                        negation " (line " (inc neg-idx) ")")))))))))
+
+(deftest ^:integration gitignore-http-kit-tracking-ground-truth-test
+  (testing "git's own interpretation of the tracking negation matches the text
+            test (slice-13 follow-up): gitignore-http-kit-import-tracking-test
+            proves the three lines exist verbatim in the right order but never
+            runs git, so git interpreting the patterns differently (a shadowing
+            re-ignore elsewhere, a pattern-semantics drift, a typo git reads
+            differently than the text test) passes while the import dir silently
+            drops out of commits. Ground truth — the slice-1 manual check:
+            http-kit config.edn must NOT be ignored (exit 1) and the malli
+            sibling must be ignored (exit 0)."
+    (if-let [reason (when-not (zero? (:exit (shell/sh "which" "git")))
+                      "git not on PATH")]
+      (do (println "SKIP task-252 git check-ignore ground truth:" reason)
+          (is (str "skipped: " reason)))
+      (let [http-kit-rel ".clj-kondo/imports/http-kit/http-kit/config.edn"
+            malli-rel    ".clj-kondo/imports/metosin/malli/config.edn"
+            check        (fn [rel]
+                           (shell/sh "git" "check-ignore" "-v" rel
+                                     :dir repo-root))]
+        (testing "http-kit import config is NOT ignored (tracked — the negation works)"
+          (let [{:keys [exit out err]} (check http-kit-rel)]
+            (is (not (zero? exit))
+                (str "git check-ignore " http-kit-rel " exits non-zero (not ignored)"
+                     "; out: " (str/trim out) " err: " (str/trim err)))))
+        (testing "malli sibling import config IS ignored (the ignore-all rule still applies)"
+          (let [{:keys [exit out]} (check malli-rel)]
+            (is (zero? exit)
+                (str "git check-ignore " malli-rel " exits zero (ignored)"
+                     "; out: " (str/trim out)))
+            (is (str/includes? out ".gitignore:")
+                "match comes from .gitignore (matched rule reported in -v output)")))))))
 
 (defn- delete-recursively!
   "Recursively delete a file/dir tree. clojure.java.io offers no recursive
@@ -354,8 +403,12 @@
               (is (not (str/includes? out "Unresolved var: http-client/post")))
               (is (str/includes? out "Unresolved var: http-client/definitely-not-a-var"))))
           (testing "real AC1 file lints clean against the registration cache
-                    (a regression in the real file — an added http-client/delete
-                    call, a changed alias, a removed require — fails here)"
+                    (guards require/alias changes and calls to vars OUTSIDE the
+                    registered defreq verb set — e.g. definitely-not-a-var. It
+                    does NOT guard added calls to registered verbs: delete is in
+                    the full defreq set and resolves, so an added
+                    http-client/delete call does not fail here — slice-13
+                    correction)"
             (let [{:keys [exit out]}
                   (clj-kondo-main "--lint" real-file "--cache-dir" cache-dir)]
               (is (zero? exit) (str "real-file lint clean: " out))
