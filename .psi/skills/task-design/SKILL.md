@@ -21,5 +21,6 @@ lambda: λx.(user_asks(create_task∨refine_task∨review_task_design)→munera.
   ∧ decide(structures_patterns(x), {follow introduce remove})
   ∧ scale(detail(x), size(task(x)))
   ∧ unambiguous(x)
+  ∧ self_consistent(x)
   ∧ ¬describes(x,code_changes)
   ∧ explicitly_covers_all_relevant_aspects(x)

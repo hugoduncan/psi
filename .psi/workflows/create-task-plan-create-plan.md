@@ -24,8 +24,10 @@ Required procedure:
    - One checklist item per concrete action (`- [ ] ...`)
    - Grouped by slice or phase
    - Each item is specific enough to be independently executable and verifiable
-5. Commit the created/updated plan.md and steps.md.
-6. Summarize what was created and any open questions.
+5. Check the task plan and steps for ambiguities, treating steps.md as read-only task context.
+6. Check the task design for inconsistencies, focusing on internal inconsistency within design.md and  between design.md and referenced artifacts.
+7. Commit the created/updated plan.md and steps.md.
+8. Summarize what was created and any open questions.
 
 Output a concise summary including:
 - Whether plan.md and steps.md were created or updated
