@@ -2,6 +2,11 @@
 - ambiguity review added 2 new design steps
 - no inconsistency review feedback
 - architectural review (re-pass): no new actionable architectural-fit feedback — current design.md already resolves prior arch steps 1-3; committed mechanism (per-library import registration, analysis-level) conforms to λ lint(f), λ fix(bug), small, change_chain proof, localization. Scope boundary well-drawn; no SCOPE_QUESTION.
+- ambiguity review (re-pass): no new actionable ambiguity feedback — prior ambiguity items 1-2 resolved in current design.md (committed mechanism = analysis-level registration in the http-kit import dir; AC1 pins repo-wide lint as proof surface). The remaining facility "or" (analyze-call/namespace hook vs `:namespaces` `:defined-by` declaration) is an explicitly declared implementation choice with acceptance closure, not a fresh ambiguity — do not re-file.
+
+## Design review context (re-pass — ambiguity)
+
+- Facility guidance (non-obvious, for the implementation slice): the repo's per-library convention is `:lint-as` in `.clj-kondo/imports/<lib>/<lib>/config.edn`, mirrored into root `.clj-kondo/config.edn` "so individual-file linting works without a full classpath scan" (plus component-local copies under `components/*/.clj-kondo/imports/`). `:lint-as` teaches clj-kondo how to analyze macros the *project invokes*; http-kit's `defreq` is invoked inside the dependency jar (never in-repo), so `:lint-as` does **not** apply — the fix needs var *registration* (e.g. `:namespaces {org.httpkit.client {get {:defined-by clojure.core/defn} ...}}` in the imports-dir config.edn), which clj-kondo reads independent of classpath. No root config mirror and no component-local copy needed: http-kit is used only by extensions/dev-http (extensions lint via root config + root imports dir), and there is no existing `components/*/.clj-kondo/imports/http-kit/`. Design AC2 confinement is coherent with repo convention.
 
 ## Design review context (re-pass — architectural fit)
 
