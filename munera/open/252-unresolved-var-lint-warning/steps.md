@@ -564,3 +564,41 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `["--cache" "--config" "--config-dir" "--dependencies"]`; exact element
       membership — the flags are clj-kondo CLI tokens, never legitimate path
       values); unit suite 9 tests / 39 assertions pass
+
+## Slice 16 — Task-test-review follow-ups (2026-08-15)
+
+- [ ] Close the clj-kondo jar guard/exec disagreement (skill infra-dep
+      criterion — the clj-kondo artifact is only guard-injectable, not
+      exec-injectable): `clj-kondo-main` executes
+      `clojure -Sdeps '{:deps {clj-kondo/clj-kondo {:mvn/version …}}} -M -m
+      clj-kondo.main` — the subprocess resolves the artifact via mvn
+      coordinates from the Clojure CLI's own local repo (default
+      `~/.m2/repository`, or `:mvn/local-repo` from deps.edn/CLJ_CONFIG),
+      while the `^:integration` skip guard checks `clj-kondo-jar`, a path
+      derived from `user.home` (+ the `psi.lint-config-test.clj-kondo-jar`
+      override) that is NEVER passed to the subprocess. So the override
+      cannot redirect execution (a valid jar at a custom path passes the
+      guard but the subprocess still resolves/downloads from the default m2;
+      a jar present only under a different local repo the CLI uses skips
+      needlessly) — unlike `http-kit-jar`, which IS the `--lint` argument
+      and therefore truly exec-effective. Fix: derive `:mvn/local-repo` for
+      the `-Sdeps` map from the guarded `clj-kondo-jar` path (strip the
+      `clj-kondo/clj-kondo/{version}/clj-kondo-{version}.jar` suffix → repo
+      root), so guard and exec agree on the exact artifact; verify the
+      override-to-custom-path case and the default case both resolve the
+      guarded jar (e.g. assert the subprocess `-Spath` output contains the
+      guarded jar path)
+- [ ] Assert the http-kit import files are TRACKED in the git index, not just
+      not-ignored: `gitignore-http-kit-import-tracking-test` (text lines) and
+      `^:integration gitignore-http-kit-tracking-ground-truth-test`
+      (`git check-ignore` exit 1 = not ignored) prove the negation rules
+      work, but "not ignored" ≠ "tracked" — a `git rm --cached` of
+      `.clj-kondo/imports/http-kit/http-kit/config.edn` (+ the hook impl)
+      keeps every existing guard green (all read from disk; check-ignore
+      still exits 1) while silently dropping the registration from future
+      commits. Add an `^:integration` assertion (same ground-truth test, or
+      extend it) running `git ls-files --error-unmatch
+      .clj-kondo/imports/http-kit/http-kit/config.edn
+      .clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj` from
+      repo root → exit 0 (tracked); git-absent → visible SKIP via
+      `report-skip!`, mirroring the existing skip arms
