@@ -256,7 +256,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 9 — Task-test-review follow-ups (2026-08-15)
 
-- [ ] Derive the http-kit jar path from deps.edn (mirror of the slice-8 clj-kondo
+- [x] Derive the http-kit jar path from deps.edn (mirror of the slice-8 clj-kondo
       pin derivation, same silent-stale-pin failure mode left open for http-kit):
       `http-kit-jar` hardcodes the 2.8.0 path
       (`~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar`), so R4's
@@ -267,7 +267,12 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       source; currently 2.8.0) and format `http-kit-jar` from it; add a unit
       assertion (like `clj-kondo-pin-sourced-from-deps-edn-test`) that the pin
       exists, so a removed/bumped entry fails loudly in `:unit`
-- [ ] Widen the AC2 root-config guard to AC2's general clause ("root
+      — done: `http-kit-version` derived from deps.edn `[:deps
+      'http-kit/http-kit :mvn/version]`, `http-kit-jar` formatted from it
+      (verified: nested-CWD load resolves version 2.8.0 and the standard m2
+      path); `http-kit-pin-sourced-from-deps-edn-test` added — 4 unit tests /
+      9 assertions pass
+- [x] Widen the AC2 root-config guard to AC2's general clause ("root
       `.clj-kondo/config.edn` gains no http-client entries"): today
       `root-config-ac2-invariant-test` asserts only `:unresolved-symbol :exclude`
       exactness and `org.httpkit.client/defreq` ∉ root `:lint-as` — so e.g.
@@ -278,17 +283,33 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `org.httpkit.client`, covering `:lint-as`, `:hooks`, `:namespaces`, …), or
       scope the guard explicitly to AC2's exact wording and record why the
       narrower guard is the intended invariant
-- [ ] Make the `^:integration` skip visible: `(is (str "skipped: " reason))` is
+      — done (wider branch — the EDN walk): `http-client-entries` returns every
+      symbol/keyword in the parsed root config whose namespace is
+      `org.httpkit.client`; `root-config-ac2-invariant-test` asserts it is
+      empty, covering `:lint-as`, `:hooks`, `:namespaces`, and any other
+      symbol/keyword-bearing spot
+- [x] Make the `^:integration` skip visible: `(is (str "skipped: " reason))` is
       always-truthy — clojure.test prints nothing for a passing truthy `is`, so a
       skip (jar absent, or clojure not on PATH) is indistinguishable from a real
       pass and the m2-cache-dependent CI guarantee vanishes with zero signal.
       Print the reason to *out* (e.g. `(println "SKIP task-252 analysis-level
       proof:" reason)`) before the truthy assert so runner output records why the
       proof did not run
-- [ ] Make `repo-root` injectable/nullable (skill infra-dep criterion): it is
+      — done: `(println "SKIP task-252 analysis-level proof:" reason)` precedes
+      the truthy assert; integration run (jar present + clojure on PATH)
+      produces no SKIP line, confirming the proof ran
+- [x] Make `repo-root` injectable/nullable (skill infra-dep criterion): it is
       `(.getCanonicalPath (io/file "."))` — an ambient CWD dependency, neither
       injectable nor nullable; a run from a non-root CWD (editor/nrepl runner,
       component dir) fails with confusing file-not-found on the config reads.
       Derive repo root by walking up from the test file's own source path (or
       from `user.dir`) until `deps.edn` is found, or make it overridable via a
       system property, failing with a clear message when no root is found
+      — done (walk up + property override): `find-repo-root` walks up from
+      user.dir until a dir containing BOTH `deps.edn` and `bb.edn` (components/
+      extensions carry their own deps.edn, so plain deps.edn presence stops at
+      the component — verified failing case; bb.edn lives only at the repo
+      root); overridable via `psi.lint-config-test.repo-root`; clear ex-info
+      when no root found. Verified: nested CWD (`components/shared-config`)
+      resolves the repo root + 2.8.0 jar; property override from /tmp resolves
+      the root

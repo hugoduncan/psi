@@ -21,20 +21,69 @@
   (:import
    [java.util.concurrent TimeUnit]))
 
-(def repo-root
-  "Canonical repo root; tests run from the repo root via bb test / CI."
-  (.getCanonicalPath (io/file ".")))
+(def ^:private repo-root-prop
+  "System property that overrides repo-root (e.g. when running from an
+  editor/nrepl CWD that is not under the repo)."
+  "psi.lint-config-test.repo-root")
 
-(def http-kit-jar
-  "Pinned http-kit 2.8.0 jar at the standard m2 path (present in CI per the
-  m2 cache; the design-step 9 m2-cache fact)."
-  (str (System/getProperty "user.home")
-       "/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar"))
+(defn- find-repo-root
+  "Walk up from `start` (a dir path string) until the psi project root is
+  found — a directory containing BOTH deps.edn and bb.edn. Components and
+  extensions carry their own deps.edn, so plain deps.edn presence is not a
+  root marker (walking up from a nested CWD would stop at the component);
+  bb.edn lives only at the repo root. Return the canonical path, or nil."
+  [start]
+  (loop [dir (io/file start)]
+    (when dir
+      (if (and (.exists (io/file dir "deps.edn"))
+               (.exists (io/file dir "bb.edn")))
+        (.getCanonicalPath dir)
+        (recur (.getParentFile dir))))))
+
+(def repo-root
+  "Canonical repo root. Derived by walking up from user.dir until the psi
+  project root is found (deps.edn + bb.edn, see find-repo-root), so the tests
+  run correctly from the repo root (bb test / CI) and from nested CWDs
+  (editor/nrepl runner in a component dir); overridable via the
+  psi.lint-config-test.repo-root system property; fails with a clear message
+  when no root is found."
+  (or (not-empty (System/getProperty repo-root-prop))
+      (find-repo-root (System/getProperty "user.dir"))
+      (throw (ex-info (str "Could not locate the repo root: no deps.edn+bb.edn "
+                           "pair found walking up from user.dir. Run from the "
+                           "repo root or set the psi.lint-config-test.repo-root "
+                           "system property.")
+                      {:user.dir (System/getProperty "user.dir")}))))
 
 (defn- read-edn
   "Read a repo-relative EDN file."
   [rel-path]
   (edn/read-string (slurp (io/file repo-root rel-path))))
+
+(def http-kit-version
+  "Pinned http-kit version for the analysis-level proof: derived from deps.edn
+  :deps (the pin source; currently 2.8.0), so an http-kit bump fails loudly
+  instead of silently re-proving a stale jar (R4's re-verification gap)."
+  (get-in (read-edn "deps.edn") [:deps 'http-kit/http-kit :mvn/version]))
+
+(def http-kit-jar
+  "Pinned http-kit jar at the standard m2 path (present in CI per the m2 cache;
+  the design-step 9 m2-cache fact). Formatted from http-kit-version so a bump
+  re-targets the jar; a removed/renamed pin fails loudly in :unit instead of
+  silently re-proving the old jar or silently skipping."
+  (str (System/getProperty "user.home")
+       "/.m2/repository/http-kit/http-kit/" http-kit-version
+       "/http-kit-" http-kit-version ".jar"))
+
+(defn- http-client-entries
+  "Every symbol/keyword in the parsed EDN whose namespace is
+  org.httpkit.client — AC2's \"root config gains no http-client entries\" clause,
+  walked over the whole tree (:lint-as, :hooks, :namespaces, …)."
+  [form]
+  (filter (fn [x]
+            (and (or (symbol? x) (keyword? x))
+                 (= "org.httpkit.client" (namespace x))))
+          (tree-seq coll? seq form)))
 
 (def clj-kondo-version
   "Pinned clj-kondo version for the analysis-level proof: derived from deps.edn
@@ -105,7 +154,14 @@
       (testing ":lint-as does not mirror the http-kit defreq registration
                 (plan.md decision 1's no-root-mirror choice; defreq is never
                 invoked in-repo, unlike the malli/promesa mirror convention)"
-        (is (not (contains? (:lint-as cfg) 'org.httpkit.client/defreq)))))))
+        (is (not (contains? (:lint-as cfg) 'org.httpkit.client/defreq))))
+      (testing "no org.httpkit.client entry anywhere in the root config
+                (AC2's general 'gains no http-client entries' clause — the EDN
+                walk covers :lint-as, :hooks, :namespaces, and any other
+                symbol/keyword-bearing spot, so e.g. a root :hooks :analyze-call
+                entry for an http-kit var fails here)"
+        (is (empty? (http-client-entries cfg))
+            "root config carries no http-client symbol or keyword")))))
 
 (deftest clj-kondo-pin-sourced-from-deps-edn-test
   (testing "the analysis-level proof's clj-kondo version is derived from deps.edn
@@ -114,6 +170,15 @@
     (let [pin (get-in (read-edn "deps.edn")
                       [:aliases :lint :extra-deps 'clj-kondo/clj-kondo])]
       (is (some? pin) "deps.edn :lint :extra-deps pins clj-kondo/clj-kondo")
+      (is (some? (:mvn/version pin))))))
+
+(deftest http-kit-pin-sourced-from-deps-edn-test
+  (testing "the analysis-level proof's http-kit jar is derived from deps.edn
+            :deps, so an http-kit bump fails loudly instead of silently
+            re-proving a stale jar or silently skipping (mirror of the
+            clj-kondo pin derivation)"
+    (let [pin (get-in (read-edn "deps.edn") [:deps 'http-kit/http-kit])]
+      (is (some? pin) "deps.edn :deps pins http-kit/http-kit")
       (is (some? (:mvn/version pin))))))
 
 (deftest ^:integration http-kit-defreq-analysis-level-resolution-test
@@ -126,7 +191,8 @@
                       (str http-kit-jar " not present")
 
                       :else nil)]
-      (is (str "skipped: " reason))
+      (do (println "SKIP task-252 analysis-level proof:" reason)
+          (is (str "skipped: " reason)))
       (let [tmp       (doto (java.io.File/createTempFile "ck252" "")
                         (.delete)
                         (.mkdirs))
