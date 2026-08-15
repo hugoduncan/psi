@@ -386,3 +386,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   - design.md AC1 + plan.md decision 3: the three `^:integration` tests now point at `lint_config_integration_test.clj`; AC1's non-exhaustive note disambiguated ("the integration test file's `^:integration` set")
   - design.md AC1 `with-channel-hook-semantics-guard-test` mechanism: "whitespace-normalized" → "parsed-form structural compare" (slice-20 `parse-forms`; literal-spacing changes now fail loudly)
   - no code/test changes; verified `bb lint` errors: 0, warnings: 0; shared-config tests untouched (doc-only)
+
+- implementation review 2026-08-15: added 2 steps to be addressed

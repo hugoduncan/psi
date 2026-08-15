@@ -1052,3 +1052,31 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       slice-20 `parse-forms` mechanism) instead of "whitespace-normalized";
       the slice-5 cljfmt indentation-drift tolerance is implied by the
       parsed-form compare (indentation-insensitive by construction)
+
+## Slice 26 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Harden `run-bounded`'s drain against an exceptionally-completed slurp
+      future: `drain` in `lint_config_test_support.clj` catches only
+      `InterruptedException`, but `(deref f 500 ::unavailable)` on a future
+      whose `slurp` THREW rethrows the wrapped `ExecutionException`
+      (deref does not distinguish an exceptional completion from a timeout).
+      The throw path is the kill paths — the timeout branch and the finally
+      both `destroyForcibly` the process before draining, and a read on a
+      forcibly-killed process's stream can throw an IOException
+      (platform/timing-dependent: macOS EOF'd cleanly in a 2026-08-15
+      scratch, but Linux/Windows paths can throw) — so the designed timeout
+      ex-info carrying `:out`/`:err` (slice 20) and the loud no-hang failure
+      (slice 21) can be bypassed by an unexpected ExecutionException with no
+      captured output. Catch the future's exception in `drain` (return a
+      marker like `::unavailable` or the message, or fold it into the
+      ex-info) so every path yields the designed failure shape
+- [ ] Resolve the dead typo'd `.gitignore` line 3
+      (`**/.clj-konde/imports.claude/`): the pattern matches nothing
+      (`.clj-konde` ≠ `.clj-kondo`; `imports.claude` ≠ `imports`) — it is a
+      pre-existing typo (d3acaca096, 2026-04-09) sitting immediately above
+      this task's tracking rules (lines 4-6) in the exact file the slice-4
+      change set includes, and no task file or guard references it (the
+      gitignore guards cover lines 4-6 only). Likely intended as
+      `**/.clj-kondo/imports/` (the pre-task line this task replaced) or a
+      Claude-imports ignore — fix the typo or delete the dead line after
+      confirming intent
