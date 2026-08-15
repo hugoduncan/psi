@@ -24,3 +24,34 @@
 - Verification surfaces: `bb lint` → `clojure -M:lint` (deps.edn `:lint` alias) lints bb.edn, deps.edn, .lsp/config.edn, .psi/startup-prompts.edn, bases/, components/, extensions/, spec/, tests.edn, extensions/tests.edn — the agent-facing surface where the friction occurred. The targeted single-file command in design-step 3 is the dev loop; both must stay green with no new warnings elsewhere.
 - Not user-facing (tooling/lint config): no CHANGELOG entry per AGENTS.md user_visible rule.
 - Task 251 (file-length lint limit) is a sibling tooling-friction task from the same analyzer (239); its bb.edn change is disjoint from this `.clj-kondo` change — no coupling.
+
+## Design follow-up complete (2026-08-15, batch = arch @45130198e + ambiguity @60d5c3d06 + inconsistency @4e17c1ca7)
+
+- All 5 design-steps resolved with updates to design.md (rewritten: root-cause
+  re-diagnosis, committed mechanism, constraints, acceptance AC1/AC2, evidence).
+  Scope unchanged; no SCOPE_QUESTION items present.
+- This pass was design documentation only: design.md now commits to the
+  per-library import mechanism (`.clj-kondo/imports/http-kit/http-kit/config.edn`),
+  but the hook/registration code itself is NOT written here — it belongs to the
+  implementation slice after the design→plan gate (no plan.md/steps.md yet).
+
+## Facts discovered for the implementation slice
+
+- `clojure -M:lint --lint <file>` does NOT narrow the lint: the `:lint` alias
+  `:main-opts` already carries `--lint` + the full path set, and clj-kondo
+  accumulates multiple `--lint` args. Verified: both invocations report the same
+  two warnings (plus unrelated infos from other files). The effective
+  verification surface is the repo-wide `bb lint` ≡ `clojure -M:lint`; design.md
+  AC1 pins that as the proof surface (the step-3 "targeted" command adds no
+  narrowing over it).
+- `defreq` specifics in http-kit 2.8.0 `org/httpkit/client.clj`: `^:private
+  defmacro defreq` at line 378; generates get/delete/head/post/put/options/patch/
+  propfind/proppatch/lock/unlock/report/acl/copy/move (lines 388-403); `request`
+  is a plain `defn` at line 231 (already resolves). Registering the full verb set
+  is uniform and acceptable; only `get`/`post` are used in-repo.
+- clj-kondo 2025.09.19 supports `:namespaces {org.httpkit.client {get
+  {:defined-by clojure.core/defn} ...}}` in config.edn (deep-merged per ns) as a
+  var-registration facility — likely simpler than a hook for `defn`-generating
+  macros; either is confined to the http-kit import dir.
+- Root `.clj-kondo/config.edn` `:unresolved-symbol :exclude` is exactly
+  `[(malli.core/=>)]`; AC2 guards that it stays that way.
