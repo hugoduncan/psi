@@ -1,5 +1,5 @@
 {:enabled true
- :prompt-header "Commit checks failed after the latest commit. Diagnose and fix the problems with minimal changes."
+ :prompt-header "Commit checks failed after the latest commit. Diagnose and fix the problems with minimal changes.  For file length issues, break the files into multiple logically consistent files; do no introduce forarding vars."
  :max-output-chars 12000
  :commands
  [{:id "rama-cc"
