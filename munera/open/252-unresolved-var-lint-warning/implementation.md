@@ -195,3 +195,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   provenance. plan.md R3 updated accordingly.
 - **No CHANGELOG entry** (tooling/lint config, not user-facing per AGENTS.md).
 - Sibling task 251's `munera/open/251-…/` untracked dir left untouched (no coupling).
+
+- implementation review 2026-08-15: added 3 steps to be addressed

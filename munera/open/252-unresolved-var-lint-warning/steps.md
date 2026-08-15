@@ -64,3 +64,28 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (nothing else, no root-config edits, no CHANGELOG entry — not user-facing per
       AGENTS.md)
 - [x] Commit with symbol prefix, e.g. `⚒ 252: register http-kit defreq vars for clj-kondo (lint-as)`
+
+## Slice 5 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Close design-step 8's provenance-grep requirement with the cache-format
+      finding: a clj-kondo 2025.09.19 `--dependencies`-built cache (rebuilt
+      in-repo and fresh `--cache-dir` scratch, both verified) records only the
+      internal path `org/httpkit/client.clj` — no jar path/version — so the
+      mandated `grep ~:filename` for the 2.8.0 jar cannot succeed and was never
+      added to slice 2. Record the adopted guard in design.md/design-steps.md
+      (explicit pinned-jar rebuild command + slice-2 verb-set grep as functional
+      proxy) and amend design-steps.md item 8, which is ticked [x] although its
+      required steps.md amendment is absent
+- [ ] Restore byte-fidelity of the tracked import dir: re-copy
+      `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj` verbatim
+      from the 2.8.0 jar's `clj-kondo.exports` (committed copy differs in
+      indentation only), so plan.md decision 2's "identical, verified" holds and
+      R5's "--copy-configs at pinned 2.8.0 yields no diff" is true; or record the
+      drift as intentional in implementation.md
+- [ ] Extend AC1's exercise-capability inventory (design-step 9) with the
+      pre-commit surface: `.pre-commit-hooks/clj-kondo-lint.sh` lints individual
+      staged files with the native (unpinned) clj-kondo binary, `--cache false`,
+      no `--dependencies` → the http-kit jar is never analyzed there (verified:
+      dev-http test file clean with and without the lint-as config), so
+      pre-commit can neither exercise the fix nor regress it; add it to design.md
+      AC1/Context alongside the CI note
