@@ -98,3 +98,24 @@ Maintain design.md Constraints when implementing: λ lint(f) fix hierarchy (fix 
 - Filed design-step 8 (actionable): stale-cache provenance contradiction — implementation.md's "2.9.0-beta1 ... unused" note vs the stale cache plan.md R3 cites as the warning source (records `http-kit-2.9.0-beta1.jar`, built 2026-06-29). Remedy: record actual provenance in design.md Context / plan.md R3 and add a slice-2 provenance check (cache is ns-keyed, not version-keyed; grep `~:filename` for 2.8.0 after rebuild) — closes the R4 version-mismatch gap.
 - Not re-filed (consumed by ambiguity turn): facility mismatch (`:lint-as` vs design.md Mechanism "or", design-steps 6) and AC2-vs-`.gitignore` (design-steps 7).
 - Verified consistent this pass: scratch test proves plan.md decision 1 end-to-end (imports-config lint-as → jar analysis registers `~$get`/`~$post` in cache → cache-driven lint clean → bogus var still warns); local import dir byte-identical to jar's clj-kondo.exports; gitignore negation pattern behaves as steps.md slice 1 expects (http-kit unignored, malli sibling still ignored — scratch git repo); test lines 572/737 are get/post; CI "Lint" step = `bb lint`; task 251 design.md has no `.gitignore`/`.clj-kondo` refs (R6 disjointness holds); root config `:lint-as` mirror convention exists (malli/promesa) — plan's no-mirror choice is justified since defreq is never invoked in-repo.
+
+## Plan review → design-steps amendment slice (turn 3)
+
+Design-steps 6-8 resolve by **doc amendment only — no code**: design.md Mechanism (name `:lint-as` as the single chosen facility; drop the `:namespaces` alternative — provably nonexistent in 2025.09.19, so removing it is factual correction, not narrowing), design.md AC2 (explicitly permit the `.gitignore` enabling edit while keeping the lint-config mechanism confined to the import dir), design.md Context + plan.md R3 (record stale-cache provenance: 2.9.0-beta1, not "unused") + steps.md slice 2 (add `~:filename` provenance grep after rebuild).
+
+Principles to hold:
+- Amend design.md first, then re-check plan.md/steps.md coherence against the amended text (AGENTS.md coherence) — plan.md/steps.md were written against the pre-amendment design and currently conflict with it (that is the finding).
+- Single-facility discipline: after amendment, Mechanism must name exactly one chosen facility; do not reopen a new "or".
+- AC2 text and the slice-4 gate list must agree verbatim on the intended change set (`.gitignore` + the two import files); disagreement between acceptance text and gate is what step 7 files.
+- Keep plan.md decision 1's empirically verified claims intact (imports-config lint-as → jar analysis registers `get`/`post`; negative control warns); only the design text reconciles to them.
+- Cache provenance grep is the R4 guard: cache entries are ns-keyed, not version-keyed — a version-mismatched cache lint is silently clean.
+
+Durable verification recipe (scratch dir `/tmp/ck-scratch` was ephemeral; do not rely on it):
+```
+clojure -Sdeps '{:deps {clj-kondo/clj-kondo {:mvn/version "2025.09.19"}}}' \
+  -M -m clj-kondo.main --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar \
+  --dependencies --cache-dir <scratch>/cache
+# then lint a test ns against the same --cache-dir: get/post resolve, bogus var warns
+```
+
+Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`**/.clj-kondo/imports/` — the exact negation target), `.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` (provenance check target), `~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar` (slice-2 lint source; other m2 http-kit versions present: 2.5.3, 2.8.0-beta3, 2.9.0-beta1).
