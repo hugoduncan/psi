@@ -21,43 +21,35 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.java.shell :as shell]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [psi.test-support.repo-root :as test-repo-root])
   (:import
    [java.util.concurrent TimeUnit]))
 
 (def ^:private repo-root-prop
   "System property that overrides repo-root (e.g. when running from an
-  editor/nrepl CWD that is not under the repo)."
+  editor/nrepl CWD that is not under the repo). Passed to the shared
+  psi.test-support.repo-root helper's :prop option (slice-22 follow-up: the
+  local find-repo-root/repo-root copy is removed — the shared helper now
+  accepts the deps.edn+bb.edn marker set and this property override, so the
+  override/root logic lands in one place for all consumers)."
   "psi.lint-config-test.repo-root")
 
-(defn- find-repo-root
-  "Walk up from `start` (a dir path string) until the psi project root is
-  found — a directory containing BOTH deps.edn and bb.edn. Components and
-  extensions carry their own deps.edn, so plain deps.edn presence is not a
-  root marker (walking up from a nested CWD would stop at the component);
-  bb.edn lives only at the repo root. Return the canonical path, or nil."
-  [start]
-  (loop [dir (io/file start)]
-    (when dir
-      (if (and (.exists (io/file dir "deps.edn"))
-               (.exists (io/file dir "bb.edn")))
-        (.getCanonicalPath dir)
-        (recur (.getParentFile dir))))))
-
 (def repo-root
-  "Canonical repo root. Derived by walking up from user.dir until the psi
-  project root is found (deps.edn + bb.edn, see find-repo-root), so the tests
-  run correctly from the repo root (bb test / CI) and from nested CWDs
-  (editor/nrepl runner in a component dir); overridable via the
-  psi.lint-config-test.repo-root system property; fails with a clear message
-  when no root is found."
-  (or (not-empty (System/getProperty repo-root-prop))
-      (find-repo-root (System/getProperty "user.dir"))
-      (throw (ex-info (str "Could not locate the repo root: no deps.edn+bb.edn "
-                           "pair found walking up from user.dir. Run from the "
-                           "repo root or set the psi.lint-config-test.repo-root "
-                           "system property.")
-                      {:user.dir (System/getProperty "user.dir")}))))
+  "Canonical repo root. Derived via the SHARED psi.test-support.repo-root
+  helper (slice-22 follow-up: the component-local find-repo-root/repo-root
+  copy is deleted; the shared helper now accepts the deps.edn+bb.edn marker
+  set and this ns's property override, so the override/root logic lands in
+  one place for all consumers). The deps.edn+bb.edn pair is the psi repo-root
+  marker (components/extensions carry their own deps.edn, so plain deps.edn
+  presence is not a root marker — verified failing case; bb.edn lives only at
+  the repo root). Overridable via the psi.lint-config-test.repo-root system
+  property; fails with a clear message when no root is found (:required? on
+  the shared helper preserves the local copy's fail-loud behavior)."
+  (str (test-repo-root/repo-root
+        {:markers  [["deps.edn"] ["bb.edn"]]
+         :prop     repo-root-prop
+         :required? true})))
 
 (defn read-edn
   "Read a repo-relative EDN file, optionally with edn/read-string opts (e.g.

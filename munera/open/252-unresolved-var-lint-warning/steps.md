@@ -910,7 +910,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       251 split was NOT double-implemented (251 remains design-only — its
       limit-raise proposal is a separate human-reviewed policy question, and the
       delegation explicitly directed splitting)
-- [ ] Reuse the shared `psi.test-support.repo-root` instead of the
+- [x] Reuse the shared `psi.test-support.repo-root` instead of the
       component-local `find-repo-root`/`repo-root` copy (skill
       reusable-existing-pattern flag): `bases/main/test/psi/test_support/repo_root.clj`
       exists precisely to "replace component-local copies so future fixes land
@@ -929,3 +929,27 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Note: the concurrent 251 split carries the SAME local copy into
       `lint_config_test_support.clj`, so the reuse decision must apply to the
       support ns too, not just the current file
+      — done (REUSE branch — supersedes the slice-23 divergence note): the
+      shared helper `bases/main/test/psi/test_support/repo_root.clj` gained
+      three backward-compatible opts — `:markers` (coll of repo-relative
+      marker paths, default `[["doc" "custom-providers.md"]]` — the no-arg
+      call is byte-for-byte the old behavior), `:prop` (system property that
+      overrides the walk entirely, injectability per the skill infra-dep
+      criterion), and `:required?` (fail-loud ex-info when the walk exhausts
+      without finding all markers, instead of silently returning the fs root);
+      the local `find-repo-root`/`repo-root` copy in
+      `lint_config_test_support.clj` is DELETED — `repo-root` is now
+      `(str (test-repo-root/repo-root {:markers [["deps.edn"] ["bb.edn"]]
+      :prop "psi.lint-config-test.repo-root" :required? true}))`, so the
+      deps.edn+bb.edn marker set and the property override land in the SHARED
+      helper (one definition site, applying to the support ns AND the current
+      file per the note). Also fixed a latent walk bug the extension surfaced:
+      the old loop's terminal `(= dir (.getParentFile dir))` never triggers on
+      macOS (parent of `/` is nil), so a never-found walk recurred into nil —
+      the new loop returns the fs root at the nil-parent boundary and lets
+      `:required?` throw there. Verified: unit 9/39, integration 33/176 (both
+      proofs ran, no SKIP), ai user-models-test 20/139 + agent-session
+      workflow-async-path-test 9/53 (the two existing shared-helper consumers,
+      unchanged contract), nested-CWD + property-override + fail-loud all
+      exercised via clojure -e; `bb lint` errors: 0 warnings: 0; `bb fmt:check`
+      clean

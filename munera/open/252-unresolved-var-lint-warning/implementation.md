@@ -351,3 +351,26 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   contract the shared helper (doc/custom-providers.md marker, no override) does
   not provide; extending the shared ns is a separate refactor outside this
   commit-check fix's minimal-change scope.
+- addressed 1 review step (slice 22 item 2, repo-root reuse — REUSE branch,
+  supersedes the slice-23 deliberate-divergence note): extended the shared
+  `psi.test-support.repo-root` helper (bases/main/test/psi/test_support/repo_root.clj)
+  with three backward-compatible opts — `:markers` (default `[["doc"
+  "custom-providers.md"]]`, the no-arg call is byte-identical behavior),
+  `:prop` (system property overriding the walk — injectability per the skill
+  infra-dep criterion), `:required?` (fail-loud ex-info when the walk exhausts
+  without all markers, instead of silently returning the fs root); the
+  component-local `find-repo-root`/`repo-root` copy in
+  `lint_config_test_support.clj` is DELETED, `repo-root` now delegating to the
+  shared helper with the deps.edn+bb.edn marker set + the
+  `psi.lint-config-test.repo-root` override + `:required?` — the override/root
+  logic lands in one place for all consumers (applies to the support ns AND the
+  current file, per the follow-up note). Also fixed a latent walk bug the
+  extension surfaced: the old terminal `(= dir (.getParentFile dir))` never
+  triggers on macOS (parent of `/` is nil), so a never-found walk recursed into
+  nil — the new loop returns the fs root at the nil-parent boundary and lets
+  `:required?` throw there. Verified: unit 9/39, integration 33/176 (both
+  proofs ran, no SKIP), ai user-models-test 20/139 + agent-session
+  workflow-async-path-test 9/53 (the two existing shared-helper consumers,
+  unchanged contract), nested-CWD + property-override + fail-loud exercised via
+  clojure -e; `bb lint` errors: 0 warnings: 0; `bb fmt:check` clean;
+  `bb commit-check:file-lengths` exit 0 (slice-23 split still under the gate).
