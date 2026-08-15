@@ -1,6 +1,11 @@
 - architectural review added 3 new design steps
 - ambiguity review added 2 new design steps
 - no inconsistency review feedback
+- architectural review (re-pass): no new actionable architectural-fit feedback — current design.md already resolves prior arch steps 1-3; committed mechanism (per-library import registration, analysis-level) conforms to λ lint(f), λ fix(bug), small, change_chain proof, localization. Scope boundary well-drawn; no SCOPE_QUESTION.
+
+## Design review context (re-pass — architectural fit)
+
+- AC1 proof surface is CI-enforced: `.github/workflows/ci.yml` check job "Lint" step runs `bb lint` (≡ `clojure -M:lint`, pinned clj-kondo 2025.09.19). The CI-installed latest clj-kondo binary is only `--version`-checked, never invoked by the lint gate — effective acceptance surface is the pinned JVM clj-kondo only; design.md's "re-verify the hook against both on any version bump" is overcautious for the lint gate.
 
 ## Design review context (turn 3 — inconsistency)
 
