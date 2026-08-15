@@ -243,18 +243,38 @@
   shell/sh-shaped {:exit :out :err}. Timeout-bounded via ProcessBuilder +
   waitFor(ms) (see process-timeout-ms); on timeout the process is killed and
   the test fails loudly rather than hanging the suite (shell/sh has no
-  :timeout — unknown opts silently ignored, verified in the 1.12 source)."
+  :timeout — unknown opts silently ignored, verified in the 1.12 source). The
+  timeout ex-info carries the partial stdout/stderr drained after the kill, so
+  a hung subprocess (e.g. a cold -Sdeps dep download stall) surfaces where it
+  stalled instead of reporting zero context (slice-20 follow-up: the ex-info
+  previously carried {:cmd cmd} only and discarded the drained streams)."
   [cmd]
   (let [pb (doto (ProcessBuilder. cmd)
              (.directory (io/file repo-root)))
         proc (.start pb)
         out-f (future (slurp (.getInputStream proc)))
-        err-f (future (slurp (.getErrorStream proc)))]
+        err-f (future (slurp (.getErrorStream proc)))
+        drain (fn [f label]
+                (try (deref f 500 ::unavailable)
+                     (catch InterruptedException _
+                       (str "<" label " interrupted>"))))]
     (try
       (if-not (.waitFor proc process-timeout-ms TimeUnit/MILLISECONDS)
-        (throw (ex-info (str "subprocess exceeded " process-timeout-ms
-                             " ms and was killed: " (pr-str cmd))
-                        {:cmd cmd}))
+        (let [;; kill the process first so the pipe streams close and the
+              ;; draining futures complete; then capture whatever partial
+              ;; output was produced before the bound was hit. (Derefing
+              ;; before the kill would block — the streams stay open while
+              ;; the process lives.)
+              _           (when (.isAlive proc) (.destroyForcibly proc))
+              partial-out (drain out-f "stdout")
+              partial-err (drain err-f "stderr")]
+          (throw (ex-info (str "subprocess exceeded " process-timeout-ms
+                               " ms and was killed: " (pr-str cmd))
+                          {:cmd cmd
+                           :out (if (= ::unavailable partial-out)
+                                  :unavailable partial-out)
+                           :err (if (= ::unavailable partial-err)
+                                  :unavailable partial-err)})))
         {:exit (.exitValue proc) :out @out-f :err @err-f})
       (finally
         (when (.isAlive proc)
@@ -327,16 +347,19 @@
                                (= 'with-channel (second f))))
                   forms))))))
 
-(defn- normalize-whitespace
-  "Collapse runs of whitespace to a single space (and trim). Used to compare the
-  tracked with-channel hook impl against the jar export modulo the documented
-  cljfmt indentation drift (slice 5: the repo's pre-commit hook reformats
-  continuation indentation to repo style — 2-space vs the jar's 3-space — so a
-  byte compare can never pass through the repo's own commit path). Collapsing
-  (not removing) whitespace preserves token boundaries, so distinct token
-  sequences still compare as different."
+(defn- parse-forms
+  "Parse a Clojure source string into a vector of its top-level forms. Used to
+  compare the tracked with-channel hook impl against the jar export
+  structurally: whitespace/indentation differences vanish by construction (the
+  documented cljfmt indentation drift, slice 5 — the repo's pre-commit hook
+  reformats continuation indentation to repo style, 2-space vs the jar's
+  3-space, so a byte compare can never pass through the repo's own commit
+  path), while every semantic difference survives — including string-literal
+  contents, which read-string preserves exactly (a spacing change inside a
+  string literal is a different parsed value, unlike a whitespace-collapsing
+  text compare)."
   [s]
-  (str/trim (str/replace s #"\s+" " ")))
+  (read-string (str "[" s "]")))
 
 (deftest ^:integration with-channel-hook-semantics-guard-test
   (testing "the tracked with-channel hook impl is semantically identical to the
@@ -349,9 +372,11 @@
             zero with-channel call sites (slice-11 fact), so nothing exercises
             the hook and the drift is undetectable. This test reads the export
             from the pinned http-kit jar (the source of truth — same artifact
-            the analysis-level proof lints) and compares it whitespace-normalized
-            against the tracked impl, so the documented cljfmt indentation drift
-            (slice 5) stays green while any semantic change fails loudly.
+            the analysis-level proof lints) and compares it against the tracked
+            impl as parsed forms (see parse-forms), so the documented cljfmt
+            indentation drift (slice 5) stays green while any semantic change —
+            including string-literal spacing (slice-20 follow-up: the previous
+            whitespace-collapsing compare was blind to it) — fails loudly.
             Jar-absent → visible SKIP via report-skip!, mirroring the existing
             skip arms (http-kit jar is already injectable/nullable via
             psi.lint-config-test.http-kit-jar / the derived m2 path)."
@@ -369,11 +394,16 @@
             (str "the pinned http-kit jar contains the clj-kondo.exports export "
                  jar-entry))
         (testing "tracked impl is semantically identical to the jar export
-                  (whitespace/indentation-normalized — see normalize-whitespace)"
-          (is (some? jar-export))
-          (is (= (normalize-whitespace jar-export)
-                 (normalize-whitespace tracked))
-              "tracked with_channel.clj differs from the pinned jar export beyond whitespace"))))))
+                  (parsed-form compare — whitespace/indentation-insensitive,
+                  string-literal-sensitive; see parse-forms)"
+          (when (some? jar-export)
+            ;; nil-guard (slice-20 follow-up): the some? assertion above fails
+            ;; cleanly when the jar entry is missing; without this guard the
+            ;; equality would throw an NPE on nil jar-export and surface as a
+            ;; clojure.test ERROR instead of the plain assertion failure it
+            ;; deserves.
+            (is (= (parse-forms jar-export) (parse-forms tracked))
+                "tracked with_channel.clj differs from the pinned jar export")))))))
 
 (deftest root-config-ac2-invariant-test
   (testing "root config keeps AC2 invariants (no http-client drift)"

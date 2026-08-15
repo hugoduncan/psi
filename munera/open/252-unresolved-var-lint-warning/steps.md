@@ -771,7 +771,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 20 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Narrow the semantics guard's whitespace blind spot: `normalize-whitespace`
+- [x] Narrow the semantics guard's whitespace blind spot: `normalize-whitespace`
       in `with-channel-hook-semantics-guard-test` collapses runs of whitespace
       in the RAW TEXT — including whitespace INSIDE string literals — so a
       semantic change confined to literal spacing (e.g. the error message
@@ -783,7 +783,19 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       strip only indentation/line-structure whitespace (per-line trim preserves
       intra-literal spacing), or record the accepted gap explicitly in the
       testing string
-- [ ] Make `with-channel-hook-semantics-guard-test` fail cleanly when the jar
+      — done (first branch — parsed-form structural compare): `normalize-whitespace`
+      removed and replaced by `parse-forms` (read-string both sides wrapped in a
+      vector — top-level whitespace/indentation vanishes by construction, so the
+      documented slice-5 cljfmt drift stays green; string-literal contents
+      survive exactly, so a literal-spacing change is a different parsed value).
+      Verified 2026-08-15: parsed-form compare is indentation-insensitive,
+      string-literal-spacing-sensitive (`"No request"` vs `"No  request"` →
+      different), and token-change-sensitive. `normalize-whitespace` deleted
+      (unused after the switch). Integration suite 33 tests / 176 assertions,
+      no SKIP (was 177 — the redundant inner `(is (some? jar-export))` dropped
+      with the nil-guard restructure below); `bb lint` errors: 0, warnings: 0;
+      `bb fmt:check` clean
+- [x] Make `with-channel-hook-semantics-guard-test` fail cleanly when the jar
       export entry is missing: when `.getEntry` returns nil, `jar-export` is
       nil — the `(is (some? jar-export))` fails but the subsequent
       `(normalize-whitespace jar-export)` throws an NPE (verified 2026-08-15:
@@ -792,10 +804,30 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       it deserves. Wrap the equality in a `when-let`/nil guard (or assert
       `some?` and return early) so the missing-entry and mismatch cases both
       fail as plain assertion failures
-- [ ] Include out/err in `run-bounded`'s timeout ex-info: the 120s-bound path
+      — done (nil guard): the parsed-form equality is wrapped in
+      `(when (some? jar-export) …)` after the outer `(is (some? jar-export)
+      …)` — a missing entry fails as the single plain assertion failure and
+      skips the equality, never reaching the nil-deref. Verified 2026-08-15
+      with a fabricated jar lacking the export entry (`psi.lint-config-test.http-kit-jar`
+      override → `jar cf` with only a dummy.txt): the focused test reports
+      `FAIL … expected: (some? jar-export), actual: (not (some? nil))` — no
+      ERROR, no NPE (the fake jar also broke the sibling analysis-level proof
+      in the same focused run, expected — the full suite with the real jar is
+      green below)
+- [x] Include out/err in `run-bounded`'s timeout ex-info: the 120s-bound path
       throws `{:cmd cmd}` only, discarding the partial stdout/stderr drained in
       the finally — a hung subprocess (cold `-Sdeps` stall, network fetch) that
       hits the bound surfaces with zero context about where it stalled, and the
       drained streams are only reachable by re-running with debugging. Capture
       the drained `@out-f`/`@err-f` (or a bounded prefix) into the ex-info data
       before throwing so the timeout diagnostic carries the partial output
+      — done: the timeout branch now destroys the process FIRST (killing it
+      closes the pipe streams so the draining futures complete — derefing
+      before the kill would block, the streams stay open while the process
+      lives), then captures the drained `@out-f`/`@err-f` via a 500 ms bounded
+      deref (3-arg `deref`, `::unavailable` fallback, InterruptedException →
+      `<stdout/stderr interrupted>`) into the ex-info `{:cmd … :out … :err …}`;
+      the finally drain is unchanged (idempotent — the process is already dead
+      on the timeout path). Verified 2026-08-15 (process-timeout-ms
+      alter-var-root'd to 2 s): `sh -c "echo partial-output-here; sleep 30"` →
+      timeout ex-info carries `:out "partial-output-here\n"` and `:err ""`
