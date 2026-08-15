@@ -320,3 +320,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   Focused unit+integration run 12 tests / 64 assertions; full integration
   suite 33 tests / 176 assertions, no SKIP; `bb lint` errors: 0, warnings: 0;
   `bb fmt:check` clean.
+
+- implementation review 2026-08-15: added 2 steps to be addressed

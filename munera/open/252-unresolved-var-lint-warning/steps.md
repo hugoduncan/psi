@@ -896,3 +896,46 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       "EvalReader not allowed when *read-eval* is false" (no evaluation);
       `(parse-forms "#?(:clj 1 :cljs 2)")` → `[#?(:clj 1 :cljs 2)]` (parsed
       structurally).
+
+## Slice 22 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Reconcile the committed test file with the repo's own file-length gate:
+      at the slice-21 close (fd55f848e)
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`
+      is 804 lines — over `commit-check:file-lengths`'s default 800-line limit
+      for src/test files under components/ (bb.edn `file-length-legacy-max-lines`;
+      the file grew 766→804 at the slice-21 commit and 221→804 across slices
+      7-21). Nothing failed at commit time: the pre-commit hooks (cljfmt-fix,
+      clj-kondo-lint) don't run the length check and it is not in ci.yml, so
+      `bb commit-check:file-lengths` fails only at the committed state with zero
+      signal. The working tree currently passes only because sibling task 251's
+      in-flight split (UNCOMMITTED: `lint_config_test_support.clj` +
+      `lint_config_integration_test.clj` + a slimmed `lint_config_test.clj`,
+      all present on disk) reduced the file to 244 lines — that split is not
+      part of this task's committed change set. Actionable: verify
+      `bb commit-check:file-lengths` passes at the committed state (or after
+      the 251 split lands, whichever is authoritative), keep the file under
+      800 lines thereafter — the slices-7-21 growth shows how silently the
+      limit is crossed — and do not double-implement the split (coordinate
+      with the in-flight 251 change; if the split is rejected, record the
+      file in `file-length-legacy-max-lines` with justification instead of
+      leaving the gate failing with no signal)
+- [ ] Reuse the shared `psi.test-support.repo-root` instead of the
+      component-local `find-repo-root`/`repo-root` copy (skill
+      reusable-existing-pattern flag): `bases/main/test/psi/test_support/repo_root.clj`
+      exists precisely to "replace component-local copies so future fixes land
+      in one place" (its docstring), and bases/main/test is on BOTH the :unit
+      and :integration suite classpaths (tests.edn) — verified requirable from
+      the shared-config test ns. The committed `lint_config_test.clj`
+      re-implements it with a different root marker (deps.edn+bb.edn vs the
+      shared doc/custom-providers.md) plus the `psi.lint-config-test.repo-root`
+      property override (slice-9 made the LOCAL copy injectable/nullable but
+      never checked for the shared existing pattern). Actionable: either
+      require `psi.test-support.repo-root` from the test ns — extending the
+      shared ns with the property override and the deps.edn+bb.edn marker (or
+      a marker option) so the override/root logic lands in one place for all
+      consumers — or record the deliberate divergence (why the shared helper's
+      marker + no-override contract is insufficient here) in implementation.md.
+      Note: the concurrent 251 split carries the SAME local copy into
+      `lint_config_test_support.clj`, so the reuse decision must apply to the
+      support ns too, not just the current file
