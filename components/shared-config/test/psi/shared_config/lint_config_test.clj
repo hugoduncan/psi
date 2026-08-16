@@ -245,10 +245,24 @@
               ;; never an ERROR). `(and neg-idx …)` short-circuits on the
               ;; missing line (nil is falsy) into a single clean FAIL; the
               ;; message is nil-guarded too (`(inc nil)` in the message would
-              ;; itself throw on the failure path).
-              (is (and neg-idx (< ignore-idx neg-idx))
-                  (str ignore-all " (last occurrence, line " (inc ignore-idx)
-                       ") precedes " negation
+              ;; itself throw on the failure path). Slice-32: the symmetric
+              ;; mirror blind spot — a MISSING ignore-all line (deleted/
+              ;; renamed `**/.clj-kondo/imports/*`, the drift slice 24's
+              ;; last-occurrence ordering was built to catch) leaves the
+              ;; negations as no-ops (malli and the whole import dir fall
+              ;; back to TRACKED — an untracked malli config.edn would enter
+              ;; commits) while `(< ignore-idx neg-idx)` would evaluate
+              ;; `(< nil N)` → NullPointerException. `(and ignore-idx …)`
+              ;; short-circuits exactly like slice-29's negation arm; the
+              ;; message's `(inc ignore-idx)` is nil-guarded likewise. The
+              ;; ^:integration check-ignore malli arm backstops the drift
+              ;; (malli no longer ignored → its exit-0 assertion fails), but
+              ;; the unit ERROR-vs-FAIL standard applies regardless.
+              (is (and ignore-idx neg-idx (< ignore-idx neg-idx))
+                  (str ignore-all
+                       (when ignore-idx
+                         (str " (last occurrence, line " (inc ignore-idx) ")"))
+                       " precedes " negation
                        (when neg-idx (str " (line " (inc neg-idx) ")")))))))))))
 
 (deftest bb-edn-lint-task-wrapper-test

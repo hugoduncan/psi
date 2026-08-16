@@ -1434,7 +1434,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 32 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Harden `gitignore-http-kit-import-tracking-test`'s ordering assertion
+- [x] Harden `gitignore-http-kit-import-tracking-test`'s ordering assertion
       against a MISSING ignore-all line (ERROR-vs-FAIL class; slice 29 closed
       only the symmetric missing-NEGATION case): the ordering assertion
       `(is (and neg-idx (< ignore-idx neg-idx)) …)` nil-guards neg-idx but not
@@ -1456,7 +1456,17 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       slice-29's short-circuit shape. The ^:integration check-ignore malli
       arm backstops the drift (malli no longer ignored → exit 0 assertion
       fails) but the unit ERROR-vs-FAIL standard applies regardless.
-- [ ] Single-source the three verbatim skip-reporting tails in
+      — done: ordering assertion is `(is (and ignore-idx neg-idx
+      (< ignore-idx neg-idx)) …)` (both indices short-circuit, mirror of
+      slice-29's negation arm) and the message's `(inc ignore-idx)` is
+      nil-guarded (`(when ignore-idx …)` — renders "**/.clj-kondo/imports/*
+      precedes …" without the line when the ignore-all is missing, never an
+      NPE). Verified 2026-08-16: ignore-all line commented out → focused unit
+      run `4 passed, 4 failed, 0 errored` (was clean FAILs + NPE ERROR
+      pre-fix; the presence + ordering assertions FAIL with their messages);
+      missing-negation arm (slice-29 regression check) still `0 errored`;
+      clean .gitignore → 10 tests / 50 assertions pass
+- [x] Single-source the three verbatim skip-reporting tails in
       lint_config_integration_test.clj: `(do (report-skip! label reason)
       (is (str "skipped: " reason)))` is copy-pasted in all three
       ^:integration proofs (with-channel semantics guard, git ground truth,
@@ -1471,7 +1481,27 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       and change the three call sites to `(is (skip! label reason))` — or
       make report-skip! return the reason string and assert on it; behavior
       unchanged.
-- [ ] Correct the stale `.gitignore` absolute line reference in
+      — done (skip! helper branch): `skip!` added to
+      lint_config_test_support.clj immediately after `report-skip!`
+      (`(defn skip! [label reason] (report-skip! label reason) reason)` — no
+      clojure.test dep; the visible SKIP line still reaches runner output via
+      report-skip!, slice-15 mechanism, and the truthy reason string drives
+      the passing `is`); all three ^:integration call sites now read
+      `(is (skip! "with-channel hook semantics" reason))`,
+      `(is (skip! "git check-ignore ground truth" reason))`,
+      `(is (skip! "analysis-level proof" reason))` — the `do`/`report-skip!`
+      tails are gone; `report-skip!` removed from the integration ns :refer
+      list (no longer used directly there — lint-clean). Verified 2026-08-16:
+      unit suite → 10 tests / 50 assertions pass; integration suite →
+      33 tests / 178 assertions pass, no SKIP (both proofs ran — assertion
+      count unchanged from slice-31's 178, behavior identical); forced-skip
+      run (`psi.lint-config-test.http-kit-jar` override to a nonexistent
+      path) still prints both http-kit-jar-dependent SKIP lines
+      (`SKIP task-252 with-channel hook semantics: …` +
+      `SKIP task-252 analysis-level proof: …`) and the git ground-truth proof
+      still runs (git-independent); `bb lint` errors: 0, warnings: 0;
+      `bb fmt:check` clean
+- [x] Correct the stale `.gitignore` absolute line reference in
       implementation.md's "Additional non-task paths" note — "`.gitignore`
       line 4 (`**/.clj-kondo/imports/` — the exact negation target)":
       slice 26's deletion of the typo'd line 3 moved the tracking rules up,
@@ -1479,3 +1509,13 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Same doc-consistency class slices 17-19/25 reconciled; the note
       describes CURRENT state (not a historical record), so the reference is
       live drift.
+      — done: the "Additional non-task paths" note now reads "`.gitignore`
+      line 3 (`**/.clj-kondo/imports/*` — the exact negation target;
+      negations at lines 4-5)" — the line reference corrected to the current
+      state (slice 26's typo'd-line-3 deletion moved the rules up one) and
+      the quoted pattern updated to the post-slice-1 form `**/.clj-kondo/imports/*`
+      (the note describes current state; the pre-task `**/.clj-kondo/imports/`
+      pattern was itself already superseded by slice 1's rewrite). Historical
+      slice-12 records ("ignore-all line 4 precedes negations 5-6") left
+      untouched — they describe the state at that time (lines 4-6, before
+      slice 26)

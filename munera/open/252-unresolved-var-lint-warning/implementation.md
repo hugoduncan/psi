@@ -134,7 +134,7 @@ clojure -Sdeps '{:deps {clj-kondo/clj-kondo {:mvn/version "2025.09.19"}}}' \
 # then lint a test ns against the same --cache-dir: get/post resolve, bogus var warns
 ```
 
-Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`**/.clj-kondo/imports/` — the exact negation target), `.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` (provenance check target), `~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar` (slice-2 lint source; other m2 http-kit versions present: 2.5.3, 2.8.0-beta3, 2.9.0-beta1).
+Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`**/.clj-kondo/imports/*` — the exact negation target; negations at lines 4-5), `.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` (provenance check target), `~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar` (slice-2 lint source; other m2 http-kit versions present: 2.5.3, 2.8.0-beta3, 2.9.0-beta1).
 
 ## Plan-review follow-up (steps) — executed 2026-08-15
 
@@ -531,3 +531,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   eab8902f2 via stash — unrelated to task 252.
 
 - implementation review 2026-08-16: added 3 steps to be addressed
+
+- addressed 3 review steps (slice 32): (1) `gitignore-http-kit-import-tracking-test` ordering assertion nil-guards BOTH indices (`(and ignore-idx neg-idx (< ignore-idx neg-idx))` — missing ignore-all line was the slice-29 mirror blind spot: `(< nil N)` → NPE ERROR; message's `(inc ignore-idx)` nil-guarded; verified ignore-all commented out → 4 failed, 0 errored, missing negation still 0 errored). (2) skip tails single-sourced — `skip!` helper in lint_config_test_support.clj (`(report-skip! label reason) reason`, no clojure.test dep), all three ^:integration call sites `(is (skip! label reason))`, `report-skip!` dropped from the integration ns :refer (lint-clean). (3) implementation.md "Additional non-task paths" `.gitignore` reference corrected to current state: line 3 (`**/.clj-kondo/imports/*`; negations 4-5) — slice 26's typo-line deletion moved the rules up and slice 1 rewrote the pattern. Verified: unit 10/50, integration 33/178 no SKIP, forced-skip run still prints both SKIP lines; `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.

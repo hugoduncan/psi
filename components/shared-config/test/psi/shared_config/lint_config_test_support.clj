@@ -368,6 +368,21 @@
   [label reason]
   (.println System/out (str "SKIP task-252 " label ": " reason)))
 
+(defn skip!
+  "Report a skipped ^:integration proof and return the reason (slice-32
+  follow-up): the three ^:integration proofs previously copy-pasted
+  `(do (report-skip! label reason) (is (str \"skipped: \" reason)))`,
+  differing only in the label — the support ns's 'each fixture is DEFINED
+  here once' contract (the slice-27/28 consolidation standard: parse-forms
+  inline copy → :refer'd fixture, which-* byte-identical copies → single
+  which-bin) applies. The skip arms are now single-sourced as
+  `(is (skip! label reason))`: the visible SKIP line still reaches runner
+  output via report-skip! (slice-15 mechanism) and the truthy reason string
+  drives the passing assertion — no clojure.test dependency in this ns."
+  [label reason]
+  (report-skip! label reason)
+  reason)
+
 (defn parse-forms
   "Parse a Clojure source string into a vector of its top-level forms. Used to
   compare the tracked with-channel hook impl against the jar export

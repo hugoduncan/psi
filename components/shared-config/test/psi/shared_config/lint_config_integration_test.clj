@@ -24,9 +24,9 @@
             git-bin
             http-kit-jar
             parse-forms
-            report-skip!
             repo-root
-            run-bounded]])
+            run-bounded
+            skip!]])
   (:import
    [java.util.zip ZipFile]))
 
@@ -76,8 +76,7 @@
                       (str http-kit-jar " is not a valid zip archive")
 
                       :else nil)]
-      (do (report-skip! "with-channel hook semantics" reason)
-          (is (str "skipped: " reason)))
+      (is (skip! "with-channel hook semantics" reason))
       (let [jar-entry   "clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj"
             tracked-rel ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
             tracked-file (io/file repo-root tracked-rel)
@@ -136,8 +135,7 @@
                       (str git-bin " not present")
 
                       :else nil)]
-      (do (report-skip! "git check-ignore ground truth" reason)
-          (is (str "skipped: " reason)))
+      (is (skip! "git check-ignore ground truth" reason))
       (let [http-kit-rel ".clj-kondo/imports/http-kit/http-kit/config.edn"
             malli-rel    ".clj-kondo/imports/metosin/malli/config.edn"
             check        (fn [rel]
@@ -187,8 +185,7 @@
                       (str clj-kondo-jar " not present (pinned clj-kondo artifact)")
 
                       :else nil)]
-      (do (report-skip! "analysis-level proof" reason)
-          (is (str "skipped: " reason)))
+      (is (skip! "analysis-level proof" reason))
       (let [tmp          (doto (java.io.File/createTempFile "ck252" "")
                            (.delete)
                            (.mkdirs))
