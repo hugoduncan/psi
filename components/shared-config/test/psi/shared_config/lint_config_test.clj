@@ -248,12 +248,26 @@
               stays 2.8.0) otherwise yields zero signal from any test, since
               http-kit-pin-sourced-from-deps-edn-test and the ^:integration
               proof both derive from ROOT deps.edn only"
-      (let [ext-pin (get-in (read-edn "extensions/dev-http/deps.edn")
-                            [:deps 'http-kit/http-kit])]
-        (is (some? ext-pin) "extensions/dev-http/deps.edn pins http-kit/http-kit")
-        (is (= http-kit-version (:mvn/version ext-pin))
-            (str "extension pin " (:mvn/version ext-pin)
-                 " equals root-derived http-kit-version " http-kit-version))))))
+      (let [ext-deps-file (io/file repo-root "extensions/dev-http/deps.edn")]
+        ;; slice-38 follow-up: the read-edn slurp must NOT run in the let
+        ;; binding before an exists assertion — a whole-file deletion of the
+        ;; extension deps.edn (the extreme of the exact drift this block
+        ;; guards: the classpath dev-http actually runs against) throws
+        ;; FileNotFoundException at read time and surfaces as a clojure.test
+        ;; ERROR with the pin assertions unreachable. The file is NOT a
+        ;; repo-root marker (the marker set is root deps.edn + bb.edn), so
+        ;; ns-load does not fail on its deletion — only this read would.
+        ;; Mirror slice-31's ci.yml shape: assert existence first (clean FAIL
+        ;; with message), then read/assert only under `when`.
+        (testing "extensions/dev-http/deps.edn exists"
+          (is (.exists ext-deps-file) "extensions/dev-http/deps.edn exists"))
+        (when (.exists ext-deps-file)
+          (let [ext-pin (get-in (read-edn "extensions/dev-http/deps.edn")
+                                [:deps 'http-kit/http-kit])]
+            (is (some? ext-pin) "extensions/dev-http/deps.edn pins http-kit/http-kit")
+            (is (= http-kit-version (:mvn/version ext-pin))
+                (str "extension pin " (:mvn/version ext-pin)
+                     " equals root-derived http-kit-version " http-kit-version))))))))
 
 (deftest lint-alias-lints-extensions-test
   (testing "the :lint alias still lints the AC1 acceptance surface (slice-13
@@ -293,21 +307,38 @@
             `**/.clj-kondo/imports/`) the file still exists locally, the unit
             suite passes, and the registration silently drops out of future
             commits. Read as text — no subprocess — so it runs anywhere."
-    (let [ignore-all "**/.clj-kondo/imports/*"
-          negations ["!.clj-kondo/imports/http-kit/"
-                     "!.clj-kondo/imports/http-kit/**"]
-          lines      (str/split-lines (slurp (io/file repo-root ".gitignore")))
-          index-of   (fn [pattern] (first (keep-indexed
-                                           (fn [i l] (when (= pattern l) i))
-                                           lines)))
-          last-index-of (fn [pattern] (last (keep-indexed
-                                             (fn [i l] (when (= pattern l) i))
-                                             lines)))]
-      (testing "all three tracking lines are present verbatim"
-        (doseq [pattern (into [ignore-all] negations)]
-          (is (some #{pattern} lines)
-              (str ".gitignore contains the tracking line " pattern))))
-      (testing "ignore-all precedes both negations (gitignore is last-match-wins:
+    (let [gitignore-file (io/file repo-root ".gitignore")]
+      ;; slice-38 follow-up: the slurp must NOT run in the let binding before
+      ;; an exists assertion — a whole-file deletion of .gitignore (the extreme
+      ;; of the exact drift this test guards: with the file gone the http-kit
+      ;; import dir and every sibling fall back to unignored/untracked state
+      ;; and the negation rules vanish) would otherwise throw
+      ;; FileNotFoundException at read time and surface as a clojure.test ERROR
+      ;; with no assertion message. Slices 31/35 hardened every other task-owned
+      ;; config slurp; slice-31's rationale for THIS site was only that the
+      ;; ^:integration check-ignore malli arm backstops the drift (malli no
+      ;; longer ignored → its exit-0 assertion fails in CI) — never a hardening
+      ;; of the unit slurp itself, and the unit ERROR-vs-FAIL standard applies
+      ;; regardless (slice-32). Mirror slice-31's ci.yml shape: assert existence
+      ;; first (clean FAIL with message), then split/parse only under `when`.
+      (testing ".gitignore exists"
+        (is (.exists gitignore-file) ".gitignore exists"))
+      (when (.exists gitignore-file)
+        (let [ignore-all "**/.clj-kondo/imports/*"
+              negations ["!.clj-kondo/imports/http-kit/"
+                         "!.clj-kondo/imports/http-kit/**"]
+              lines      (str/split-lines (slurp gitignore-file))
+              index-of   (fn [pattern] (first (keep-indexed
+                                               (fn [i l] (when (= pattern l) i))
+                                               lines)))
+              last-index-of (fn [pattern] (last (keep-indexed
+                                                 (fn [i l] (when (= pattern l) i))
+                                                 lines)))]
+          (testing "all three tracking lines are present verbatim"
+            (doseq [pattern (into [ignore-all] negations)]
+              (is (some #{pattern} lines)
+                  (str ".gitignore contains the tracking line " pattern))))
+          (testing "ignore-all precedes both negations (gitignore is last-match-wins:
                 if `**/.clj-kondo/imports/*` moved BELOW the negation lines, git
                 would re-ignore the http-kit import dir — the registration
                 silently drops out of future commits — while all three lines
@@ -317,11 +348,11 @@
                 the http-kit dir under last-match-wins while the FIRST
                 occurrence is still above them, so a first-occurrence compare
                 passes the guard while git silently drops the registration"
-        (let [ignore-idx (last-index-of ignore-all)]
-          (is (some? ignore-idx) "ignore-all pattern present (index found)")
-          (doseq [negation negations]
-            (let [neg-idx (index-of negation)]
-              (is (some? neg-idx) (str "negation line present (index found): " negation))
+            (let [ignore-idx (last-index-of ignore-all)]
+              (is (some? ignore-idx) "ignore-all pattern present (index found)")
+              (doseq [negation negations]
+                (let [neg-idx (index-of negation)]
+                  (is (some? neg-idx) (str "negation line present (index found): " negation))
               ;; slice-29 follow-up: when the negation line is MISSING the
               ;; presence assertion above FAILs first, but the ordering
               ;; assertion then evaluates `(< ignore-idx nil)` →
@@ -345,12 +376,12 @@
               ;; ^:integration check-ignore malli arm backstops the drift
               ;; (malli no longer ignored → its exit-0 assertion fails), but
               ;; the unit ERROR-vs-FAIL standard applies regardless.
-              (is (and ignore-idx neg-idx (< ignore-idx neg-idx))
-                  (str ignore-all
-                       (when ignore-idx
-                         (str " (last occurrence, line " (inc ignore-idx) ")"))
-                       " precedes " negation
-                       (when neg-idx (str " (line " (inc neg-idx) ")")))))))))))
+                  (is (and ignore-idx neg-idx (< ignore-idx neg-idx))
+                      (str ignore-all
+                           (when ignore-idx
+                             (str " (last occurrence, line " (inc ignore-idx) ")"))
+                           " precedes " negation
+                           (when neg-idx (str " (line " (inc neg-idx) ")")))))))))))))
 
 (deftest bb-edn-lint-task-wrapper-test
   (testing "bb.edn's lint task remains the plain `clojure -M:lint` wrapper

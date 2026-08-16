@@ -1908,7 +1908,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 38 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Exists-guard the `.gitignore` slurp in `gitignore-http-kit-import-tracking-test`
+- [x] Exists-guard the `.gitignore` slurp in `gitignore-http-kit-import-tracking-test`
       (lint_config_test.clj:299, ERROR-vs-FAIL class — the LAST unguarded
       task-owned slurp in the unit file): the let binding reads
       `(str/split-lines (slurp (io/file repo-root ".gitignore")))` before any
@@ -1930,7 +1930,18 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       under `when`, mirroring slice-31's ci.yml shape; verify a moved-aside
       `.gitignore` → focused unit run `9 passed, 1 failed, 0 errored` (was
       FileNotFoundException ERROR pre-fix), restored → 10 tests / 56 assertions
-- [ ] Exists-guard the `extensions/dev-http/deps.edn` read in
+      — done (2026-08-16): `(let [gitignore-file (io/file repo-root
+      ".gitignore")]` binds the file, `(testing ".gitignore exists" (is
+      (.exists gitignore-file) …))` asserts existence first (clean FAIL with
+      message), then split/parse runs only under `(when (.exists
+      gitignore-file) …)` — slice-31's ci.yml shape, same class as the
+      slice-35 import-config.edn guards. Verified: moved-aside `.gitignore` →
+      focused unit run `9 passed, 1 failed, 0 errored` (clean FAIL ".gitignore
+      exists", was FileNotFoundException ERROR pre-fix), restored → 10 tests /
+      58 assertions (58 = 56 + the 2 new exists assertions); `bb lint` errors
+      0 / warnings 0; `bb fmt:check` clean; `bb commit-check:file-lengths`
+      exit 0 (file 523 lines, under the gate)
+- [x] Exists-guard the `extensions/dev-http/deps.edn` read in
       `http-kit-pin-sourced-from-deps-edn-test`'s extension-pin testing block
       (ERROR-vs-FAIL class): `(get-in (read-edn "extensions/dev-http/deps.edn")
       …)` runs in the let binding before the `(is (some? ext-pin) …)` /
@@ -1948,3 +1959,11 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       under `when`, mirroring the established shape; verify moved-aside
       extension deps.edn → `1 failed, 0 errored`, restored → 10 tests / 56
       assertions
+      — done (2026-08-16): the block binds `ext-deps-file`, asserts `(.exists
+      …)` first (clean FAIL with message), then reads/asserts only under
+      `when`, mirroring the established slice-31/slice-35 shape. Verified:
+      moved-aside extension deps.edn → focused unit run `9 passed, 1 failed,
+      0 errored` (clean FAIL "extensions/dev-http/deps.edn exists", root-pin
+      assertions still pass; was FileNotFoundException ERROR pre-fix),
+      restored → 10 tests / 58 assertions; `bb lint` errors 0 / warnings 0;
+      `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0

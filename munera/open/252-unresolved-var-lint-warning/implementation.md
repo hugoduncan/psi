@@ -677,3 +677,14 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   implementation.md only.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 38): exists-guarded the two last unguarded
+  task-owned slurps in lint_config_test.clj — `.gitignore` in
+  gitignore-http-kit-import-tracking-test (assert (.exists gitignore-file)
+  first, split/parse under `when`, slice-31 ci.yml shape) and
+  extensions/dev-http/deps.edn in http-kit-pin-sourced-from-deps-edn-test's
+  extension-pin block (same shape). Both now clean-FAIL on whole-file deletion
+  (was FileNotFoundException ERROR). Verified: moved-aside .gitignore → 9
+  passed, 1 failed, 0 errored; moved-aside extension deps.edn → 9 passed, 1
+  failed, 0 errored; restored → 10 tests / 58 assertions (56 + 2 new exists
+  assertions); `bb lint` errors 0 / warnings 0; `bb fmt:check` clean;
+  `bb commit-check:file-lengths` exit 0 (file 523 lines, under the gate).
