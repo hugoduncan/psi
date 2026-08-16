@@ -1905,3 +1905,46 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       code/test changes. Verified: `grep -n '^## Slice' steps.md` shows a
       continuous 0-37 sequence with no missing headers; `git diff --stat`
       touches the task's own steps.md + implementation.md only
+
+## Slice 38 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Exists-guard the `.gitignore` slurp in `gitignore-http-kit-import-tracking-test`
+      (lint_config_test.clj:299, ERROR-vs-FAIL class — the LAST unguarded
+      task-owned slurp in the unit file): the let binding reads
+      `(str/split-lines (slurp (io/file repo-root ".gitignore")))` before any
+      assertion, so a whole-file deletion of `.gitignore` (the extreme of the
+      exact drift this test guards — with the file gone the http-kit import
+      dir and every sibling fall back to unignored/untracked state and the
+      negation rules vanish) throws FileNotFoundException → clojure.test ERROR
+      with no assertion message. Slices 31/35 hardened every other task-owned
+      config slurp (ci.yml, root config, both import-config.edn sites, the
+      impl file, the no-reg transit), and slice-31's rationale for THIS site
+      was only that the ^:integration check-ignore malli arm backstops the
+      drift (malli no longer ignored → its exit-0 assertion fails in CI) —
+      never a hardening of the unit slurp itself, and the task's own standard
+      (slice-32: "the unit ERROR-vs-FAIL standard applies regardless"; slice-35
+      reversed the analogous config.edn decline because the index-arm backstop
+      checks the index, not the worktree) requires the unit guard to clean-FAIL
+      on the deletion class, backstop or not. Fix: assert `(.exists
+      gitignore-file)` first (clean FAIL with message), then split/parse only
+      under `when`, mirroring slice-31's ci.yml shape; verify a moved-aside
+      `.gitignore` → focused unit run `9 passed, 1 failed, 0 errored` (was
+      FileNotFoundException ERROR pre-fix), restored → 10 tests / 56 assertions
+- [ ] Exists-guard the `extensions/dev-http/deps.edn` read in
+      `http-kit-pin-sourced-from-deps-edn-test`'s extension-pin testing block
+      (ERROR-vs-FAIL class): `(get-in (read-edn "extensions/dev-http/deps.edn")
+      …)` runs in the let binding before the `(is (some? ext-pin) …)` /
+      equality assertions (the slice-11 addition), and the file is NOT a
+      repo-root marker — the root marker set is deps.edn + bb.edn at the repo
+      root, so a whole-file deletion of the extension deps.edn does NOT fail
+      ns-load and instead throws FileNotFoundException at read time →
+      clojure.test ERROR with the pin assertions unreachable. The file is
+      task-referenced: design.md Context cites "http-kit 2.8.0 (root deps.edn
+      + extensions/dev-http/deps.edn)" as the R4 re-verification set, and the
+      block's purpose is to detect a drift in the extension pin (the classpath
+      dev-http actually runs against) — deletion is the extreme of that drift
+      and must report as a plain assertion FAIL. Fix: bind the file, assert
+      `(.exists …)` first (clean FAIL with message), then read/assert only
+      under `when`, mirroring the established shape; verify moved-aside
+      extension deps.edn → `1 failed, 0 errored`, restored → 10 tests / 56
+      assertions

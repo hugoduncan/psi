@@ -675,3 +675,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   to an actual section. Doc-only; no code/test changes. Verified: grep shows
   continuous slice headers; git diff touches the task's own steps.md +
   implementation.md only.
+
+- implementation review 2026-08-16: added 2 steps to be addressed
