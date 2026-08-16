@@ -1522,7 +1522,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 33 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Remove the orphaned duplicate review note in implementation.md — the
+- [x] Remove the orphaned duplicate review note in implementation.md — the
       slice-31 note "- implementation review 2026-08-16: added 2 steps to be
       addressed" appears TWICE consecutively (the two bullet lines immediately
       before the slice-31 "addressed 2 review steps" paragraph); the first
@@ -1534,7 +1534,13 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       Verify: every "- implementation review …" note except the latest is
       immediately followed by its "addressed" paragraph (grep the notes; the
       orphan is the only unpaired one).
-- [ ] Make the analysis-level proof skip visibly (or fail cleanly) when the
+      — done: the orphaned first copy (line 512, no addressing paragraph)
+      deleted — the slice-31 note + its "addressed 2 review steps (slice 31)"
+      paragraph remain as one pair; every remaining "- implementation review
+      …" marker except the latest (slice 33's own) is immediately followed by
+      its "addressed" paragraph (grep-verified: 16 notes, 15 paired + the
+      current unaddressed slice-33 marker)
+- [x] Make the analysis-level proof skip visibly (or fail cleanly) when the
       `psi.lint-config-test.clj-kondo-jar` override is a valid file in a
       NON-standard m2 layout: `clj-kondo-local-repo` throws a clear ex-info
       ("Cannot derive the m2 local-repo root from clj-kondo-jar … Set the
@@ -1561,3 +1567,19 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       path (e.g. /tmp/ck252-nonm2-layout.jar) → visible SKIP line, 0 errored
       (was 1 ERROR); default layout + m2-layout override unchanged (33/178 no
       SKIP; the -Spath arm still proves guard/exec agreement).
+      — done (`or` branch, single evaluation): the skip guard now falls
+      through the cond's `:else nil` into
+      `(try (clj-kondo-deps) nil (catch clojure.lang.ExceptionInfo e
+      (ex-message e)))` via `or` — nil on success (proceed), the derivation
+      ex-message as the visible SKIP reason on failure (mirror of the
+      valid-zip? arm), evaluated ONCE, never a clojure.test ERROR. Verified
+      2026-08-16: override to the real clj-kondo jar copied at
+      /tmp/ck252-nonm2-layout.jar → visible `SKIP task-252 analysis-level
+      proof: Cannot derive the m2 local-repo root from clj-kondo-jar
+      /tmp/ck252-nonm2-layout.jar … Set the
+      psi.lint-config-test.clj-kondo-local-repo system property …`,
+      1 test / 1 assertion / 0 errored (was 1 ERROR pre-fix); default layout
+      → focused integration ns 3 tests / 27 assertions, 0 failures, no SKIP
+      (both proofs ran); explicit m2-layout jar override → 3 tests / 27
+      assertions, 0 failures, no SKIP (the -Spath arm still proves
+      guard/exec agreement); unit suite 10 tests / 50 assertions pass

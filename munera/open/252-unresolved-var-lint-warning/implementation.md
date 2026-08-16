@@ -510,8 +510,6 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
-
-- implementation review 2026-08-16: added 2 steps to be addressed
 - addressed 2 review steps (slice 31, ERROR→clean-FAIL class, no backstop):
   (1) `ci-execution-chain-guard-test` — ci.yml slurp moved out of the let
   binding into an exists assertion (`(is (.exists ci-file) …)` fails cleanly
@@ -535,3 +533,27 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
 - addressed 3 review steps (slice 32): (1) `gitignore-http-kit-import-tracking-test` ordering assertion nil-guards BOTH indices (`(and ignore-idx neg-idx (< ignore-idx neg-idx))` — missing ignore-all line was the slice-29 mirror blind spot: `(< nil N)` → NPE ERROR; message's `(inc ignore-idx)` nil-guarded; verified ignore-all commented out → 4 failed, 0 errored, missing negation still 0 errored). (2) skip tails single-sourced — `skip!` helper in lint_config_test_support.clj (`(report-skip! label reason) reason`, no clojure.test dep), all three ^:integration call sites `(is (skip! label reason))`, `report-skip!` dropped from the integration ns :refer (lint-clean). (3) implementation.md "Additional non-task paths" `.gitignore` reference corrected to current state: line 3 (`**/.clj-kondo/imports/*`; negations 4-5) — slice 26's typo-line deletion moved the rules up and slice 1 rewrote the pattern. Verified: unit 10/50, integration 33/178 no SKIP, forced-skip run still prints both SKIP lines; `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 33): (1) orphaned duplicate review note
+  removed — the slice-31 "- implementation review 2026-08-16: added 2 steps
+  to be addressed" marker appeared TWICE consecutively (first copy had no
+  matching addressed paragraph); the orphaned line deleted, the note + its
+  slice-31 addressing paragraph kept as one pair (grep-verified: 16 notes,
+  15 paired + the current unaddressed slice-33 marker). (2) analysis-level
+  proof skip guard folded the clj-kondo local-repo derivation in — the
+  skip cond's `:else nil` now falls through an `or` into
+  `(try (clj-kondo-deps) nil (catch clojure.lang.ExceptionInfo e
+  (ex-message e)))`: nil on success (proceed), the derivation ex-message as
+  the visible SKIP reason on failure (mirror of the slice-30 valid-zip?
+  arm), evaluated ONCE — a valid clj-kondo jar at a non-standard-m2-layout
+  override path (the documented jar-override use case) now SKIPs visibly
+  instead of throwing the slice-16 "clear ex-info" as a clojure.test ERROR.
+  Verified 2026-08-16: real jar copied to /tmp/ck252-nonm2-layout.jar →
+  `SKIP task-252 analysis-level proof: Cannot derive the m2 local-repo root
+  from clj-kondo-jar /tmp/ck252-nonm2-layout.jar … Set the
+  psi.lint-config-test.clj-kondo-local-repo system property …`, 1 test / 1
+  assertion / 0 errored (was 1 ERROR); default layout → focused integration
+  ns 3 tests / 27 assertions, 0 failures, no SKIP (both proofs ran);
+  explicit m2-layout jar override → 3 tests / 27 assertions, 0 failures, no
+  SKIP (-Spath arm still proves guard/exec agreement). Verified: unit
+  suite 10 tests / 50 assertions pass; `bb lint` errors: 0 warnings: 0;
+  `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0.

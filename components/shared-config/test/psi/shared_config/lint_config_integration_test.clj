@@ -174,17 +174,40 @@
             (extensions/dev-http/test/extensions/dev_http_test.clj, lines 572/737)
             clean with the registration cache; real file warns against a
             no-registration cache (discriminating control, slice-10 follow-up)"
-    (if-let [reason (cond
-                      (nil? clojure-bin)
-                      "clojure CLI binary not on PATH (clj-kondo subprocess cannot run)"
+    (if-let [reason (or (cond
+                          (nil? clojure-bin)
+                          "clojure CLI binary not on PATH (clj-kondo subprocess cannot run)"
 
-                      (not (.exists (io/file http-kit-jar)))
-                      (str http-kit-jar " not present")
+                          (not (.exists (io/file http-kit-jar)))
+                          (str http-kit-jar " not present")
 
-                      (not (.exists (io/file clj-kondo-jar)))
-                      (str clj-kondo-jar " not present (pinned clj-kondo artifact)")
+                          (not (.exists (io/file clj-kondo-jar)))
+                          (str clj-kondo-jar " not present (pinned clj-kondo artifact)"))
 
-                      :else nil)]
+                        ;; slice-33 follow-up: clj-kondo-local-repo throws a clear
+                        ;; ex-info when the guarded jar path is not in the standard
+                        ;; m2 layout and no local-repo property is set — the throw
+                        ;; fired inside clj-kondo-deps while building the
+                        ;; -Sdeps/-Spath command vectors AFTER this skip guard had
+                        ;; passed, so a valid jar at a non-m2-layout override path
+                        ;; surfaced as a clojure.test ERROR with no assertion
+                        ;; message (slice-16 recorded that error as accepted,
+                        ;; predating the ERROR-vs-FAIL/SKIP standard slices
+                        ;; 20/24/29/30/31/32; slice-30's corrupt-jar override →
+                        ;; visible SKIP via valid-zip? is the direct precedent for
+                        ;; a bad jar-path override, and a non-standard-m2 layout
+                        ;; is exactly the documented use case for the jar override
+                        ;; — a CI home with a custom artifact layout). Fold the
+                        ;; derivation into the skip guard via `or`: the cond's
+                        ;; :else nil falls through to the try, which returns nil
+                        ;; on success (proceed) or the derivation ex-message as
+                        ;; the visible SKIP reason (mirror of the valid-zip?
+                        ;; arm) — evaluated ONCE, never a clojure.test ERROR. The
+                        ;; body's later (clj-kondo-deps) calls (the -Spath arm
+                        ;; and clj-kondo-main) are then guaranteed to succeed.
+                        (try (clj-kondo-deps) nil
+                             (catch clojure.lang.ExceptionInfo e
+                               (ex-message e))))]
       (is (skip! "analysis-level proof" reason))
       (let [tmp          (doto (java.io.File/createTempFile "ck252" "")
                            (.delete)
