@@ -2171,3 +2171,70 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       assertions (59 + 3 new: step assertion + task some? + depends
       assertion), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
+
+## Slice 42 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Assert the `clojure:test:unit` TASK's routing in
+      `ci-execution-chain-guard-test` — the remaining unguarded link in the
+      CI unit-suite chain. Slice-41 closed the "Run Clojure tests" step
+      (`bb clojure:test`, ci.yml:162-163) and the `clojure:test` `:depends`
+      name (bb.edn:327-329), and slices 28/29/39 structurally asserted the
+      `clojure:test:integration` task's routing (System/exit →
+      run-scry-kaocha-suite! + suite id + focus args) — but the
+      `clojure:test:unit` task (bb.edn:295-300,
+      `(System/exit (run-scry-kaocha-suite! "unit" (into []
+      *command-line-args*)))`) has NO mirror assertion of its suite id or
+      runner. A drift of the suite id ("unit" → "extensions") or the runner
+      silently drops the 10 unit invariants from `bb clojure:test` — the
+      exact command the asserted CI step runs — while every existing guard
+      stays green: the step assertion (still `bb clojure:test`), the
+      :depends name assertion (name still present), tests.edn's :unit suite
+      config (untouched), and all lint/integration guards. Fix: mirror the
+      slice-28/29/39 integration-task shape for `clojure:test:unit` — some? /
+      seq? guards first (slice-39 non-seqable-safe shape), then assert
+      System/exit wrap, `run-scry-kaocha-suite!` as the call's first, and
+      suite id "unit" as the call's second (the unit task's args are `(into
+      [] *command-line-args*)`, not a hardcoded focus — assert the suite id
+      and runner symbol, not the args). Verify: suite id changed to
+      "extensions" in a scratch copy → 1 clean FAIL, 0 errored (was silent
+      divergence); restored → unit 10 tests / 62 assertions, integration
+      34/186 no SKIP, `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+- [ ] Guard the four exists-checked but try-unwrapped test-body slurps
+      against the directory-at-path / unreadable-file class: `.exists`
+      returns true for a DIRECTORY, so the exists assertions pass and the
+      unguarded slurp throws (FileNotFoundException "(Is a directory)" /
+      IOException on permission-denied) → clojure.test ERROR with no
+      assertion message — the exact ERROR-vs-FAIL class slices 24/29/34/35
+      closed for deletion/parse, still open at the slurp boundary. Sites:
+      `with-channel-hook-impl-guard-test` `(parseable? (slurp impl-file))`
+      (lint_config_test.clj), `with-channel-hook-semantics-guard-test`
+      `(parseable? (slurp tracked-file))` (lint_config_integration_test.clj),
+      `gitignore-http-kit-import-tracking-test`
+      `(str/split-lines (slurp gitignore-file))`, and
+      `ci-execution-chain-guard-test` `(ci-run-steps (str/split-lines (slurp
+      ci-file)))`. The read-edn guarded-read sites (root config, import
+      config, extension deps.edn) are accidentally clean-FAIL for this class
+      — their `(try (read-edn …) (catch Exception _ nil))` wraps the slurp —
+      so the standard is inconsistent at the slurp boundary. Fix options:
+      try-wrap the slurp (`(try (slurp …) (catch Exception _ nil))` feeding
+      nil → clean some? FAIL, mirror of the guarded-read shape), or assert
+      `(.isFile f)` instead of `.exists` at these sites (false for both
+      missing AND directory — closes both classes in one predicate). Verify:
+      replace one site's file with a directory → 1 clean FAIL, 0 errored
+      (was 1 ERROR); restored → unit 10/62, integration 34/186 no SKIP,
+      `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+- [ ] Remove the orphaned duplicate review note at implementation.md:739 —
+      "implementation review 2026-08-16: added 2 steps to be addressed"
+      appears TWICE consecutively (lines 739 + 741); the first copy
+      (introduced by the slice-41 review commit cdf445507) has no matching
+      addressing paragraph, while the second (line 741, added by the slice-41
+      addressing commit 6307c24e6) pairs with the slice-41 "addressed 2
+      review steps" paragraph. This is the exact orphan pattern slices 33 and
+      35 removed — each previously reintroduced by an addressing commit
+      duplicating a note the review commit had already appended; the slice-41
+      addressing commit 6307c24e6 did it again. Delete the line-739 copy;
+      grep-verify: no consecutive duplicate "added … steps to be addressed"
+      notes, every note except the latest carries its addressed paragraph.
+      Doc-only; no code/test changes

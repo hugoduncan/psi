@@ -760,3 +760,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   restored → unit 10 tests / 62 assertions (59 + 3 new), integration 34/186 no
   SKIP, bb lint errors: 0, warnings: 0, bb fmt:check clean,
   bb commit-check:file-lengths exit 0.
+- implementation review 2026-08-16: added 3 steps to be addressed
