@@ -469,3 +469,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   workflow-delegate-review-step-live-test, unchanged; integration suite: the
   flaky tmux harness :startup-timeout scenario — environmental, varies between
   runs, unrelated to the shared-config change.)
+
+- implementation review 2026-08-15: added 3 steps to be addressed

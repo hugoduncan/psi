@@ -1268,3 +1268,41 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       both delegation paths via clojure-bin/git-bin (integration proofs ran,
       no SKIP — both binaries resolved through the single helper). Unit
       suite → 10 tests / 48 assertions pass
+
+## Slice 29 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Harden `ci-execution-chain-guard-test`'s task-args read against a dropped
+      focus-args drift (ERROR → clean-FAIL class, slices 20/24): the
+      clojure:test:integration guard asserts the run-scry-kaocha-suite! args via
+      `(nth call 2)` — a drift that DROPS the `["--focus" "integration"]` args
+      (e.g. `(run-scry-kaocha-suite! "integration")`, a two-element call) makes
+      `(nth call 2)` throw IndexOutOfBoundsException (verified: `(nth
+      '(run-scry-kaocha-suite! "integration") 2)` → IndexOutOfBoundsException),
+      so the guard built to catch exactly that drift surfaces as a clojure.test
+      ERROR with no assertion message instead of the plain FAIL — the exact
+      ERROR-vs-FAIL class slices 20 (jar-entry nil → NPE → ERROR, nil-guarded)
+      and 24 (slurp-before-exists → ERROR, when-guarded) closed elsewhere. Fix:
+      `(is (= ["--focus" "integration"] (nth call 2 nil)))` — an out-of-bounds
+      read yields nil and FAILs cleanly with the assertion message.
+- [ ] Make `gitignore-http-kit-import-tracking-test`'s ordering assertion fail
+      cleanly when a negation line is MISSING (same ERROR-vs-FAIL class): the
+      presence `(is (some? neg-idx) …)` FAILs first, but the next
+      `(is (< ignore-idx neg-idx) …)` then evaluates `(< 4 nil)` →
+      NullPointerException (verified) — so the exact regression the test guards
+      (a negation line removed) reports 1 FAIL + 1 ERROR, the ERROR masking the
+      intended clean signal (slice-24 standard: "reports exactly ONE plain
+      assertion FAIL with its message, never an ERROR"). Fix:
+      `(is (and neg-idx (< ignore-idx neg-idx)) …)` so a missing negation line
+      is a single clean FAIL.
+- [ ] Guard the tracked-side slurp in `with-channel-hook-semantics-guard-test`
+      against a deleted tracked impl (ERROR-vs-FAIL class; slice 24 hardened
+      only the UNIT impl-guard): the ^:integration semantics guard slurps
+      `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`
+      unconditionally in the let binding — a deleted worktree file (still in
+      the git index, so the `git ls-files --error-unmatch` arm keeps passing —
+      it checks the index, not worktree presence) throws FileNotFoundException
+      → clojure.test ERROR, while the unit impl-guard reports the same drift as
+      a clean FAIL. Mirror slice-24's shape: exists-guard the tracked slurp
+      (assert existence, then read/compare only under `when (.exists …)`) so
+      the integration suite FAILs cleanly on deletion instead of ERRORing
+      redundantly on top of the unit guard's clean signal.
