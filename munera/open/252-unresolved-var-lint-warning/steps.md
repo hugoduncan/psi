@@ -1519,3 +1519,45 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       slice-12 records ("ignore-all line 4 precedes negations 5-6") left
       untouched — they describe the state at that time (lines 4-6, before
       slice 26)
+
+## Slice 33 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Remove the orphaned duplicate review note in implementation.md — the
+      slice-31 note "- implementation review 2026-08-16: added 2 steps to be
+      addressed" appears TWICE consecutively (the two bullet lines immediately
+      before the slice-31 "addressed 2 review steps" paragraph); the first
+      copy has no matching "addressed" paragraph, so the append-only
+      local_memory record carries a duplicated pass marker. Same
+      doc-consistency class slices 17-19/25/32 reconciled; never re-checked
+      since slice 31's note was written twice. Fix: delete the orphaned line
+      (keep the note + its slice-31 addressing paragraph as one pair).
+      Verify: every "- implementation review …" note except the latest is
+      immediately followed by its "addressed" paragraph (grep the notes; the
+      orphan is the only unpaired one).
+- [ ] Make the analysis-level proof skip visibly (or fail cleanly) when the
+      `psi.lint-config-test.clj-kondo-jar` override is a valid file in a
+      NON-standard m2 layout: `clj-kondo-local-repo` throws a clear ex-info
+      ("Cannot derive the m2 local-repo root from clj-kondo-jar … Set the
+      psi.lint-config-test.clj-kondo-local-repo system property …") when the
+      guarded jar path doesn't end in the standard
+      `clj-kondo/clj-kondo/{version}/clj-kondo-{version}.jar` suffix and no
+      local-repo property is set. The throw fires inside `clj-kondo-deps`,
+      evaluated while building the -Spath / clj-kondo-main command vectors —
+      AFTER the ^:integration skip guard (which checks only `(not (.exists
+      …))` on the jar) has passed — so the ex-info propagates as a
+      clojure.test ERROR with no assertion message. Slice-16 recorded
+      "non-m2-layout jar → 1 error, the clear ex-info" as accepted, but that
+      predates the ERROR-vs-FAIL/SKIP standard slices 20/24/29/30/31/32
+      ("never an ERROR, always clean FAIL or visible SKIP" for infra/override
+      arms); slice-30's corrupt-jar override → visible SKIP (`valid-zip?`) is
+      the direct precedent for a bad jar-path override, and a non-standard-m2
+      layout is exactly the documented use case for the jar override (CI home
+      with a custom artifact layout). Fix: fold the local-repo derivation
+      into the skip guard — e.g. try/catch the `(clj-kondo-deps)` /
+      `(clj-kondo-local-repo)` call in the skip cond and
+      `(is (skip! "analysis-level proof" reason))` with the derivation
+      message, mirroring the valid-zip? arm. Verify: override
+      `psi.lint-config-test.clj-kondo-jar` to a valid jar at a non-m2-layout
+      path (e.g. /tmp/ck252-nonm2-layout.jar) → visible SKIP line, 0 errored
+      (was 1 ERROR); default layout + m2-layout override unchanged (33/178 no
+      SKIP; the -Spath arm still proves guard/exec agreement).
