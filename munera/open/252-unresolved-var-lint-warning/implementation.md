@@ -713,3 +713,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   a call form"); restored → 10 tests / 59 assertions. Verified: unit 10/59,
   integration 33/181 no SKIP (both proofs ran), `bb lint` errors 0 /
   warnings 0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
+
+- implementation review 2026-08-16: added 1 step to be addressed

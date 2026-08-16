@@ -2036,3 +2036,40 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `bb lint` errors 0 / warnings 0; `bb fmt:check` clean;
       `bb commit-check:file-lengths` exit 0; integration suite 33 tests / 181
       assertions pass, no SKIP (both proofs ran)
+
+## Slice 40 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Give the tracked import config.edn the jar-export drift comparison that
+      tracked with_channel.clj already has (slice-18 asymmetry, within R4's
+      standing version-bump re-verification set): the tracked import dir holds
+      TWO files — `config.edn` (the ACTUAL mechanism: the `:lint-as` defreq
+      registration AND the `:hooks :analyze-call` with-channel mapping) and
+      `httpkit/with_channel.clj` (the hook impl). Only the impl has the
+      ^:integration `with-channel-hook-semantics-guard-test` jar-export
+      comparison (slice-18, added because the hook is never exercised in-repo
+      — zero call sites — so semantic drift of the tracked impl vs the pinned
+      2.8.0 jar export would be silent); `config.edn` is asserted ONLY against
+      hardcoded values (`http-kit-import-registration-test`'s exact `:lint-as`
+      / `:hooks` equalities read the UNCHANGED tracked copy, so they stay green
+      on any bump-induced drift). Verified 2026-08-16: the 2.8.0 jar's
+      `clj-kondo.exports/http-kit/http-kit/config.edn` is exactly
+      `{:hooks {:analyze-call {org.httpkit.server/with-channel
+      httpkit.with-channel/with-channel}}}` and the tracked file is that PLUS
+      `:lint-as {org.httpkit.client/defreq clojure.core/def}` — an exact
+      additive diff. On an http-kit version bump where the jar's export
+      config.edn changes (hook renamed, new hook/entry added), the tracked
+      copy silently diverges: the unit assertions keep passing (they assert
+      the tracked copy, not the jar), the impl semantics guard keeps passing
+      (the impl file at the same path is unchanged), and the hook is never
+      exercised → silent drift, exactly the slice-18 class. Fix: extend
+      `with-channel-hook-semantics-guard-test` (or a sibling ^:integration
+      proof — the jar is only available there, behind the existing skip guard)
+      to read the jar's export config.edn through a guarded read (slice-35
+      IOException-guard shape), parse it as EDN through a guarded parse
+      (`(try (edn/read-string …) (catch Exception _ nil))` — clean FAIL, never
+      an ERROR, mirror of the parseable? shape), and assert the tracked
+      config.edn's `:hooks` equal the export's `:hooks` (the `:lint-as`
+      additive diff stays the unit test's exact-equality assertion). Verify:
+      jar-path override with a modified export config.edn (e.g. an extra
+      `:analyze-call` entry) → 1 clean FAIL, 0 errored; restored → integration
+      suite 33 tests / 181 assertions, no SKIP
