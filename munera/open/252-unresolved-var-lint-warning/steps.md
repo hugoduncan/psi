@@ -1967,3 +1967,43 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       assertions still pass; was FileNotFoundException ERROR pre-fix),
       restored → 10 tests / 58 assertions; `bb lint` errors 0 / warnings 0;
       `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0
+
+## Slice 39 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Guard the extension deps.edn read against a PRESENT-but-unparseable file
+      (ERROR class; slice-38 closed only the DELETION class for this read):
+      `http-kit-pin-sourced-from-deps-edn-test`'s extension-pin block reads
+      `(get-in (read-edn "extensions/dev-http/deps.edn") …)` inside the
+      `(when (.exists ext-deps-file) …)` — the slice-38 exists-guard handles
+      whole-file deletion, but a present-but-unparseable extension deps.edn
+      (bad merge, hand-edit truncation — the file exists, so the exists-guard
+      passes) makes `edn/read-string` throw ("Unmatched delimiter: …") inside
+      the `when` → clojure.test ERROR with no assertion message. This is the
+      exact mirror blind spot slices 35/36 closed for the root config and the
+      import config.edn sites (both gained the guarded-read shape
+      `(try (read-edn …) (catch Exception _ nil))` + a some? "parses as EDN"
+      clean-FAIL assertion); the extension deps.edn read's deletion gap was
+      closed in slice-38 but its unparseable class was never closed. Fix:
+      mirror the root-config shape — `(try (read-edn …) (catch Exception _
+      nil))` asserted `some?` (clean FAIL with message) before the pin
+      assertions, which run only under `(when ext-pin …)`. Verify: corrupt
+      extension deps.edn → 1 plain assertion FAIL, 0 errored (was 1 ERROR);
+      restored → 10 tests / 58 assertions
+- [ ] Make `ci-execution-chain-guard-test`'s `(second task)` binding
+      non-seqable-safe (ERROR-vs-FAIL class; slice-29 fixed only the
+      `(nth call 2)` out-of-bounds arm of the SAME let): the bb.edn task arm
+      binds `call (second task)` in the let binding BEFORE any assertion —
+      a drift of the clojure:test:integration task to a NON-seqable value
+      (`:task 42`, `:task :disabled`, `:task true` — verified 2026-08-16:
+      `(second 42)` / `(second :foo)` / `(second true)` all throw
+      IllegalArgumentException "Don't know how to create ISeq from …") makes
+      the guard ERROR with no assertion message, exactly the drift class it
+      exists to catch surfacing as the ERROR-vs-FAIL class slices 20/24/29
+      closed elsewhere — while a seqable-but-wrong task (e.g. a string, whose
+      `second` returns a char) already FAILs cleanly via the `(seq? task)`
+      assertion. Fix: bind `call` under `(when (seq? task) …)` (asserting
+      `(seq? task)` cleanly first), or `(second (and (seq? task) task))`, so a
+      non-seqable task value is a single plain FAIL with the seq? assertion
+      message, never an uncaught exception. Verify: task replaced with a
+      number/keyword → focused unit run `N passed, 1 failed, 0 errored` (was
+      ERROR pre-fix); restored → 10 tests / 58 assertions

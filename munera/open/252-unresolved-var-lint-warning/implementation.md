@@ -688,3 +688,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   failed, 0 errored; restored → 10 tests / 58 assertions (56 + 2 new exists
   assertions); `bb lint` errors 0 / warnings 0; `bb fmt:check` clean;
   `bb commit-check:file-lengths` exit 0 (file 523 lines, under the gate).
+- implementation review 2026-08-16: added 2 steps to be addressed
