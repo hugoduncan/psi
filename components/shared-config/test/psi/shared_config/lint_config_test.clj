@@ -218,9 +218,21 @@
           (doseq [negation negations]
             (let [neg-idx (index-of negation)]
               (is (some? neg-idx) (str "negation line present (index found): " negation))
-              (is (< ignore-idx neg-idx)
+              ;; slice-29 follow-up: when the negation line is MISSING the
+              ;; presence assertion above FAILs first, but the ordering
+              ;; assertion then evaluates `(< ignore-idx nil)` →
+              ;; NullPointerException, so the exact regression this test
+              ;; guards (a negation line removed) reports 1 FAIL + 1 ERROR —
+              ;; the ERROR masking the intended clean signal (slice-24
+              ;; standard: exactly ONE plain assertion FAIL with its message,
+              ;; never an ERROR). `(and neg-idx …)` short-circuits on the
+              ;; missing line (nil is falsy) into a single clean FAIL; the
+              ;; message is nil-guarded too (`(inc nil)` in the message would
+              ;; itself throw on the failure path).
+              (is (and neg-idx (< ignore-idx neg-idx))
                   (str ignore-all " (last occurrence, line " (inc ignore-idx)
-                       ") precedes " negation " (line " (inc neg-idx) ")")))))))))
+                       ") precedes " negation
+                       (when neg-idx (str " (line " (inc neg-idx) ")")))))))))))
 
 (deftest bb-edn-lint-task-wrapper-test
   (testing "bb.edn's lint task remains the plain `clojure -M:lint` wrapper
@@ -332,6 +344,14 @@
             "clojure:test:integration invokes run-scry-kaocha-suite!")
         (is (= "integration" (second call))
             "run-scry-kaocha-suite! receives the integration suite id")
-        (is (= ["--focus" "integration"] (nth call 2))
+        ;; slice-29 follow-up: `(nth call 2)` on a drift that DROPS the focus
+        ;; args (e.g. a two-element (run-scry-kaocha-suite! "integration"))
+        ;; throws IndexOutOfBoundsException → clojure.test ERROR with no
+        ;; assertion message — the exact regression this guard exists to catch
+        ;; surfacing as the exact ERROR-vs-FAIL class slices 20/24 closed
+        ;; elsewhere. `(nth call 2 nil)` reads out-of-bounds as nil and FAILs
+        ;; cleanly with the assertion message (the ERROR-vs-FAIL standard:
+        ;; exactly ONE plain assertion FAIL, never an ERROR).
+        (is (= ["--focus" "integration"] (nth call 2 nil))
             "run-scry-kaocha-suite! keeps the --focus integration args")))))
 

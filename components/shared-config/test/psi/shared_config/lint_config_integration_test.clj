@@ -53,25 +53,36 @@
                       (str http-kit-jar " not present"))]
       (do (report-skip! "with-channel hook semantics" reason)
           (is (str "skipped: " reason)))
-      (let [jar-entry "clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj"
-            tracked   (slurp (io/file repo-root
-                                      ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"))
+      (let [jar-entry   "clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj"
+            tracked-rel ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
+            tracked-file (io/file repo-root tracked-rel)
             jar-export (with-open [zf (ZipFile. (io/file http-kit-jar))]
                          (when-let [entry (.getEntry zf jar-entry)]
                            (slurp (.getInputStream zf entry))))]
         (is (some? jar-export)
             (str "the pinned http-kit jar contains the clj-kondo.exports export "
                  jar-entry))
+        (testing "tracked impl file exists (slice-29 follow-up: the ^:integration
+                  ls-files index arm checks the INDEX, not worktree presence, so
+                  a deleted worktree file still passes it — the tracked-side
+                  slurp previously ran unconditionally in the let binding and
+                  threw FileNotFoundException → clojure.test ERROR on deletion,
+                  while the unit impl-guard reports the same drift as a clean
+                  FAIL. Mirror slice-24's shape: assert existence first, read/
+                  compare only under `when` — a deleted tracked impl is a single
+                  plain assertion FAIL here, never an ERROR)"
+          (is (.exists tracked-file) (str tracked-rel " exists")))
         (testing "tracked impl is semantically identical to the jar export
                   (parsed-form compare — whitespace/indentation-insensitive,
                   string-literal-sensitive; see parse-forms)"
-          (when (some? jar-export)
-            ;; nil-guard (slice-20 follow-up): the some? assertion above fails
-            ;; cleanly when the jar entry is missing; without this guard the
-            ;; equality would throw an NPE on nil jar-export and surface as a
-            ;; clojure.test ERROR instead of the plain assertion failure it
+          (when (and (some? jar-export) (.exists tracked-file))
+            ;; nil-guards (slice-20 + slice-29 follow-ups): the some? and
+            ;; exists assertions above fail cleanly when the jar entry is
+            ;; missing or the tracked impl is deleted; without the guards the
+            ;; equality would throw an NPE/FileNotFoundException and surface as
+            ;; a clojure.test ERROR instead of the plain assertion failures it
             ;; deserves.
-            (is (= (parse-forms jar-export) (parse-forms tracked))
+            (is (= (parse-forms jar-export) (parse-forms (slurp tracked-file)))
                 "tracked with_channel.clj differs from the pinned jar export")))))))
 
 (deftest ^:integration gitignore-http-kit-tracking-ground-truth-test

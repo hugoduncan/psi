@@ -471,3 +471,19 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   runs, unrelated to the shared-config change.)
 
 - implementation review 2026-08-15: added 3 steps to be addressed
+- addressed 3 review steps (slice 29, ERROR→clean-FAIL class): (1)
+  `ci-execution-chain-guard-test` — `(nth call 2)` → `(nth call 2 nil)` so a
+  drift dropping the `["--focus" "integration"]` args fails as a plain FAIL,
+  not an IndexOutOfBoundsException ERROR (verified: two-element task call →
+  1 failed, 0 errored); (2) `gitignore-http-kit-import-tracking-test` — ordering
+  assertion `(is (< ignore-idx neg-idx))` → `(is (and neg-idx (< ignore-idx
+  neg-idx)))` with a nil-guarded message, so a missing negation line is clean
+  FAILs, not FAIL + NPE ERROR (verified: negation removed → 3 failed, 0
+  errored); (3) `with-channel-hook-semantics-guard-test` — tracked-side slurp
+  moved out of the let binding into an exists assertion + `when (.exists …)`
+  compare guard (mirror of slice-24), so a deleted worktree impl (index entry
+  intact → ls-files arm stays green) fails as a clean exists FAIL, not a
+  FileNotFoundException ERROR (verified: impl moved aside → 1 failed, 0
+  errored). All mutations restored after verification. Verified: unit 10/48,
+  integration 33/177 no SKIP (proofs ran), `bb lint` errors: 0, warnings: 0,
+  `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.

@@ -1271,7 +1271,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 29 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Harden `ci-execution-chain-guard-test`'s task-args read against a dropped
+- [x] Harden `ci-execution-chain-guard-test`'s task-args read against a dropped
       focus-args drift (ERROR → clean-FAIL class, slices 20/24): the
       clojure:test:integration guard asserts the run-scry-kaocha-suite! args via
       `(nth call 2)` — a drift that DROPS the `["--focus" "integration"]` args
@@ -1284,7 +1284,11 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       and 24 (slurp-before-exists → ERROR, when-guarded) closed elsewhere. Fix:
       `(is (= ["--focus" "integration"] (nth call 2 nil)))` — an out-of-bounds
       read yields nil and FAILs cleanly with the assertion message.
-- [ ] Make `gitignore-http-kit-import-tracking-test`'s ordering assertion fail
+      — done: `(nth call 2 nil)` (out-of-bounds → nil → clean FAIL; comment
+      added). Verified: bb.edn task mutated to the two-element
+      `(run-scry-kaocha-suite! "integration")` → focused unit run
+      `1 failed, 0 errored` (was ERROR pre-fix); bb.edn restored.
+- [x] Make `gitignore-http-kit-import-tracking-test`'s ordering assertion fail
       cleanly when a negation line is MISSING (same ERROR-vs-FAIL class): the
       presence `(is (some? neg-idx) …)` FAILs first, but the next
       `(is (< ignore-idx neg-idx) …)` then evaluates `(< 4 nil)` →
@@ -1294,7 +1298,13 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       assertion FAIL with its message, never an ERROR"). Fix:
       `(is (and neg-idx (< ignore-idx neg-idx)) …)` so a missing negation line
       is a single clean FAIL.
-- [ ] Guard the tracked-side slurp in `with-channel-hook-semantics-guard-test`
+      — done: ordering assertion is `(is (and neg-idx (< ignore-idx neg-idx))
+      …)` with a nil-guarded message (`(when neg-idx (str " (line " (inc
+      neg-idx) ")"))` — an `(inc nil)` in the failure-path message would itself
+      throw). Verified: `!.clj-kondo/imports/http-kit/` line removed →
+      focused unit run `3 failed, 0 errored` (was FAIL + NPE ERROR pre-fix);
+      .gitignore restored.
+- [x] Guard the tracked-side slurp in `with-channel-hook-semantics-guard-test`
       against a deleted tracked impl (ERROR-vs-FAIL class; slice 24 hardened
       only the UNIT impl-guard): the ^:integration semantics guard slurps
       `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`
@@ -1306,3 +1316,12 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (assert existence, then read/compare only under `when (.exists …)`) so
       the integration suite FAILs cleanly on deletion instead of ERRORing
       redundantly on top of the unit guard's clean signal.
+      — done: the tracked-side slurp moved out of the let binding into an
+      exists assertion (`(is (.exists tracked-file) …)` — fails cleanly first)
+      with the compare read guarded by `(when (and (some? jar-export)
+      (.exists tracked-file)) …)`, mirroring slice-24/20. Verified: tracked
+      impl moved aside (index entry intact, ls-files arm still green) →
+      focused integration run `1 failed, 0 errored` (was FileNotFoundException
+      ERROR pre-fix); impl restored. Unit 10/48, integration 33/177 no SKIP;
+      `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0.
