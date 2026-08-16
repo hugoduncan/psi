@@ -2174,7 +2174,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 42 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Assert the `clojure:test:unit` TASK's routing in
+- [x] Assert the `clojure:test:unit` TASK's routing in
       `ci-execution-chain-guard-test` — the remaining unguarded link in the
       CI unit-suite chain. Slice-41 closed the "Run Clojure tests" step
       (`bb clojure:test`, ci.yml:162-163) and the `clojure:test` `:depends`
@@ -2200,7 +2200,20 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       divergence); restored → unit 10 tests / 62 assertions, integration
       34/186 no SKIP, `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
-- [ ] Guard the four exists-checked but try-unwrapped test-body slurps
+      — done: new testing block in `ci-execution-chain-guard-test` mirroring
+      the integration-task shape — some? task + seq? task guards first
+      (slice-39 non-seqable-safe: a non-seqable task value is a single plain
+      seq? FAIL), then System/exit wrap, `run-scry-kaocha-suite!` as the
+      call's first, and suite id "unit" as the call's second (the unit
+      task's args `(into [] *command-line-args*)` are NOT asserted — the
+      suite id + runner symbol only, per the item). Verified 2026-08-16:
+      suite id mutated to "extensions" in bb.edn → focused unit run
+      `9 passed, 1 failed, 0 errored` (clean FAIL "run-scry-kaocha-suite!
+      receives the unit suite id", was silent divergence pre-fix); bb.edn
+      restored → unit suite 10 tests / 68 assertions (62 + 6 new:
+      task some? + seq? + System/exit + call seq? + runner + suite id),
+      integration 34/186 no SKIP (both proofs ran)
+- [x] Guard the four exists-checked but try-unwrapped test-body slurps
       against the directory-at-path / unreadable-file class: `.exists`
       returns true for a DIRECTORY, so the exists assertions pass and the
       unguarded slurp throws (FileNotFoundException "(Is a directory)" /
@@ -2225,7 +2238,22 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (was 1 ERROR); restored → unit 10/62, integration 34/186 no SKIP,
       `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
-- [ ] Remove the orphaned duplicate review note at implementation.md:739 —
+      — done (`.isFile` branch — the item's second option, chosen for
+      minimal diff + single predicate closing both missing AND directory):
+      all four sites now assert `(.isFile f)` (was `.exists`) and guard with
+      the same predicate, so the slurp never sees a directory —
+      `with-channel-hook-impl-guard-test` ("impl file … is a regular file"),
+      `with-channel-hook-semantics-guard-test` ("tracked impl … is a regular
+      file"; the `(when (and (some? jar-export) (.isFile tracked-file))`
+      guard updated likewise), `gitignore-http-kit-import-tracking-test`
+      (".gitignore is a regular file"), `ci-execution-chain-guard-test`
+      ("ci.yml is a regular file"). Verified 2026-08-16: with_channel.clj
+      replaced by a directory at path → focused unit `9 passed, 1 failed,
+      0 errored` + integration `33 passed, 1 failed, 0 errored` (was 1 ERROR
+      class pre-fix — the directory passes `.exists` then the slurp throws;
+      both sites now clean-FAIL with the isFile assertion message); restored
+      → unit 10/68, integration 34/186 no SKIP
+- [x] Remove the orphaned duplicate review note at implementation.md:739 —
       "implementation review 2026-08-16: added 2 steps to be addressed"
       appears TWICE consecutively (lines 739 + 741); the first copy
       (introduced by the slice-41 review commit cdf445507) has no matching
@@ -2238,3 +2266,9 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       grep-verify: no consecutive duplicate "added … steps to be addressed"
       notes, every note except the latest carries its addressed paragraph.
       Doc-only; no code/test changes
+      — done: the line-739 copy deleted (the note sequence now has the
+      slice-41 note immediately followed by its "addressed 2 review steps
+      (slice 41)" paragraph — one pair); grep-verified: no consecutive
+      duplicate "added … steps to be addressed" notes remain (the 739/741
+      pair was the only one; slices 33/35's removals held). Doc-only — 2
+      lines deleted from implementation.md, no code/test changes

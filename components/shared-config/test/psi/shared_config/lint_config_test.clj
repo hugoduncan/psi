@@ -143,7 +143,16 @@
               (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
                 (is (= 'httpkit.with-channel/with-channel ref)))))))
       (testing "impl file exists (member of the slice-4 tracked change set)"
-        (is (.exists impl-file) (str impl-rel " exists")))
+        ;; slice-42 follow-up: `.isFile` (not `.exists`) — .exists returns
+        ;; true for a DIRECTORY, so a directory at the path (or an unreadable
+        ;; file) would pass an exists-guard and the slurp below would throw
+        ;; FileNotFoundException "(Is a directory)" outside any try →
+        ;; clojure.test ERROR with no assertion message (the ERROR-vs-FAIL
+        ;; class slices 24/29/34/35 closed for deletion/parse, still open at
+        ;; the slurp boundary). .isFile is false for both missing AND
+        ;; directory — closes both classes in one predicate; the when-guard
+        ;; below uses the same predicate so the slurp never sees a directory.
+        (is (.isFile impl-file) (str impl-rel " is a regular file")))
       ;; slice-24 follow-up: the slurp must NOT run in a let binding before the
       ;; exists assertion — a deleted/renamed impl would otherwise throw
       ;; FileNotFoundException at read time and surface as a clojure.test ERROR
@@ -160,7 +169,7 @@
       ;; fixture (guarded parse, nil on unparseable — single definition site in
       ;; the support ns) turns the corruption class into this clean assertion
       ;; FAIL, never an ERROR.
-      (when (.exists impl-file)
+      (when (.isFile impl-file)
         (let [forms (parseable? (slurp impl-file))]
           (testing "impl parses as Clojure forms"
             (is (some? forms)
@@ -339,9 +348,18 @@
       ;; of the unit slurp itself, and the unit ERROR-vs-FAIL standard applies
       ;; regardless (slice-32). Mirror slice-31's ci.yml shape: assert existence
       ;; first (clean FAIL with message), then split/parse only under `when`.
-      (testing ".gitignore exists"
-        (is (.exists gitignore-file) ".gitignore exists"))
-      (when (.exists gitignore-file)
+      (testing ".gitignore is a regular file"
+        ;; slice-42 follow-up: `.isFile` (not `.exists`) — .exists returns
+        ;; true for a DIRECTORY, so a directory at the path (or an unreadable
+        ;; file) would pass an exists-guard and the slurp below would throw
+        ;; FileNotFoundException "(Is a directory)" outside any try →
+        ;; clojure.test ERROR with no assertion message (the ERROR-vs-FAIL
+        ;; class slices 31/35/38 closed for deletion elsewhere, still open at
+        ;; the slurp boundary). .isFile is false for both missing AND
+        ;; directory — closes both classes in one predicate; the when-guard
+        ;; below uses the same predicate so the slurp never sees a directory.
+        (is (.isFile gitignore-file) ".gitignore is a regular file"))
+      (when (.isFile gitignore-file)
         (let [ignore-all "**/.clj-kondo/imports/*"
               negations ["!.clj-kondo/imports/http-kit/"
                          "!.clj-kondo/imports/http-kit/**"]
@@ -481,7 +499,10 @@
             and the three ^:integration proofs (design.md AC1 names
             `bb clojure:test:integration` as the CI-enforceable regression
             surface) — nor bb.edn's clojure:test:integration task
-            (bb.edn:307-309) nor clojure:test's :depends on clojure:test:unit
+            (bb.edn:307-309), clojure:test:unit's OWN routing (bb.edn:295-300
+            — slice-42 follow-up: the suite-id/runner link that executes the
+            10 unit invariants; slices 28/29/39 asserted the integration task
+            only), nor clojure:test's :depends on clojure:test:unit
             (bb.edn:327-329), so a dropped/renamed CI step or a task drift to
             another suite/focus silently disables the CI regression surface
             while every existing guard stays green — the exact silent-drift
@@ -503,9 +524,18 @@
       ;; so the exists assertion below is the ONLY guard against whole-file
       ;; deletion: clean FAIL with its message, then split/parse only under
       ;; `when` (mirror of slice-24's shape).
-      (testing "ci.yml exists"
-        (is (.exists ci-file) ".github/workflows/ci.yml exists"))
-      (when (.exists ci-file)
+      (testing "ci.yml is a regular file"
+        ;; slice-42 follow-up: `.isFile` (not `.exists`) — .exists returns
+        ;; true for a DIRECTORY, so a directory at the path (or an unreadable
+        ;; file) would pass an exists-guard and the slurp below would throw
+        ;; FileNotFoundException "(Is a directory)" outside any try →
+        ;; clojure.test ERROR with no assertion message (the ERROR-vs-FAIL
+        ;; class slices 20/24/29/30/31 closed for deletion elsewhere, still
+        ;; open at the slurp boundary). .isFile is false for both missing AND
+        ;; directory — closes both classes in one predicate; the when-guard
+        ;; below uses the same predicate so the slurp never sees a directory.
+        (is (.isFile ci-file) ".github/workflows/ci.yml is a regular file"))
+      (when (.isFile ci-file)
         (let [steps (ci-run-steps
                      (str/split-lines (slurp ci-file)))]
           (testing "Lint step runs `bb lint` (the local AC1 gate — ci.yml:89)"
@@ -564,6 +594,34 @@
               ;; exactly ONE plain assertion FAIL, never an ERROR).
               (is (= ["--focus" "integration"] (nth call 2 nil))
                   "run-scry-kaocha-suite! keeps the --focus integration args"))))))
+    (testing "bb.edn clojure:test:unit task still routes to
+              run-scry-kaocha-suite! with the unit suite id (slice-42
+              follow-up): slices 28/29/39 structurally asserted the
+              clojure:test:integration task's routing, and slice-41 closed the
+              \"Run Clojure tests\" CI step + clojure:test's :depends name —
+              but clojure:test:unit's OWN routing (bb.edn:295-300) had no
+              mirror assertion, so a suite-id drift (\"unit\" → \"extensions\")
+              or a runner swap silently drops the 10 unit invariants from
+              `bb clojure:test` — the exact command the asserted CI step runs —
+              while the step assertion, the :depends name assertion, tests.edn's
+              :unit config, and all lint/integration guards stay green. Mirror
+              the integration-task shape: some?/seq? guards first (slice-39
+              non-seqable-safe), then System/exit wrap + runner symbol + suite
+              id. The unit task's args are `(into [] *command-line-args*)`, NOT
+              a hardcoded focus — assert the suite id and runner symbol only."
+      (let [task (:task (get-in (read-edn "bb.edn") [:tasks 'clojure:test:unit]))]
+        (is (some? task) "bb.edn defines a :tasks clojure:test:unit entry")
+        (is (seq? task) "the task is a call form")
+        (when (seq? task)
+          (let [call (second task)]   ; (System/exit (run-scry-kaocha-suite! "unit" (into [] *command-line-args*)))
+            (is (= 'System/exit (first task))
+                "task wraps the call in System/exit (scry exit-code propagation)")
+            (is (seq? call) "the System/exit argument is a call form")
+            (when (seq? call)
+              (is (= 'run-scry-kaocha-suite! (first call))
+                  "clojure:test:unit invokes run-scry-kaocha-suite!")
+              (is (= "unit" (second call))
+                  "run-scry-kaocha-suite! receives the unit suite id"))))))
     (testing "bb.edn clojure:test task still :depends on clojure:test:unit — a
               drift to another suite (or a dropped :depends) would silently
               drop the unit invariants from `bb clojure:test`, the exact

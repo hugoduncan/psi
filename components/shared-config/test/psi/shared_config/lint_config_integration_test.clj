@@ -108,11 +108,20 @@
                   FAIL. Mirror slice-24's shape: assert existence first, read/
                   compare only under `when` — a deleted tracked impl is a single
                   plain assertion FAIL here, never an ERROR)"
-          (is (.exists tracked-file) (str tracked-rel " exists")))
+          (is (.isFile tracked-file) (str tracked-rel " is a regular file")))
         (testing "tracked impl is semantically identical to the jar export
                   (parsed-form compare — whitespace/indentation-insensitive,
                   string-literal-sensitive; see parse-forms)"
-          (when (and (some? jar-export) (.exists tracked-file))
+          (when (and (some? jar-export) (.isFile tracked-file))
+            ;; slice-42 follow-up: `.isFile` (not `.exists`) in the guard and
+            ;; the exists assertion above — .exists returns true for a
+            ;; DIRECTORY, so a directory at the tracked path would pass an
+            ;; exists-guard and the tracked-side slurp below would throw
+            ;; FileNotFoundException "(Is a directory)" outside any try →
+            ;; clojure.test ERROR (the ERROR-vs-FAIL class closed for
+            ;; deletion/parse elsewhere, still open at the slurp boundary).
+            ;; .isFile is false for both missing AND directory — closes both
+            ;; classes in one predicate, so the slurp never sees a directory.
             ;; nil-guards (slice-20 + slice-29 follow-ups): the some? and
             ;; exists assertions above fail cleanly when the jar entry is
             ;; missing or the tracked impl is deleted; without the guards the
@@ -145,7 +154,8 @@
               (when export-forms
                 (let [tracked-forms (parseable? (slurp tracked-file))]
                   (testing "tracked impl parses as Clojure forms"
-                    (is (some? tracked-forms) (str tracked-rel " parses as Clojure forms")))
+                    (is (some? tracked-forms)
+                        (str tracked-rel " parses as Clojure forms")))
                   (when tracked-forms
                     (is (= export-forms tracked-forms)
                         "tracked with_channel.clj differs from the pinned jar export")))))))))))

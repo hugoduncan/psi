@@ -737,8 +737,6 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   (pre-existing environmental, unknown model; fails identically at base).
 
 - implementation review 2026-08-16: added 2 steps to be addressed
-
-- implementation review 2026-08-16: added 2 steps to be addressed
 - addressed 2 review steps (slice 41): (1) http-kit-import-config-jar-export-guard-test
   equality strengthened to (= export-config (dissoc tracked-config :lint-as)) —
   the tracked import config.edn must equal the pinned jar's clj-kondo.exports
@@ -761,3 +759,22 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   SKIP, bb lint errors: 0, warnings: 0, bb fmt:check clean,
   bb commit-check:file-lengths exit 0.
 - implementation review 2026-08-16: added 3 steps to be addressed
+- addressed 3 review steps (slice 42): (1) `ci-execution-chain-guard-test`
+  gained a `clojure:test:unit` routing block (mirror of the integration-task
+  shape — some?/seq? guards, System/exit wrap, run-scry-kaocha-suite! + suite
+  id "unit"; args `(into [] *command-line-args*)` not asserted); drift drill
+  (suite id → "extensions") → 1 clean FAIL, 0 errored, restored. (2) the four
+  exists-checked but try-unwrapped test-body slurps (with_channel.clj ×2 via
+  `(parseable? (slurp …))`, .gitignore, ci.yml) hardened via the `.isFile`
+  branch of the item's two options — .exists passes for a DIRECTORY, so a
+  directory at path made the unguarded slurp throw outside any try → ERROR;
+  .isFile is false for both missing AND directory, closing both classes in one
+  predicate at the assertion AND the when-guard (slurp never sees a
+  directory); directory-drill on with_channel.clj → unit 1 FAIL + integration
+  1 FAIL, 0 errored (was ERROR class), restored. (3) orphaned duplicate review
+  note at implementation.md:739 deleted (the slice-41 addressing commit
+  6307c24e6 had re-added a note the review commit cdf445507 already wrote;
+  the 739/741 pair was the only consecutive duplicate — grep-verified gone).
+  Verified: unit 10 tests / 68 assertions (62 + 6 new unit-task routing),
+  integration 34/186 no SKIP, `bb lint` errors: 0, warnings: 0,
+  `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
