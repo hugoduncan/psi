@@ -178,11 +178,20 @@
   differs from the invoking shell's."
   "psi.lint-config-test.clojure-bin")
 
+(defn- which-bin
+  "Resolve a binary from PATH via `which`, or nil when not on PATH. Single
+  definition site for the which → trim → nil-on-nonzero contract (slice-28
+  follow-up): which-clojure-bin and which-git-bin were byte-identical copies
+  differing only in the binary name, so a future hardening (quoting, error
+  handling) or a regression would diverge silently between the two sites."
+  [bin]
+  (some-> (shell/sh "which" bin)
+          (as-> r (when (zero? (:exit r)) (str/trim (:out r))))))
+
 (defn- which-clojure-bin
   "Resolve the clojure CLI binary from PATH, or nil when not on PATH."
   []
-  (some-> (shell/sh "which" "clojure")
-          (as-> r (when (zero? (:exit r)) (str/trim (:out r))))))
+  (which-bin "clojure"))
 
 (def clojure-bin
   "Path to the clojure CLI binary used by the analysis-level proof, or nil when
@@ -208,8 +217,7 @@
 (defn- which-git-bin
   "Resolve the git binary from PATH, or nil when not on PATH."
   []
-  (some-> (shell/sh "which" "git")
-          (as-> r (when (zero? (:exit r)) (str/trim (:out r))))))
+  (which-bin "git"))
 
 (def git-bin
   "Path to the git binary used by the git check-ignore ground-truth proof, or

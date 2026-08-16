@@ -1213,7 +1213,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 28 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Guard the CI execution chain that makes the regression surface
+- [x] Guard the CI execution chain that makes the regression surface
       CI-enforceable — ci.yml's steps and bb.edn's clojure:test:integration
       task are the only unguarded links: tests-edn-suite-wiring-test (slice
       14) guards tests.edn's :integration suite and bb-edn-lint-task-wrapper-test
@@ -1237,7 +1237,19 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       bb.edn's clojure:test:integration task still invokes
       run-scry-kaocha-suite! with suite id "integration" (a drift to a
       different suite/focus would silently stop the proofs from running)
-- [ ] Single-source the byte-identical `which-*` resolution in
+      — done: new `ci-execution-chain-guard-test` + private `ci-run-steps`
+      helper in lint_config_test.clj — `ci-run-steps` parses ci.yml lines
+      into a step-name → run-command map (every `- name: X` line paired with
+      the next `run: Y`; line-based like the .gitignore test, no YAML parser,
+      no subprocess, runs anywhere); the test asserts the Lint step runs
+      `bb lint` (ci.yml:89) and the Run Clojure integration tests step runs
+      `bb clojure:test:integration` (ci.yml:166), then asserts bb.edn's
+      clojure:test:integration task structurally: `System/exit`-wrapped
+      `(run-scry-kaocha-suite! "integration" ["--focus" "integration"])`
+      (suite id "integration" + the integration focus preserved — a drift to
+      another suite/focus fails loudly in `:unit`). Unit suite → 10 tests /
+      48 assertions pass (was 9/39)
+- [x] Single-source the byte-identical `which-*` resolution in
       lint_config_test_support.clj (reusable-existing-pattern flag — the same
       class slice 27 closed for parse-forms): `which-clojure-bin`
       (lines 181-186) and `which-git-bin` (lines 208-213) are structurally
@@ -1248,3 +1260,11 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       the two sites. Fix: extract a single private `which-bin` helper taking
       the binary name, with `which-clojure-bin`/`which-git-bin` delegating to
       it; behavior unchanged (same which → trim → nil-on-nonzero contract).
+      — done: private `which-bin` extracted in lint_config_test_support.clj
+      (the which → trim → nil-on-nonzero contract defined once); both
+      `which-clojure-bin` and `which-git-bin` now delegate to it
+      (`(which-bin "clojure")` / `(which-bin "git")`) — behavior unchanged
+      (same which resolution, same nil-on-nonzero); the unit suite exercises
+      both delegation paths via clojure-bin/git-bin (integration proofs ran,
+      no SKIP — both binaries resolved through the single helper). Unit
+      suite → 10 tests / 48 assertions pass

@@ -27,6 +27,28 @@
             parse-forms
             read-edn
             repo-root]]))
+
+(defn- ci-run-steps
+  "Parse the GitHub Actions steps from ci.yml lines into a map of
+  step-name → run-command. Every `- name: X` line is paired with the NEXT
+  `run: Y` line (the step's command); steps without a run (e.g. `uses:`-only)
+  are skipped. Mirrors how the .gitignore test reads lines — no YAML parser,
+  no subprocess — so it runs anywhere."
+  [lines]
+  (let [acc (reduce (fn [{:keys [pending] :as acc} line]
+                      (let [t (str/trim line)]
+                        (cond
+                          (str/starts-with? t "- name: ")
+                          (assoc acc :pending (subs t (count "- name: ")))
+                          (and pending (str/starts-with? t "run: "))
+                          (-> acc
+                              (assoc :pending nil)
+                              (update :steps assoc pending (subs t (count "run: "))))
+                          :else acc)))
+                    {:steps {} :pending nil}
+                    lines)]
+    (:steps acc)))
+
 (deftest http-kit-import-registration-test
   (testing "http-kit import config retains the defreq :lint-as registration"
     (let [cfg (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")]
@@ -263,4 +285,53 @@
             ":integration :test-paths contains components/shared-config/test")
         (is (= [:integration] (:focus-meta intg))
             ":integration :focus-meta retains [:integration]")))))
+
+(deftest ci-execution-chain-guard-test
+  (testing "ci.yml + bb.edn still execute the lint gate and the ^:integration
+            proofs (slice-28 follow-up): tests-edn-suite-wiring-test guards
+            tests.edn's :integration suite and bb-edn-lint-task-wrapper-test
+            guards bb.edn's lint task, but nothing guards ci.yml's Lint step
+            (`run: bb lint`, ci.yml:89) or its Run Clojure integration tests
+            step (`run: bb clojure:test:integration`, ci.yml:166) — the outer
+            links that actually execute the lint gate and the three
+            ^:integration proofs (design.md AC1 names
+            `bb clojure:test:integration` as the CI-enforceable regression
+            surface) — nor bb.edn's clojure:test:integration task
+            (bb.edn:307-309), so a dropped/renamed CI step or a task drift to
+            another suite/focus silently disables the entire CI regression
+            surface while every existing guard stays green — the exact
+            silent-drift class the task already closed for .gitignore /
+            lint-alias / bb.edn lint wrapper / tests.edn. Read ci.yml as text
+            (line-paired like the .gitignore test) and bb.edn as EDN — no
+            subprocess, runs anywhere."
+    (let [steps (ci-run-steps
+                 (str/split-lines
+                  (slurp (io/file repo-root ".github/workflows/ci.yml"))))]
+      (testing "Lint step runs `bb lint` (the local AC1 gate — ci.yml:89)"
+        (is (= "bb lint" (get steps "Lint"))
+            "ci.yml Lint step runs `bb lint`"))
+      (testing "Run Clojure integration tests step runs
+                `bb clojure:test:integration` (the CI-enforceable regression
+                surface — the three ^:integration proofs run there; ci.yml:166)"
+        (is (= "bb clojure:test:integration"
+               (get steps "Run Clojure integration tests"))
+            "ci.yml integration step runs `bb clojure:test:integration`")))
+    (testing "bb.edn clojure:test:integration task still routes to
+              run-scry-kaocha-suite! with the integration suite and focus — a
+              drift to another suite/focus (or a dropped task) would silently
+              stop the proofs from running while the tests.edn wiring stays
+              green (bb.edn:307-309)"
+      (let [task (:task (get-in (read-edn "bb.edn") [:tasks 'clojure:test:integration]))
+            call (second task)]   ; (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))
+        (is (some? task) "bb.edn defines a :tasks clojure:test:integration entry")
+        (is (seq? task) "the task is a call form")
+        (is (= 'System/exit (first task))
+            "task wraps the call in System/exit (scry exit-code propagation)")
+        (is (seq? call) "the System/exit argument is a call form")
+        (is (= 'run-scry-kaocha-suite! (first call))
+            "clojure:test:integration invokes run-scry-kaocha-suite!")
+        (is (= "integration" (second call))
+            "run-scry-kaocha-suite! receives the integration suite id")
+        (is (= ["--focus" "integration"] (nth call 2))
+            "run-scry-kaocha-suite! keeps the --focus integration args")))))
 

@@ -445,3 +445,27 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-15: added 2 steps to be addressed
+- addressed 2 review steps (slice 28): (1) CI execution chain guard — new
+  `ci-execution-chain-guard-test` + private `ci-run-steps` helper in
+  lint_config_test.clj: parses ci.yml lines into a step-name → run-command map
+  (line-paired like the .gitignore test, no YAML parser/subprocess) and asserts
+  the Lint step runs `bb lint` (ci.yml:89) and the Run Clojure integration
+  tests step runs `bb clojure:test:integration` (ci.yml:166) — the outer links
+  that execute the lint gate and the three ^:integration proofs; then asserts
+  bb.edn's clojure:test:integration task structurally
+  (`System/exit`-wrapped `(run-scry-kaocha-suite! "integration"
+  ["--focus" "integration"])`, suite id + focus preserved) so a dropped/renamed
+  CI step or a task drift to another suite/focus fails loudly in `:unit`
+  instead of silently disabling the whole CI regression surface. (2) `which-*`
+  single-sourcing — private `which-bin` extracted in lint_config_test_support.clj
+  (the which → trim → nil-on-nonzero contract defined once; the two
+  byte-identical copies removed), with which-clojure-bin/which-git-bin
+  delegating (`(which-bin "clojure")` / `(which-bin "git")`); behavior
+  unchanged. Verified: unit suite 10 tests / 48 assertions pass (was 9/39);
+  integration suite — shared-config proofs all ran, no SKIP (git/clojure/jar
+  resolved through the single which-bin); `bb lint` errors: 0 warnings: 0;
+  `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0. (Full unit
+  suite: 2694 passed / 1 failed — pre-existing environmental
+  workflow-delegate-review-step-live-test, unchanged; integration suite: the
+  flaky tmux harness :startup-timeout scenario — environmental, varies between
+  runs, unrelated to the shared-config change.)
