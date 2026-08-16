@@ -68,13 +68,27 @@
       (testing "import config.edn exists"
         (is (.exists cfg-file) (str cfg-rel " exists")))
       (when (.exists cfg-file)
-        (let [cfg (read-edn cfg-rel)]
-          (is (= '{org.httpkit.client/defreq clojure.core/def} (:lint-as cfg)))
-          (testing "server-side with-channel hook is preserved exactly alongside it
-                    (the design mechanism requires the existing hook be kept)"
-            (is (= '{:analyze-call {org.httpkit.server/with-channel
-                                    httpkit.with-channel/with-channel}}
-                   (:hooks cfg)))))))))
+        ;; slice-36 follow-up: a PRESENT-but-unparseable import config (bad
+        ;; merge, hand-edit truncation, encoding corruption — the file
+        ;; exists, so the exists-guard above passes) makes read-edn throw
+        ;; ("Unmatched delimiter: }") inside the `when` → clojure.test ERROR
+        ;; with no assertion message. Slice-35 item 3 closed the mirror blind
+        ;; spot for the ROOT config and explicitly noted this import config
+        ;; read is the same class once its deletion gap was closed. Guarded
+        ;; read (mirror of the root-config shape — `(try (read-edn …) (catch
+        ;; Exception _ nil))`): assert some? (clean FAIL with message), then
+        ;; the lint-as/hooks assertions run only under `when`, so the
+        ;; corruption class is a clean FAIL, never an uncaught exception.
+        (let [cfg (try (read-edn cfg-rel) (catch Exception _ nil))]
+          (testing "import config parses as EDN"
+            (is (some? cfg) (str cfg-rel " parses as EDN")))
+          (when cfg
+            (is (= '{org.httpkit.client/defreq clojure.core/def} (:lint-as cfg)))
+            (testing "server-side with-channel hook is preserved exactly alongside it
+                      (the design mechanism requires the existing hook be kept)"
+              (is (= '{:analyze-call {org.httpkit.server/with-channel
+                                      httpkit.with-channel/with-channel}}
+                     (:hooks cfg))))))))))
 
 (deftest with-channel-hook-impl-guard-test
   (testing "the with-channel hook implementation file exists and matches the
@@ -112,10 +126,22 @@
       (testing "import config.edn exists"
         (is (.exists cfg-file) (str cfg-rel " exists")))
       (when (.exists cfg-file)
-        (let [cfg (read-edn cfg-rel)
-              ref (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])]
-          (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
-            (is (= 'httpkit.with-channel/with-channel ref)))))
+        ;; slice-36 follow-up: a PRESENT-but-unparseable import config is the
+        ;; mirror blind spot of slice-35 item 3's root-config fix — the file
+        ;; exists, so the exists-guard above passes, but read-edn throws
+        ;; ("Unmatched delimiter: }") inside the `when` → clojure.test ERROR
+        ;; with no assertion message (the same class http-kit-import-
+        ;; registration-test's guarded read closes at its site). Same
+        ;; guarded-read shape as the root config and the sibling unit test:
+        ;; assert some? (clean FAIL with message), then the :analyze-call
+        ;; assertion runs only under `when` — never an uncaught exception.
+        (let [cfg (try (read-edn cfg-rel) (catch Exception _ nil))]
+          (testing "import config parses as EDN"
+            (is (some? cfg) (str cfg-rel " parses as EDN")))
+          (when cfg
+            (let [ref (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])]
+              (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
+                (is (= 'httpkit.with-channel/with-channel ref)))))))
       (testing "impl file exists (member of the slice-4 tracked change set)"
         (is (.exists impl-file) (str impl-rel " exists")))
       ;; slice-24 follow-up: the slurp must NOT run in a let binding before the

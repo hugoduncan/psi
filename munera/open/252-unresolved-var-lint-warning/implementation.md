@@ -634,3 +634,28 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   failures re-confirmed unrelated (none in the integration run).
 
 - implementation review 2026-08-16: added 3 steps to be addressed
+
+- addressed 3 review steps (slice 36): (1) present-but-unparseable import
+  config.edn → clean FAIL at BOTH unit sites — http-kit-import-registration-test
+  and with-channel-hook-impl-guard-test now read through
+  `(try (read-edn cfg-rel) (catch Exception _ nil))`, assert some? ("parses as
+  EDN", clean FAIL), and run the lint-as/hooks/:analyze-call assertions only
+  under `(when cfg …)` (mirror of slice-35 item 3's root-config shape; corrupt
+  config → 8 passed/2 failed/0 errored, was 2 ERRORs). (2) analysis-proof temp
+  cleanup verified — the finally now asserts `(not (.exists (io/file tmp)))`
+  (clean FAIL with message) after the recursive delete, so a failed `.delete`
+  (in-use handle / child failure) is a visible test failure, never a silent
+  recurrence of the slice-12 leak; negative simulation confirms the assertion
+  catches the leak class (fail count 1 on a left-behind tree); normal run →
+  no new /tmp/ck252* dir. (3) support-ns delete-recursively! wrapper DELETED
+  (branch (a)) — the forwarding var that contradicted the ns's own "No
+  forwarding vars" contract is gone; the integration test requires
+  psi.test-support.fs directly (test-fs/delete-recursively! in the finally,
+  wrapper dropped from :refer); the support ns docstring updated (the
+  analysis-level proof's cleanup calls the shared helper directly, not a
+  fixture here; repo-root's shared-helper delegation is a VALUE, never a
+  forwarding fn). Verified: unit 10 tests / 56 assertions (was 10/54, +2 parse
+  assertions), integration 33 tests / 181 assertions (was 33/180, +1 cleanup
+  assertion), no SKIP (both proofs ran); `bb lint` errors: 0, warnings: 0;
+  `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0 (unit 492,
+  support 435, integration 391 — all under the gate).

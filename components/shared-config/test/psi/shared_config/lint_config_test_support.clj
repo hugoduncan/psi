@@ -8,10 +8,14 @@
   the pinned http-kit/clj-kondo versions and jar paths (each overridable via
   its own system property, mirroring repo-root), the pinned-JVM-clj-kondo
   subprocess runner (timeout-bounded, see run-bounded), the visible SKIP
-  reporter for jar/clojure/git-absent ^:integration arms, the parsed-form
+  reporter for jar/clojure/git-absent ^:integration arms, and the parsed-form
   compare used by both hook guards (plus its guarded parseable? variant for
-  present-but-unparseable tracked input), and the recursive temp-dir cleanup
-  used by the analysis-level proof. Kept outside the .clj-kondo/imports/ dir
+  present-but-unparseable tracked input). The analysis-level proof's recursive
+  temp-dir cleanup is NOT a fixture here — it calls the shared
+  psi.test-support.fs/delete-recursively! directly (slice-36 follow-up: the
+  previous delegation wrapper was a forwarding var by this ns's own
+  definition; deleting it makes the no-forwarding-vars contract literally
+  true). Kept outside the .clj-kondo/imports/ dir
   (AC2 confinement); the ns ends in -support, not -test, so kaocha's .*-test$
   ns-pattern never runs it as a suite.
 
@@ -23,7 +27,6 @@
    [clojure.java.io :as io]
    [clojure.java.shell :as shell]
    [clojure.string :as str]
-   [psi.test-support.fs :as test-fs]
    [psi.test-support.repo-root :as test-repo-root])
   (:import
    [java.util.concurrent TimeUnit]))
@@ -429,15 +432,4 @@
   (try
     (parse-forms s)
     (catch Exception _ nil)))
-
-(defn delete-recursively!
-  "Recursively delete a file/dir tree. No-op when the path does not exist.
-  clojure.java.io offers no recursive delete and `.deleteOnExit` only removes
-  empty dirs, so without this every integration run leaks the temp cache tree
-  under /tmp (slice-12 follow-up). Delegates to the shared
-  psi.test-support.fs helper — the single definition site since the slice-27
-  consolidation (the seven repo-wide local copies, incl. this one, migrated
-  to it). Returns nil."
-  [f]
-  (test-fs/delete-recursively! f))
 

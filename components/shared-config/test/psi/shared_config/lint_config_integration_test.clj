@@ -20,13 +20,13 @@
             clj-kondo-jar
             clj-kondo-main
             clojure-bin
-            delete-recursively!
             git-bin
             http-kit-jar
             parseable?
             repo-root
             run-bounded
-            skip!]])
+            skip!]]
+   [psi.test-support.fs :as test-fs])
   (:import
    [java.util.zip ZipFile]))
 
@@ -370,4 +370,22 @@
               (is (str/includes? out "errors: 0, warnings: 2")
                   "no-reg cache ⇒ exactly the two warnings (AC1 baseline shape)")))
           (finally
-            (delete-recursively! tmp)))))))
+            ;; slice-36 follow-up (item 3, branch (a)): the cleanup calls the
+            ;; SHARED psi.test-support.fs helper directly — the support ns's
+            ;; delegation wrapper was a forwarding var by its own
+            ;; "No forwarding vars" contract and is deleted (the single
+            ;; definition site is then literally true).
+            (test-fs/delete-recursively! tmp)
+            ;; slice-36 follow-up (item 2): the shared helper ignores
+            ;; `.delete`'s boolean return (false when the file/dir is in use
+            ;; — e.g. a platform/timing-dependent handle held by the clj-kondo
+            ;; JVM subprocess, or a child deletion failure), so a failed
+            ;; cleanup would silently leak the /tmp/ck252* hermetic cache tree
+            ;; while the proof still passes — the exact leak class slice 12
+            ;; set out to eliminate (its addressing note records 9 pre-existing
+            ;; leaked dirs; the fix removed the *always*-leak but made the
+            ;; *occasional*-leak invisible). Assert the tree is gone (clean
+            ;; FAIL with message) so a failed cleanup is a visible test
+            ;; failure, never a silent recurrence.
+            (is (not (.exists (io/file tmp)))
+                (str "temp tree cleaned up: " tmp " removed"))))))))
