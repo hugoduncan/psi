@@ -2039,7 +2039,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 40 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Give the tracked import config.edn the jar-export drift comparison that
+- [x] Give the tracked import config.edn the jar-export drift comparison that
       tracked with_channel.clj already has (slice-18 asymmetry, within R4's
       standing version-bump re-verification set): the tracked import dir holds
       TWO files — `config.edn` (the ACTUAL mechanism: the `:lint-as` defreq
@@ -2073,3 +2073,23 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       jar-path override with a modified export config.edn (e.g. an extra
       `:analyze-call` entry) → 1 clean FAIL, 0 errored; restored → integration
       suite 33 tests / 181 assertions, no SKIP
+      — done (sibling ^:integration proof branch): new
+      `http-kit-import-config-jar-export-guard-test` in
+      `lint_config_integration_test.clj` — reads the jar's
+      `clj-kondo.exports/http-kit/http-kit/config.edn` through the slice-35
+      guarded-read shape (IOException → nil → clean some? FAIL), parses it as
+      EDN through a guarded parse (`(try (edn/read-string …) (catch Exception
+      _ nil))` → clean some? FAIL, never an ERROR), exists-guards the tracked
+      config.edn read, parses the tracked copy the same guarded way, and
+      asserts `(= (:hooks export-config) (:hooks tracked-config))` — the
+      `:lint-as` additive diff stays the unit test's exact-equality assertion
+      (tracked = export + `:lint-as`, verified additive); jar-absent /
+      corrupt-jar → visible SKIP via skip! + the shared valid-zip? arm,
+      mirroring the sibling guards. Verified 2026-08-16: drift drill — jar
+      override with an extra `:analyze-call` entry
+      (`org.httpkit.server/new-hook`) → focused integration run
+      `4 passed, 1 failed, 0 errored` (the :hooks equality FAILs cleanly with
+      its message; was silent divergence pre-fix); restored → integration
+      suite 34 tests / 186 assertions, no SKIP (was 33/181; +1 test +5
+      assertions), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0

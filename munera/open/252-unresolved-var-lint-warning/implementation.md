@@ -715,3 +715,23 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   warnings 0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 1 step to be addressed
+- addressed 1 review step (slice 40): tracked import config.edn jar-export
+  drift guard — new ^:integration `http-kit-import-config-jar-export-guard-test`
+  in lint_config_integration_test.clj (sibling of the slice-18 semantics
+  guard): reads the pinned 2.8.0 jar's
+  clj-kondo.exports/http-kit/http-kit/config.edn through the slice-35
+  guarded-read shape (IOException → nil → clean some? FAIL), parses it as EDN
+  through a guarded parse (try edn/read-string catch → nil → clean some? FAIL,
+  never an ERROR, mirror of the parseable? shape), exists-guards the tracked
+  config.edn read, and asserts (= (:hooks export-config) (:hooks
+  tracked-config)) — the :lint-as defreq registration is the tracked-only
+  additive diff, still asserted exactly by the unit test; jar-absent /
+  corrupt-jar → visible SKIP via skip! + shared valid-zip? arm. Verified
+  2026-08-16: drift drill — jar override with an extra :analyze-call entry →
+  focused integration run `4 passed, 1 failed, 0 errored` (the :hooks equality
+  FAILs cleanly with its message, was silent divergence); restored →
+  integration suite 34 tests / 186 assertions no SKIP (was 33/181; +1 test +5
+  assertions), unit 10/59, `bb lint` errors: 0, warnings: 0, `bb fmt:check`
+  clean, `bb commit-check:file-lengths` exit 0. Full-suite failure re-confirmed
+  unrelated: delegate-review-task-implementation-completes-with-nullable-local-model-test
+  (pre-existing environmental, unknown model; fails identically at base).
