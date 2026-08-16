@@ -1970,7 +1970,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 39 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Guard the extension deps.edn read against a PRESENT-but-unparseable file
+- [x] Guard the extension deps.edn read against a PRESENT-but-unparseable file
       (ERROR class; slice-38 closed only the DELETION class for this read):
       `http-kit-pin-sourced-from-deps-edn-test`'s extension-pin block reads
       `(get-in (read-edn "extensions/dev-http/deps.edn") …)` inside the
@@ -1989,7 +1989,21 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       assertions, which run only under `(when ext-pin …)`. Verify: corrupt
       extension deps.edn → 1 plain assertion FAIL, 0 errored (was 1 ERROR);
       restored → 10 tests / 58 assertions
-- [ ] Make `ci-execution-chain-guard-test`'s `(second task)` binding
+      — done (2026-08-16): the block now reads through `(try (read-edn
+      "extensions/dev-http/deps.edn") (catch Exception _ nil))` (mirror of
+      the slice-35 root-config shape / slice-36 import-config.edn sites),
+      asserts some? ("extensions/dev-http/deps.edn parses as EDN", clean FAIL
+      with message) before the pin assertions, which run under `(when ext-cfg
+      …)` (pin exists) with the equality guarded by `(when ext-pin …)` — the
+      pin-exists guard is preserved (a parseable file with a missing pin still
+      clean-FAILs), and the corrupt class is a single plain FAIL, never an
+      uncaught exception. Verified 2026-08-16: corrupt extension deps.edn
+      (`{:deps {:http-kit (unclosed`) → focused unit run `9 passed, 1 failed,
+      0 errored` (clean FAIL "extensions/dev-http/deps.edn parses as EDN"; was
+      1 RuntimeException ERROR pre-fix), restored → 10 tests / 59 assertions
+      (58 + the new parses-as-EDN assertion); `bb lint` errors 0 / warnings 0;
+      `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0
+- [x] Make `ci-execution-chain-guard-test`'s `(second task)` binding
       non-seqable-safe (ERROR-vs-FAIL class; slice-29 fixed only the
       `(nth call 2)` out-of-bounds arm of the SAME let): the bb.edn task arm
       binds `call (second task)` in the let binding BEFORE any assertion —
@@ -2007,3 +2021,18 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       message, never an uncaught exception. Verify: task replaced with a
       number/keyword → focused unit run `N passed, 1 failed, 0 errored` (was
       ERROR pre-fix); restored → 10 tests / 58 assertions
+      — done (2026-08-16): the `call` binding moved out of the let (the
+      binding is now `task` only) and the bb.edn task arm asserts `(seq?
+      task)` cleanly first, then binds/asserts `call` under `(when (seq?
+      task) …)` with the call-dependent assertions (System/exit wrap,
+      run-scry-kaocha-suite! + suite id + focus args) under `(when (seq?
+      call) …)` — a non-seqable task value is a single plain FAIL with the
+      seq? assertion message (was IllegalArgumentException ERROR pre-fix);
+      the string-task case (seqable-but-wrong, `second` returns a char) also
+      collapses to the single seq? FAIL instead of ERRORing at `(first \f)`.
+      Verified 2026-08-16: task replaced with `42` and with `:disabled` →
+      focused unit run `9 passed, 1 failed, 0 errored` (clean FAIL "the task
+      is a call form"; was 1 ERROR), restored → 10 tests / 59 assertions;
+      `bb lint` errors 0 / warnings 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0; integration suite 33 tests / 181
+      assertions pass, no SKIP (both proofs ran)

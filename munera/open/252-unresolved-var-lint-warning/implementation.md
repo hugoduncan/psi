@@ -689,3 +689,27 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   assertions); `bb lint` errors 0 / warnings 0; `bb fmt:check` clean;
   `bb commit-check:file-lengths` exit 0 (file 523 lines, under the gate).
 - implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 39, ERROR→clean-FAIL class): (1)
+  extension deps.edn PRESENT-but-unparseable guard —
+  http-kit-pin-sourced-from-deps-edn-test's extension-pin block now reads
+  through `(try (read-edn "extensions/dev-http/deps.edn") (catch Exception _
+  nil))` (mirror of the slice-35 root-config / slice-36 import-config.edn
+  shape), asserts some? ("extensions/dev-http/deps.edn parses as EDN", clean
+  FAIL) before the pin assertions — pin-exists under `(when ext-cfg …)`,
+  equality under `(when ext-pin …)`, so the slice-11 missing-pin guard is
+  preserved while the corrupt class is a single plain FAIL (was 1
+  RuntimeException ERROR). Verified 2026-08-16: corrupt extension deps.edn →
+  `9 passed, 1 failed, 0 errored`; restored → 10 tests / 59 assertions. (2)
+  ci-execution-chain-guard-test `(second task)` non-seqable-safe — the `call`
+  binding moved out of the let; the bb.edn task arm asserts `(seq? task)`
+  cleanly first, then binds/asserts `call` under `(when (seq? task) …)` with
+  the call-dependent assertions (System/exit wrap, run-scry-kaocha-suite! +
+  suite id + focus args) under `(when (seq? call) …)`: a non-seqable task
+  value (`42` / `:disabled` / `true`) is a single plain FAIL with the seq?
+  message (was IllegalArgumentException ERROR), and the string-task case
+  (seqable-but-wrong) also collapses to the single seq? FAIL instead of
+  ERRORing at `(first \f)`. Verified 2026-08-16: task replaced with `42` and
+  with `:disabled` → `9 passed, 1 failed, 0 errored` (clean FAIL "the task is
+  a call form"); restored → 10 tests / 59 assertions. Verified: unit 10/59,
+  integration 33/181 no SKIP (both proofs ran), `bb lint` errors 0 /
+  warnings 0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.

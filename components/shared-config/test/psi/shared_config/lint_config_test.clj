@@ -262,12 +262,30 @@
         (testing "extensions/dev-http/deps.edn exists"
           (is (.exists ext-deps-file) "extensions/dev-http/deps.edn exists"))
         (when (.exists ext-deps-file)
-          (let [ext-pin (get-in (read-edn "extensions/dev-http/deps.edn")
-                                [:deps 'http-kit/http-kit])]
-            (is (some? ext-pin) "extensions/dev-http/deps.edn pins http-kit/http-kit")
-            (is (= http-kit-version (:mvn/version ext-pin))
-                (str "extension pin " (:mvn/version ext-pin)
-                     " equals root-derived http-kit-version " http-kit-version))))))))
+          ;; slice-39 follow-up: a PRESENT-but-unparseable extension deps.edn
+          ;; (bad merge, hand-edit truncation — the file exists, so the
+          ;; slice-38 exists-guard passes) would make read-edn throw
+          ;; ("Unmatched delimiter: …") inside the `when` → clojure.test ERROR
+          ;; with no assertion message — slice-38 closed only the DELETION
+          ;; class for this read; the unparseable class is the mirror blind
+          ;; spot slices 35/36 closed for the root config and the import
+          ;; config.edn sites (both gained the guarded-read shape
+          ;; `(try (read-edn …) (catch Exception _ nil))` + a some?
+          ;; "parses as EDN" clean-FAIL assertion). Guarded read (mirror of
+          ;; the root-config shape): assert some? (clean FAIL with message),
+          ;; then the pin assertions run only under `when`, so the corruption
+          ;; class is a clean FAIL, never an uncaught exception.
+          (let [ext-cfg (try (read-edn "extensions/dev-http/deps.edn")
+                             (catch Exception _ nil))]
+            (testing "extensions/dev-http/deps.edn parses as EDN"
+              (is (some? ext-cfg) "extensions/dev-http/deps.edn parses as EDN"))
+            (when ext-cfg
+              (let [ext-pin (get-in ext-cfg [:deps 'http-kit/http-kit])]
+                (is (some? ext-pin) "extensions/dev-http/deps.edn pins http-kit/http-kit")
+                (when ext-pin
+                  (is (= http-kit-version (:mvn/version ext-pin))
+                      (str "extension pin " (:mvn/version ext-pin)
+                           " equals root-derived http-kit-version " http-kit-version)))))))))))
 
 (deftest lint-alias-lints-extensions-test
   (testing "the :lint alias still lints the AC1 acceptance surface (slice-13
@@ -499,25 +517,40 @@
               drift to another suite/focus (or a dropped task) would silently
               stop the proofs from running while the tests.edn wiring stays
               green (bb.edn:307-309)"
-      (let [task (:task (get-in (read-edn "bb.edn") [:tasks 'clojure:test:integration]))
-            call (second task)]   ; (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))
+      (let [task (:task (get-in (read-edn "bb.edn") [:tasks 'clojure:test:integration]))]
         (is (some? task) "bb.edn defines a :tasks clojure:test:integration entry")
+        ;; slice-39 follow-up: `(second task)` must NOT run in the let binding
+        ;; before any assertion — a drift of the clojure:test:integration task
+        ;; to a NON-seqable value (:task 42, :task :disabled, :task true —
+        ;; (second 42) / (second :foo) / (second true) all throw
+        ;; IllegalArgumentException "Don't know how to create ISeq from …")
+        ;; would make the guard ERROR with no assertion message, the exact
+        ;; drift class it exists to catch surfacing as the ERROR-vs-FAIL class
+        ;; slices 20/24/29 closed elsewhere — while a seqable-but-wrong task
+        ;; (e.g. a string, whose `second` returns a char) already FAILs
+        ;; cleanly via the `(seq? task)` assertion. Assert `(seq? task)`
+        ;; cleanly first, then bind/assert `call` under `(when (seq? task)
+        ;; …)`: a non-seqable task value is a single plain FAIL with the seq?
+        ;; assertion message, never an uncaught exception.
         (is (seq? task) "the task is a call form")
-        (is (= 'System/exit (first task))
-            "task wraps the call in System/exit (scry exit-code propagation)")
-        (is (seq? call) "the System/exit argument is a call form")
-        (is (= 'run-scry-kaocha-suite! (first call))
-            "clojure:test:integration invokes run-scry-kaocha-suite!")
-        (is (= "integration" (second call))
-            "run-scry-kaocha-suite! receives the integration suite id")
-        ;; slice-29 follow-up: `(nth call 2)` on a drift that DROPS the focus
-        ;; args (e.g. a two-element (run-scry-kaocha-suite! "integration"))
-        ;; throws IndexOutOfBoundsException → clojure.test ERROR with no
-        ;; assertion message — the exact regression this guard exists to catch
-        ;; surfacing as the exact ERROR-vs-FAIL class slices 20/24 closed
-        ;; elsewhere. `(nth call 2 nil)` reads out-of-bounds as nil and FAILs
-        ;; cleanly with the assertion message (the ERROR-vs-FAIL standard:
-        ;; exactly ONE plain assertion FAIL, never an ERROR).
-        (is (= ["--focus" "integration"] (nth call 2 nil))
-            "run-scry-kaocha-suite! keeps the --focus integration args")))))
+        (when (seq? task)
+          (let [call (second task)]   ; (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))
+            (is (= 'System/exit (first task))
+                "task wraps the call in System/exit (scry exit-code propagation)")
+            (is (seq? call) "the System/exit argument is a call form")
+            (when (seq? call)
+              (is (= 'run-scry-kaocha-suite! (first call))
+                  "clojure:test:integration invokes run-scry-kaocha-suite!")
+              (is (= "integration" (second call))
+                  "run-scry-kaocha-suite! receives the integration suite id")
+              ;; slice-29 follow-up: `(nth call 2)` on a drift that DROPS the focus
+              ;; args (e.g. a two-element (run-scry-kaocha-suite! "integration"))
+              ;; throws IndexOutOfBoundsException → clojure.test ERROR with no
+              ;; assertion message — the exact regression this guard exists to catch
+              ;; surfacing as the exact ERROR-vs-FAIL class slices 20/24 closed
+              ;; elsewhere. `(nth call 2 nil)` reads out-of-bounds as nil and FAILs
+              ;; cleanly with the assertion message (the ERROR-vs-FAIL standard:
+              ;; exactly ONE plain assertion FAIL, never an ERROR).
+              (is (= ["--focus" "integration"] (nth call 2 nil))
+                  "run-scry-kaocha-suite! keeps the --focus integration args"))))))))
 
