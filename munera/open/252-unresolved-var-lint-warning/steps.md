@@ -1668,7 +1668,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 35 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Remove the orphaned duplicate review note in implementation.md — the
+- [x] Remove the orphaned duplicate review note in implementation.md — the
       slice-34 ADDRESSING commit (0f7aadd8d) re-added the note line
       "- implementation review 2026-08-16: added 2 steps to be addressed"
       even though the slice-34 REVIEW commit (094b63eea) had already written
@@ -1685,7 +1685,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       slice-33's deletion). Verify: every "- implementation review …" note
       except the latest is immediately followed by its "addressed" paragraph
       (grep the notes; the orphan is the only unpaired one).
-- [ ] Exists-guard the import config.edn read-edn in BOTH unit tests —
+- [x] Exists-guard the import config.edn read-edn in BOTH unit tests —
       `http-kit-import-registration-test` (lint_config_test.clj:54) and
       `with-channel-hook-impl-guard-test` (lint_config_test.clj:80) read
       `.clj-kondo/imports/http-kit/http-kit/config.edn` via `read-edn` in
@@ -1713,7 +1713,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       under `when` — mirror of slice-31's root-config shape (and slice-24's
       impl-file shape in the same test). Verify: config.edn moved aside → 2
       plain assertion FAILs, 0 errored (was 2 ERRORs); restored → 10/51.
-- [ ] Make `root-config-ac2-invariant-test` fail cleanly on a PRESENT-but-
+- [x] Make `root-config-ac2-invariant-test` fail cleanly on a PRESENT-but-
       unparseable root config.edn (ERROR class; slice-34's present-but-
       unparseable fix closed only the with_channel.clj tracked impl — the
       root config read is the mirror blind spot): slice-31 exists-guards
@@ -1736,7 +1736,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       the AC2 assertions, with the assertions under `when`) so the corruption
       class is a clean FAIL, never an uncaught exception. Verify: corrupt
       config → 1 clean FAIL, 0 errored (was 1 ERROR); restored → 10/51.
-- [ ] Guard `with-channel-hook-semantics-guard-test`'s jar-export side
+- [x] Guard `with-channel-hook-semantics-guard-test`'s jar-export side
       against a VALID-zip-with-corrupt-entry (ERROR class; slice-34's
       present-but-unparseable fix explicitly deferred this side — "the
       integration site's jar-export side keeps the direct parse-forms call —

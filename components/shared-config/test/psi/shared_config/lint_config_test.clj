@@ -51,13 +51,30 @@
 
 (deftest http-kit-import-registration-test
   (testing "http-kit import config retains the defreq :lint-as registration"
-    (let [cfg (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")]
-      (is (= '{org.httpkit.client/defreq clojure.core/def} (:lint-as cfg)))
-      (testing "server-side with-channel hook is preserved exactly alongside it
-                (the design mechanism requires the existing hook be kept)"
-        (is (= '{:analyze-call {org.httpkit.server/with-channel
-                                httpkit.with-channel/with-channel}}
-               (:hooks cfg)))))))
+    (let [cfg-rel  ".clj-kondo/imports/http-kit/http-kit/config.edn"
+          cfg-file (io/file repo-root cfg-rel)]
+      ;; slice-35 follow-up: the read-edn slurp must NOT run in the let
+      ;; binding before an exists assertion — a worktree-only rm of
+      ;; config.edn (the git ls-files --error-unmatch index arm in
+      ;; gitignore-http-kit-tracking-ground-truth-test checks the INDEX, not
+      ;; worktree presence, so it stays green on the deletion class) would
+      ;; otherwise throw FileNotFoundException at read time and surface as a
+      ;; clojure.test ERROR with no assertion message (slice-24's recorded
+      ;; decline covered only the index arm; slice-31 repeated that rationale
+      ;; — the worktree-only deletion class is a gap in its coverage premise).
+      ;; Mirror slice-31's root-config shape (and slice-24's impl-file shape
+      ;; in with-channel-hook-impl-guard-test): assert existence first (clean
+      ;; FAIL with message), then read/assert only under `when`.
+      (testing "import config.edn exists"
+        (is (.exists cfg-file) (str cfg-rel " exists")))
+      (when (.exists cfg-file)
+        (let [cfg (read-edn cfg-rel)]
+          (is (= '{org.httpkit.client/defreq clojure.core/def} (:lint-as cfg)))
+          (testing "server-side with-channel hook is preserved exactly alongside it
+                    (the design mechanism requires the existing hook be kept)"
+            (is (= '{:analyze-call {org.httpkit.server/with-channel
+                                    httpkit.with-channel/with-channel}}
+                   (:hooks cfg)))))))))
 
 (deftest with-channel-hook-impl-guard-test
   (testing "the with-channel hook implementation file exists and matches the
@@ -75,12 +92,30 @@
             exercises the same parse-forms the ^:integration semantics guard
             relies on (a future hardening — or regression — cannot diverge
             between the two sites)."
-    (let [impl-rel  ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
-          impl-file (io/file repo-root impl-rel)
-          cfg       (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")
-          ref       (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])]
-      (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
-        (is (= 'httpkit.with-channel/with-channel ref)))
+    (let [cfg-rel   ".clj-kondo/imports/http-kit/http-kit/config.edn"
+          cfg-file  (io/file repo-root cfg-rel)
+          impl-rel  ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
+          impl-file (io/file repo-root impl-rel)]
+      ;; slice-35 follow-up: the read-edn slurp must NOT run in the let
+      ;; binding before an exists assertion — a worktree-only rm of
+      ;; config.edn (the ls-files index arm checks the INDEX, not worktree
+      ;; presence, so it stays green on the deletion class) would otherwise
+      ;; throw FileNotFoundException at read time and surface as a clojure.test
+      ;; ERROR with no assertion message. This site was never part of
+      ;; slice-24's flagged item (which named only
+      ;; http-kit-import-registration-test) but has the same unguarded shape.
+      ;; Mirror slice-31's root-config shape (and slice-24's impl-file shape
+      ;; below): assert existence first (clean FAIL with message), then
+      ;; read/assert only under `when`. The impl checks stay independent — a
+      ;; missing config reports exactly ONE plain FAIL (its existence), never
+      ;; masking or being masked by the impl assertions.
+      (testing "import config.edn exists"
+        (is (.exists cfg-file) (str cfg-rel " exists")))
+      (when (.exists cfg-file)
+        (let [cfg (read-edn cfg-rel)
+              ref (get-in cfg [:hooks :analyze-call 'org.httpkit.server/with-channel])]
+          (testing "config.edn :analyze-call maps with-channel to httpkit.with-channel/with-channel"
+            (is (= 'httpkit.with-channel/with-channel ref)))))
       (testing "impl file exists (member of the slice-4 tracked change set)"
         (is (.exists impl-file) (str impl-rel " exists")))
       ;; slice-24 follow-up: the slurp must NOT run in a let binding before the
@@ -133,21 +168,36 @@
       (testing "root config exists"
         (is (.exists cfg-file) ".clj-kondo/config.edn exists"))
       (when (.exists cfg-file)
-        (let [cfg (read-edn ".clj-kondo/config.edn")]
-          (testing ":unresolved-symbol :exclude remains exactly [(malli.core/=>)]"
-            (is (= '[(malli.core/=>)]
-                   (get-in cfg [:linters :unresolved-symbol :exclude]))))
-          (testing ":lint-as does not mirror the http-kit defreq registration
-                    (plan.md decision 1's no-root-mirror choice; defreq is never
-                    invoked in-repo, unlike the malli/promesa mirror convention)"
-            (is (not (contains? (:lint-as cfg) 'org.httpkit.client/defreq))))
-          (testing "no org.httpkit.client entry anywhere in the root config
-                    (AC2's general 'gains no http-client entries' clause — the EDN
-                    walk covers :lint-as, :hooks, :namespaces, and any other
-                    symbol/keyword-bearing spot, so e.g. a root :hooks :analyze-call
-                    entry for an http-kit var fails here)"
-            (is (empty? (http-client-entries cfg))
-                "root config carries no http-client symbol or keyword")))))))
+        ;; slice-35 follow-up: a PRESENT-but-unparseable root config (bad
+        ;; merge, hand-edit truncation, encoding corruption — the file
+        ;; exists, so the exists-guard above passes) would make read-edn
+        ;; throw ("Unmatched delimiter: …") inside the `when` → clojure.test
+        ;; ERROR with no assertion message — slice-34's present-but-
+        ;; unparseable fix closed only the with_channel.clj tracked impl; the
+        ;; root config read is the mirror blind spot. Guarded read (mirror
+        ;; of slice-34's parseable? fixture — `(try (read-edn …) (catch
+        ;; Exception _ nil))`): assert some? (clean FAIL with message), then
+        ;; the AC2 assertions run only under `when`, so the corruption class
+        ;; is a clean FAIL, never an uncaught exception.
+        (let [cfg (try (read-edn ".clj-kondo/config.edn")
+                       (catch Exception _ nil))]
+          (testing "root config parses as EDN"
+            (is (some? cfg) ".clj-kondo/config.edn parses as EDN"))
+          (when cfg
+            (testing ":unresolved-symbol :exclude remains exactly [(malli.core/=>)]"
+              (is (= '[(malli.core/=>)]
+                     (get-in cfg [:linters :unresolved-symbol :exclude]))))
+            (testing ":lint-as does not mirror the http-kit defreq registration
+                      (plan.md decision 1's no-root-mirror choice; defreq is never
+                      invoked in-repo, unlike the malli/promesa mirror convention)"
+              (is (not (contains? (:lint-as cfg) 'org.httpkit.client/defreq))))
+            (testing "no org.httpkit.client entry anywhere in the root config
+                      (AC2's general 'gains no http-client entries' clause — the EDN
+                      walk covers :lint-as, :hooks, :namespaces, and any other
+                      symbol/keyword-bearing spot, so e.g. a root :hooks :analyze-call
+                      entry for an http-kit var fails here)"
+              (is (empty? (http-client-entries cfg))
+                  "root config carries no http-client symbol or keyword"))))))))
 
 (deftest clj-kondo-pin-sourced-from-deps-edn-test
   (testing "the analysis-level proof's clj-kondo version is derived from deps.edn

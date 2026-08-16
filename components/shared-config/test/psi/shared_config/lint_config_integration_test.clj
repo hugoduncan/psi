@@ -24,7 +24,6 @@
             git-bin
             http-kit-jar
             parseable?
-            parse-forms
             repo-root
             run-bounded
             skip!]])
@@ -81,9 +80,21 @@
       (let [jar-entry   "clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj"
             tracked-rel ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
             tracked-file (io/file repo-root tracked-rel)
-            jar-export (with-open [zf (ZipFile. (io/file http-kit-jar))]
-                         (when-let [entry (.getEntry zf jar-entry)]
-                           (slurp (.getInputStream zf entry))))]
+            jar-export (try
+                         ;; slice-35 follow-up: the entry slurp must NOT throw
+                         ;; inside the let binding — a valid-zip-with-corrupt-
+                         ;; entry (bit rot, partial overwrite, bad artifact
+                         ;; copy — the slice-30 valid-zip? arm validates only
+                         ;; the CONTAINER, so this passes the guard) can make
+                         ;; the entry slurp throw ZipException (inflate error)
+                         ;; → clojure.test ERROR before any assertion. Guarded
+                         ;; read → nil on IOException (the ZipException
+                         ;; superclass) → the some? assertion below fails
+                         ;; cleanly, never an uncaught exception.
+                         (with-open [zf (ZipFile. (io/file http-kit-jar))]
+                           (when-let [entry (.getEntry zf jar-entry)]
+                             (slurp (.getInputStream zf entry))))
+                         (catch java.io.IOException _ nil))]
         (is (some? jar-export)
             (str "the pinned http-kit jar contains the clj-kondo.exports export "
                  jar-entry))
@@ -113,13 +124,30 @@
             ;; message (the unit impl-guard is the same class); the shared
             ;; parseable? fixture (guarded parse, nil on unparseable — single
             ;; definition site in the support ns) turns the corruption class
-            ;; into this clean assertion FAIL, never an ERROR.
-            (let [tracked-forms (parseable? (slurp tracked-file))]
-              (testing "tracked impl parses as Clojure forms"
-                (is (some? tracked-forms) (str tracked-rel " parses as Clojure forms")))
-              (when tracked-forms
-                (is (= (parse-forms jar-export) tracked-forms)
-                    "tracked with_channel.clj differs from the pinned jar export")))))))))
+            ;; into this clean assertion FAIL, never an ERROR. slice-35
+            ;; follow-up: the JAR-EXPORT side is the mirror blind spot
+            ;; slice-34 explicitly deferred ("the integration site's jar-export
+            ;; side keeps the direct parse-forms call — pinned-jar data,
+            ;; zip-validated by the slice-30 valid-zip? arm") — a valid-zip-
+            ;; with-corrupt-entry whose entry slurps to garbage-but-slurpable
+            ;; content (verified 2026-08-16: byte flipped in the deflate
+            ;; stream → the direct (parse-forms jar-export) threw "Unmatched
+            ;; delimiter: )" → clojure.test ERROR) makes the direct parse
+            ;; throw at the equality. Parse jar-export through the shared
+            ;; parseable? fixture and assert some? (clean FAIL with message)
+            ;; before the equality, mirroring the tracked-forms guard directly
+            ;; above — never an uncaught exception.
+            (let [export-forms (parseable? jar-export)]
+              (testing "jar export parses as Clojure forms"
+                (is (some? export-forms)
+                    (str "jar export " jar-entry " parses as Clojure forms")))
+              (when export-forms
+                (let [tracked-forms (parseable? (slurp tracked-file))]
+                  (testing "tracked impl parses as Clojure forms"
+                    (is (some? tracked-forms) (str tracked-rel " parses as Clojure forms")))
+                  (when tracked-forms
+                    (is (= export-forms tracked-forms)
+                        "tracked with_channel.clj differs from the pinned jar export")))))))))))
 
 (deftest ^:integration gitignore-http-kit-tracking-ground-truth-test
   (testing "git's own interpretation of the tracking negation matches the text

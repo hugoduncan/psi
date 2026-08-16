@@ -559,8 +559,6 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
-
-- implementation review 2026-08-16: added 2 steps to be addressed
 - addressed 2 review steps (slice 34): (1) present-but-unparseable tracked
   with_channel.clj → clean FAIL at BOTH guard sites: new shared `parseable?`
   fixture in lint_config_test_support.clj (guarded parse via parse-forms —
@@ -595,3 +593,42 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   timing flake — passes focused 14/14 with this change, and on base).
 
 - implementation review 2026-08-16: added 4 steps to be addressed
+- addressed 4 review steps (slice 35): (1) orphaned duplicate slice-34
+  review note removed — the implementation.md 561/563 pair ("added 2 steps to
+  be addressed" twice consecutively, the first copy with no matching
+  addressing paragraph; reintroduced by the slice-34 addressing commit
+  0f7aadd8d) is now a single note immediately followed by its slice-34
+  "addressed 2 review steps" paragraph — the exact orphan pattern slice-33
+  removed; grep-verified: the 561/563 consecutive duplicate is gone, every
+  note except the latest carries its addressed paragraph. (2) import
+  config.edn read-edn exists-guarded in BOTH unit tests —
+  http-kit-import-registration-test and with-channel-hook-impl-guard-test now
+  assert `(.exists cfg-file)` (clean FAIL with message) before `read-edn`
+  under `when` (mirror of slice-31's root-config shape / slice-24's impl-file
+  shape): a worktree-only `rm` of config.edn (the git ls-files index arm
+  checks the INDEX only, so it stays green) was 2× FileNotFoundException
+  ERROR, now 2 plain FAILs, 0 errored. (3) root-config-ac2-invariant-test
+  guards a PRESENT-but-unparseable root config.edn (slice-34's
+  present-but-unparseable fix closed only the tracked with_channel.clj — the
+  root config read was the mirror blind spot): read-edn wrapped in
+  `(try … (catch Exception _ nil))`, asserted some? ("parses as EDN", clean
+  FAIL) before the AC2 assertions under `when` — corrupt config was 1
+  RuntimeException ERROR, now 1 clean FAIL, 0 errored. (4)
+  with-channel-hook-semantics-guard-test's jar-export side guarded against a
+  valid-zip-with-corrupt-entry (the side slice-34 explicitly deferred — the
+  slice-30 valid-zip? arm validates only the CONTAINER): the entry slurp is
+  IOException-guarded (ZipException → nil → the some? jar-export assertion
+  fails cleanly) and the equality parses jar-export through the shared
+  parseable? fixture, asserting some? ("jar export parses as Clojure forms")
+  before the compare (direct parse-forms call removed — now unused :refer
+  dropped) — corrupt-entry jar override was 1 RuntimeException ERROR, now 1
+  clean FAIL, 0 errored. Verified 2026-08-16: unit 10 tests / 54 assertions
+  pass (was 10/51; +2 exists +1 parses-as-EDN), focused integration ns 3
+  tests / 29 assertions no SKIP, full integration suite 33 tests / 180
+  assertions pass no SKIP (was 33/179; +1 jar-export parse assertion); drift
+  drills — config.edn moved aside → unit `8 passed, 2 failed, 0 errored`
+  (was 2 ERRORs), corrupt root config → unit `9 passed, 1 failed, 0 errored`
+  (was 1 ERROR), corrupt-entry jar override → integration ns `2 passed, 1
+  failed, 0 errored` (was 1 ERROR); `bb lint` errors: 0, warnings: 0,
+  `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0. Full-suite
+  failures re-confirmed unrelated (none in the integration run).
