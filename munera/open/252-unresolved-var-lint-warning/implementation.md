@@ -508,3 +508,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   (both proofs ran; +1 exists assertion), corrupt-jar override → visible SKIP
   + clean FAILs only, `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean,
   `bb commit-check:file-lengths` exit 0.
+
+- implementation review 2026-08-16: added 2 steps to be addressed

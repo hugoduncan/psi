@@ -1374,3 +1374,34 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       reports, never a FileNotFoundException ERROR. Verified 2026-08-16 with
       the corrupt-jar override: focused integration run → analysis-level
       proof 8 clean FAILs, `0 errored` (was 1 ERROR pre-fix)
+
+## Slice 31 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Harden `ci-execution-chain-guard-test`'s ci.yml read against whole-file
+      deletion (ERROR class; slices 20/24/29/30 standard — "never an ERROR,
+      always clean FAIL or visible SKIP"): the test slurps
+      `.github/workflows/ci.yml` unconditionally in the let binding
+      (`(slurp (io/file repo-root ".github/workflows/ci.yml"))`) — a deleted
+      ci.yml (the extreme of the exact drift the test guards: "a
+      dropped/renamed CI step … silently disables the entire CI regression
+      surface") throws FileNotFoundException → clojure.test ERROR with no
+      assertion message. Unlike the .gitignore slurp (^:integration
+      check-ignore malli arm backstop) and the import config.edn read-edn
+      (ls-files index arm backstop, slice-24's recorded decline), NO
+      ^:integration proof reads ci.yml — there is no backstop. Fix: assert
+      `(.exists ci-file)` first (clean FAIL with message), then
+      split/parse only under `when`, mirroring slice-24's shape.
+- [ ] Harden `root-config-ac2-invariant-test`'s root config read against
+      whole-file deletion (same ERROR class): the test's
+      `(read-edn ".clj-kondo/config.edn")` slurp runs in the let binding —
+      a deleted root config throws FileNotFoundException → ERROR with no
+      assertion message. Slice-24's decline of the parallel shape applied
+      ONLY to the import config.edn (covered by the `git ls-files
+      --error-unmatch` index arm, which checks `.clj-kondo/imports/`); the
+      ROOT config has no such backstop — no ^:integration test reads it, and
+      its deletion is a SILENT drift (clj-kondo falls back to defaults: the
+      malli `=>` exclude and every AC2 invariant vanish with zero signal from
+      `bb lint`/CI), so the only guard ERRORing instead of clean-FAILing is
+      worse here, not better. Fix: exists-guard the read (assert
+      `(.exists …)` first → clean FAIL, then read/assert only under `when`),
+      mirroring slice-24's shape.
