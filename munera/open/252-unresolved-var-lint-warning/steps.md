@@ -1377,7 +1377,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 31 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Harden `ci-execution-chain-guard-test`'s ci.yml read against whole-file
+- [x] Harden `ci-execution-chain-guard-test`'s ci.yml read against whole-file
       deletion (ERROR class; slices 20/24/29/30 standard — "never an ERROR,
       always clean FAIL or visible SKIP"): the test slurps
       `.github/workflows/ci.yml` unconditionally in the let binding
@@ -1391,7 +1391,16 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       ^:integration proof reads ci.yml — there is no backstop. Fix: assert
       `(.exists ci-file)` first (clean FAIL with message), then
       split/parse only under `when`, mirroring slice-24's shape.
-- [ ] Harden `root-config-ac2-invariant-test`'s root config read against
+      — done: the slurp moved OUT of the let binding into an exists assertion
+      (`(is (.exists ci-file) ".github/workflows/ci.yml exists")` — fails
+      cleanly first) with `ci-run-steps`/split-lines/parse guarded by
+      `(when (.exists ci-file) …)` (mirror of slice-24); the bb.edn task arm
+      stays OUTSIDE the `when`, so a deleted ci.yml FAILs cleanly while the
+      bb.edn guard still runs (more signal, not less). Verified 2026-08-16:
+      ci.yml moved aside → focused unit run `9 passed, 1 failed, 0 errored`
+      (was FileNotFoundException ERROR pre-fix — the exists assertion FAILs
+      with its message, the bb.edn arm still passes); ci.yml restored.
+- [x] Harden `root-config-ac2-invariant-test`'s root config read against
       whole-file deletion (same ERROR class): the test's
       `(read-edn ".clj-kondo/config.edn")` slurp runs in the let binding —
       a deleted root config throws FileNotFoundException → ERROR with no
@@ -1405,3 +1414,20 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       worse here, not better. Fix: exists-guard the read (assert
       `(.exists …)` first → clean FAIL, then read/assert only under `when`),
       mirroring slice-24's shape.
+      — done: the read-edn moved OUT of the let binding into an exists
+      assertion (`(is (.exists cfg-file) ".clj-kondo/config.edn exists")` —
+      fails cleanly first, mirror of slice-24's shape) with the EDN read and
+      all three AC2 invariant assertions guarded by
+      `(when (.exists cfg-file) …)`; the "root config keeps AC2 invariants"
+      testing block's comment records the rationale (no ^:integration
+      backstop; silent clj-kondo default fallback makes the ERROR-vs-FAIL
+      distinction worse here). Verified 2026-08-16: config.edn moved aside →
+      focused unit run `9 passed, 1 failed, 0 errored` (was
+      FileNotFoundException ERROR pre-fix — the exists assertion FAILs with
+      its message); config.edn restored. Unit 10/50 (was 10/48, +2 exists
+      assertions), integration 33/178 no SKIP, `bb lint` errors: 0 warnings:
+      0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0. The
+      full-suite `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+      failure is pre-existing at eab8902f2 (verified via stash: fails
+      identically with this change absent — local-model env config, unrelated
+      to task 252).

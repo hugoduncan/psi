@@ -510,3 +510,22 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+
+- implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 31, ERROR→clean-FAIL class, no backstop):
+  (1) `ci-execution-chain-guard-test` — ci.yml slurp moved out of the let
+  binding into an exists assertion (`(is (.exists ci-file) …)` fails cleanly
+  first) with parse guarded by `when`; the bb.edn task arm stays outside the
+  `when` so it still runs on deletion (more signal). No ^:integration backstop
+  reads ci.yml (unlike .gitignore/import config.edn), so this is the only
+  guard against whole-file deletion. (2) `root-config-ac2-invariant-test` —
+  root `.clj-kondo/config.edn` read-edn exists-guarded identically (its
+  deletion is a SILENT drift — clj-kondo falls back to defaults — and no
+  ^:integration backstop reads it). Verified both negative paths (file moved
+  aside → 1 clean FAIL, 0 errored; was FileNotFoundException ERROR) and
+  restored. Verified: unit 10/50 (+2 exists assertions), integration 33/178
+  no SKIP, `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean,
+  `bb commit-check:file-lengths` exit 0. Pre-existing full-suite failure
+  `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+  (unknown local model deepseek/deepseek-v4-flash) confirmed at base commit
+  eab8902f2 via stash — unrelated to task 252.

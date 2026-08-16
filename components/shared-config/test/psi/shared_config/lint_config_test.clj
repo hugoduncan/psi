@@ -105,21 +105,38 @@
 
 (deftest root-config-ac2-invariant-test
   (testing "root config keeps AC2 invariants (no http-client drift)"
-    (let [cfg (read-edn ".clj-kondo/config.edn")]
-      (testing ":unresolved-symbol :exclude remains exactly [(malli.core/=>)]"
-        (is (= '[(malli.core/=>)]
-               (get-in cfg [:linters :unresolved-symbol :exclude]))))
-      (testing ":lint-as does not mirror the http-kit defreq registration
-                (plan.md decision 1's no-root-mirror choice; defreq is never
-                invoked in-repo, unlike the malli/promesa mirror convention)"
-        (is (not (contains? (:lint-as cfg) 'org.httpkit.client/defreq))))
-      (testing "no org.httpkit.client entry anywhere in the root config
-                (AC2's general 'gains no http-client entries' clause — the EDN
-                walk covers :lint-as, :hooks, :namespaces, and any other
-                symbol/keyword-bearing spot, so e.g. a root :hooks :analyze-call
-                entry for an http-kit var fails here)"
-        (is (empty? (http-client-entries cfg))
-            "root config carries no http-client symbol or keyword")))))
+    (let [cfg-file (io/file repo-root ".clj-kondo/config.edn")]
+      ;; slice-31 follow-up: the read-edn slurp must NOT run in the let
+      ;; binding before an exists assertion — a deleted root config throws
+      ;; FileNotFoundException → clojure.test ERROR with no assertion message
+      ;; (the ERROR-vs-FAIL standard slices 20/24/29/30 closed elsewhere).
+      ;; Slice-24's decline of the parallel shape applied ONLY to the import
+      ;; config.edn (covered by the git ls-files --error-unmatch index arm,
+      ;; which checks .clj-kondo/imports/); the ROOT config has no backstop —
+      ;; no ^:integration test reads it, and its deletion is a SILENT drift
+      ;; (clj-kondo falls back to defaults: the malli `=>` exclude and every
+      ;; AC2 invariant vanish with zero signal from bb lint/CI), so the only
+      ;; guard ERRORing instead of clean-FAILing is worse here, not better.
+      ;; Assert existence first (clean FAIL with message), then read/assert
+      ;; only under `when` (mirror of slice-24's shape).
+      (testing "root config exists"
+        (is (.exists cfg-file) ".clj-kondo/config.edn exists"))
+      (when (.exists cfg-file)
+        (let [cfg (read-edn ".clj-kondo/config.edn")]
+          (testing ":unresolved-symbol :exclude remains exactly [(malli.core/=>)]"
+            (is (= '[(malli.core/=>)]
+                   (get-in cfg [:linters :unresolved-symbol :exclude]))))
+          (testing ":lint-as does not mirror the http-kit defreq registration
+                    (plan.md decision 1's no-root-mirror choice; defreq is never
+                    invoked in-repo, unlike the malli/promesa mirror convention)"
+            (is (not (contains? (:lint-as cfg) 'org.httpkit.client/defreq))))
+          (testing "no org.httpkit.client entry anywhere in the root config
+                    (AC2's general 'gains no http-client entries' clause — the EDN
+                    walk covers :lint-as, :hooks, :namespaces, and any other
+                    symbol/keyword-bearing spot, so e.g. a root :hooks :analyze-call
+                    entry for an http-kit var fails here)"
+            (is (empty? (http-client-entries cfg))
+                "root config carries no http-client symbol or keyword")))))))
 
 (deftest clj-kondo-pin-sourced-from-deps-edn-test
   (testing "the analysis-level proof's clj-kondo version is derived from deps.edn
@@ -316,18 +333,35 @@
             lint-alias / bb.edn lint wrapper / tests.edn. Read ci.yml as text
             (line-paired like the .gitignore test) and bb.edn as EDN — no
             subprocess, runs anywhere."
-    (let [steps (ci-run-steps
-                 (str/split-lines
-                  (slurp (io/file repo-root ".github/workflows/ci.yml"))))]
-      (testing "Lint step runs `bb lint` (the local AC1 gate — ci.yml:89)"
-        (is (= "bb lint" (get steps "Lint"))
-            "ci.yml Lint step runs `bb lint`"))
-      (testing "Run Clojure integration tests step runs
-                `bb clojure:test:integration` (the CI-enforceable regression
-                surface — the three ^:integration proofs run there; ci.yml:166)"
-        (is (= "bb clojure:test:integration"
-               (get steps "Run Clojure integration tests"))
-            "ci.yml integration step runs `bb clojure:test:integration`")))
+    (let [ci-file (io/file repo-root ".github/workflows/ci.yml")]
+      ;; slice-31 follow-up: the slurp must NOT run in the let binding before
+      ;; an exists assertion — a deleted ci.yml (the extreme of the exact
+      ;; drift this test guards: "a dropped/renamed CI step … silently
+      ;; disables the entire CI regression surface") would otherwise throw
+      ;; FileNotFoundException at read time and surface as a clojure.test
+      ;; ERROR with no assertion message (the ERROR-vs-FAIL standard slices
+      ;; 20/24/29/30 closed elsewhere). Unlike the .gitignore slurp
+      ;; (^:integration check-ignore malli arm backstop) and the import
+      ;; config.edn read-edn (ls-files index arm backstop, slice-24's recorded
+      ;; decline), NO ^:integration proof reads ci.yml — there is no backstop,
+      ;; so the exists assertion below is the ONLY guard against whole-file
+      ;; deletion: clean FAIL with its message, then split/parse only under
+      ;; `when` (mirror of slice-24's shape).
+      (testing "ci.yml exists"
+        (is (.exists ci-file) ".github/workflows/ci.yml exists"))
+      (when (.exists ci-file)
+        (let [steps (ci-run-steps
+                     (str/split-lines (slurp ci-file)))]
+          (testing "Lint step runs `bb lint` (the local AC1 gate — ci.yml:89)"
+            (is (= "bb lint" (get steps "Lint"))
+                "ci.yml Lint step runs `bb lint`"))
+          (testing "Run Clojure integration tests step runs
+                    `bb clojure:test:integration` (the CI-enforceable
+                    regression surface — the three ^:integration proofs run
+                    there; ci.yml:166)"
+            (is (= "bb clojure:test:integration"
+                   (get steps "Run Clojure integration tests"))
+                "ci.yml integration step runs `bb clojure:test:integration`")))))
     (testing "bb.edn clojure:test:integration task still routes to
               run-scry-kaocha-suite! with the integration suite and focus — a
               drift to another suite/focus (or a dropped task) would silently
