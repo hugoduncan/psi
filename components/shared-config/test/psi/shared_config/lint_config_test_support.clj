@@ -9,9 +9,10 @@
   its own system property, mirroring repo-root), the pinned-JVM-clj-kondo
   subprocess runner (timeout-bounded, see run-bounded), the visible SKIP
   reporter for jar/clojure/git-absent ^:integration arms, the parsed-form
-  compare used by both hook guards, and the recursive temp-dir cleanup used by
-  the analysis-level proof. Kept outside the .clj-kondo/imports/ dir (AC2
-  confinement); the ns ends in -support, not -test, so kaocha's .*-test$
+  compare used by both hook guards (plus its guarded parseable? variant for
+  present-but-unparseable tracked input), and the recursive temp-dir cleanup
+  used by the analysis-level proof. Kept outside the .clj-kondo/imports/ dir
+  (AC2 confinement); the ns ends in -support, not -test, so kaocha's .*-test$
   ns-pattern never runs it as a suite.
 
   No forwarding vars: each fixture is DEFINED here once and :refer'd into the
@@ -407,6 +408,27 @@
   [s]
   (binding [*read-eval* false]
     (read-string {:read-cond :preserve} (str "[" s "]"))))
+
+(defn parseable?
+  "Parse a Clojure source string into its top-level forms via the shared
+  parse-forms fixture (the *read-eval*-false / :read-cond :preserve hardening
+  applies), or return nil when the input does not parse (slice-34 follow-up):
+  both with_channel.clj guard sites — with-channel-hook-impl-guard-test (unit)
+  and with-channel-hook-semantics-guard-test (integration) — guard DELETION
+  via exists-assertions (slices 24/29), but a present-but-unparseable tracked
+  impl (bad merge, hand-edit truncation, encoding corruption — the file
+  exists, so both exists-guards pass) made parse-forms' read-string throw
+  (\"Unmatched delimiter: ]\" / \"Unexpected EOF\") inside the `when` →
+  clojure.test ERROR with no assertion message. The guarded parse turns the
+  corruption class into a clean assertion FAIL (`(is (some? …))` on the
+  result), never an uncaught exception — the ERROR-vs-FAIL/SKIP standard
+  slices 20/24/29/30/31/32/33 established. Single definition site (mirror of
+  the skip!/parse-forms consolidation): both guard sites use the same helper,
+  so a future hardening or regression cannot diverge between them."
+  [s]
+  (try
+    (parse-forms s)
+    (catch Exception _ nil)))
 
 (defn delete-recursively!
   "Recursively delete a file/dir tree. No-op when the path does not exist.

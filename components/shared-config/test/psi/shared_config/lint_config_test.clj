@@ -24,7 +24,7 @@
    [psi.shared-config.lint-config-test-support
     :refer [http-client-entries
             http-kit-version
-            parse-forms
+            parseable?
             read-edn
             repo-root]]))
 
@@ -92,16 +92,27 @@
       ;; check above fails cleanly; the parse (and the ns/defn assertions that
       ;; depend on it) is guarded by `when`, so the deletion case reports
       ;; exactly ONE plain assertion FAIL with its message, never an ERROR.
+      ;; slice-34 follow-up: a PRESENT-but-unparseable impl (bad merge,
+      ;; hand-edit truncation, encoding corruption — the file exists, so the
+      ;; exists-guard passes) would make parse-forms' read-string throw inside
+      ;; the `when` → ERROR with no assertion message; the shared parseable?
+      ;; fixture (guarded parse, nil on unparseable — single definition site in
+      ;; the support ns) turns the corruption class into this clean assertion
+      ;; FAIL, never an ERROR.
       (when (.exists impl-file)
-        (let [forms (parse-forms (slurp impl-file))]
-          (testing "impl ns is httpkit.with-channel — matches the reference's namespace"
-            (is (some (fn [f] (and (seq? f) (= 'ns (first f))
-                                   (= 'httpkit.with-channel (second f))))
-                      forms)))
-          (testing "impl defines (defn with-channel …) — matches the reference's var"
-            (is (some (fn [f] (and (seq? f) (= 'defn (first f))
-                                   (= 'with-channel (second f))))
-                      forms))))))))
+        (let [forms (parseable? (slurp impl-file))]
+          (testing "impl parses as Clojure forms"
+            (is (some? forms)
+                (str impl-rel " parses as Clojure forms")))
+          (when forms
+            (testing "impl ns is httpkit.with-channel — matches the reference's namespace"
+              (is (some (fn [f] (and (seq? f) (= 'ns (first f))
+                                     (= 'httpkit.with-channel (second f))))
+                        forms)))
+            (testing "impl defines (defn with-channel …) — matches the reference's var"
+              (is (some (fn [f] (and (seq? f) (= 'defn (first f))
+                                     (= 'with-channel (second f))))
+                        forms)))))))))
 
 (deftest root-config-ac2-invariant-test
   (testing "root config keeps AC2 invariants (no http-client drift)"

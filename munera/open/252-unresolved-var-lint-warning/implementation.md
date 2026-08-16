@@ -559,3 +559,37 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+
+- implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 34): (1) present-but-unparseable tracked
+  with_channel.clj → clean FAIL at BOTH guard sites: new shared `parseable?`
+  fixture in lint_config_test_support.clj (guarded parse via parse-forms —
+  `(try (parse-forms s) (catch Exception _ nil))`, returns forms or nil,
+  single definition site mirroring skip!/parse-forms consolidation);
+  with-channel-hook-impl-guard-test (unit) and
+  with-channel-hook-semantics-guard-test (integration) both parse the tracked
+  impl through it and assert `(is (some? …) "… parses as Clojure forms")`
+  before the dependent ns/defn / equality assertions, which run only under
+  `(when forms …)` (the integration site's jar-export side keeps the direct
+  parse-forms call — pinned-jar data, zip-validated by the slice-30 valid-zip?
+  arm). Verified 2026-08-16: truncated impl (unclosed defn) → unit `9 passed,
+  1 failed, 0 errored` + integration `32 passed, 1 failed, 0 errored` (was
+  `9/0/1` + `32/0/1` ERRORs pre-fix; scry :status :fail, :error 0 — the single
+  FAIL is the parse assertion with its message); restored impl → unit 10/51,
+  integration 33/179 no SKIP. (2) analysis-level proof skip guard gained the
+  clojure-bin `.exists` arm (`(not (.exists (io/file clojure-bin)))` →
+  `(str clojure-bin " not present")`, exact mirror of the git-bin arm's shape
+  — slice-15 asymmetry closed): a stale psi.lint-config-test.clojure-bin
+  override or a `which clojure` result pointing at a since-deleted binary is
+  now a visible SKIP, never the ProcessBuilder IOException → clojure.test
+  ERROR (verified via JAVA_OPTS override — `-J-D` after `-m` lands in kaocha
+  argv, not the JVM, the slice-15 finding — `/nonexistent/clojure` →
+  `SKIP task-252 analysis-level proof: /nonexistent/clojure not present`, 0
+  errored; was 2 errored). Verified: unit 10/51, integration 33/179 no SKIP
+  (both proofs ran, -Spath arm still proves guard/exec agreement),
+  `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+  `bb commit-check:file-lengths` exit 0. Full-suite failures re-confirmed
+  unrelated: delegate-review-task-implementation-completes-with-nullable-local-model-test
+  (pre-existing environmental, unknown model; fails identically with this
+  change stashed) and the workflow-statechart cancellation test (full-suite
+  timing flake — passes focused 14/14 with this change, and on base).

@@ -23,6 +23,7 @@
             delete-recursively!
             git-bin
             http-kit-jar
+            parseable?
             parse-forms
             repo-root
             run-bounded
@@ -105,9 +106,20 @@
             ;; missing or the tracked impl is deleted; without the guards the
             ;; equality would throw an NPE/FileNotFoundException and surface as
             ;; a clojure.test ERROR instead of the plain assertion failures it
-            ;; deserves.
-            (is (= (parse-forms jar-export) (parse-forms (slurp tracked-file)))
-                "tracked with_channel.clj differs from the pinned jar export")))))))
+            ;; deserves. slice-34 follow-up: a PRESENT-but-unparseable tracked
+            ;; impl (bad merge, hand-edit truncation, encoding corruption — the
+            ;; file exists, so the exists-guard passes) would make parse-forms'
+            ;; read-string throw inside the `when` → ERROR with no assertion
+            ;; message (the unit impl-guard is the same class); the shared
+            ;; parseable? fixture (guarded parse, nil on unparseable — single
+            ;; definition site in the support ns) turns the corruption class
+            ;; into this clean assertion FAIL, never an ERROR.
+            (let [tracked-forms (parseable? (slurp tracked-file))]
+              (testing "tracked impl parses as Clojure forms"
+                (is (some? tracked-forms) (str tracked-rel " parses as Clojure forms")))
+              (when tracked-forms
+                (is (= (parse-forms jar-export) tracked-forms)
+                    "tracked with_channel.clj differs from the pinned jar export")))))))))
 
 (deftest ^:integration gitignore-http-kit-tracking-ground-truth-test
   (testing "git's own interpretation of the tracking negation matches the text
@@ -177,6 +189,22 @@
     (if-let [reason (or (cond
                           (nil? clojure-bin)
                           "clojure CLI binary not on PATH (clj-kondo subprocess cannot run)"
+
+                          ;; slice-34 follow-up: the .exists arm mirrors the
+                          ;; git-bin guard (slice-15: both nil? and .exists
+                          ;; arms) and the http-kit/clj-kondo jar arms — a
+                          ;; stale psi.lint-config-test.clojure-bin override
+                          ;; (the documented injection use case — an
+                          ;; editor/nrepl runner whose CLI path went stale) or
+                          ;; a `which clojure` result pointing at a
+                          ;; since-deleted binary passed the guard, then
+                          ;; ProcessBuilder.start threw IOException
+                          ;; (FileNotFound wrapped) BEFORE run-bounded's try →
+                          ;; clojure.test ERROR with no assertion message.
+                          ;; Visible SKIP, mirroring the git-bin arm's message
+                          ;; shape.
+                          (not (.exists (io/file clojure-bin)))
+                          (str clojure-bin " not present")
 
                           (not (.exists (io/file http-kit-jar)))
                           (str http-kit-jar " not present")

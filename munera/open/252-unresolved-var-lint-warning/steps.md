@@ -1586,7 +1586,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 34 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Make both with_channel.clj guard sites fail cleanly on a PRESENT-but-
+- [x] Make both with_channel.clj guard sites fail cleanly on a PRESENT-but-
       unparseable tracked impl (ERROR class; slices 20/24/29/30/31/32/33
       standard "never an ERROR, always clean FAIL or visible SKIP"):
       `with-channel-hook-impl-guard-test` (unit) and
@@ -1611,7 +1611,25 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       site, mirror of skip!/parse-forms consolidation). Verify: truncated
       impl → focused unit + integration runs report plain assertion FAILs
       (0 errored); restored impl → unit 10/50, integration 33/178 no SKIP.
-- [ ] Add the `.exists` arm for `clojure-bin` to the analysis-level proof's
+      — done (shared `parseable?` fixture branch): new `parseable?` in
+      lint_config_test_support.clj — guarded parse
+      (`(try (parse-forms s) (catch Exception _ nil))` — the shared
+      *read-eval*-false / :read-cond :preserve hardening applies), returns
+      the parsed forms or nil, single definition site (mirror of the
+      skip!/parse-forms consolidation); both guard sites now parse the
+      tracked impl through it and assert `(is (some? …) "… parses as Clojure
+      forms")` (clean FAIL with message) before the dependent assertions,
+      which run only `(when forms …)`. The integration site's jar-export
+      side keeps the direct parse-forms call (pinned-jar data, validated as
+      a zip by the slice-30 valid-zip? arm). Verified 2026-08-16: truncated
+      impl (unclosed defn) → unit `9 passed, 1 failed, 0 errored` +
+      integration `32 passed, 1 failed, 0 errored` (was `9/0/1` + `32/0/1`
+      ERRORs pre-fix; the single FAIL is the "parses as Clojure forms"
+      assertion with its message — scry :status :fail, :error 0); restored
+      impl → unit 10/51, integration 33/179 no SKIP (both proofs ran; +1
+      parse assertion per site); `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
+- [x] Add the `.exists` arm for `clojure-bin` to the analysis-level proof's
       skip guard (ERROR class; slice-15's own rationale "a stale override or
       which result is a visible SKIP, not a loud subprocess error"): the
       guard cond checks `(nil? clojure-bin)` but NOT `(not (.exists (io/file
@@ -1633,3 +1651,17 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       …` line, 0 errored (was 2 errored); default + real-override layouts
       unchanged (33/178 no SKIP, the -Spath arm still proves guard/exec
       agreement).
+      — done: the analysis-level proof's skip-guard cond gained the
+      `(not (.exists (io/file clojure-bin)))` arm between the nil? arm and
+      the http-kit jar arm, message `(str clojure-bin " not present")` —
+      exact mirror of the git-bin arm's shape (slice-15). A stale
+      `psi.lint-config-test.clojure-bin` override or a `which clojure`
+      result pointing at a since-deleted binary is now a visible SKIP via
+      report-skip!/skip!, never the ProcessBuilder IOException →
+      clojure.test ERROR. Verified 2026-08-16 via JAVA_OPTS override
+      (`-J-D` after `-m` lands in kaocha argv, not the JVM — the slice-15
+      finding): `psi.lint-config-test.clojure-bin=/nonexistent/clojure` →
+      `SKIP task-252 analysis-level proof: /nonexistent/clojure not present`
+      in runner output, 0 errored (was 2 errored); default layout →
+      integration 33/179 no SKIP (both proofs ran; the -Spath arm still
+      proves guard/exec agreement); `bb lint` errors: 0, warnings: 0.
