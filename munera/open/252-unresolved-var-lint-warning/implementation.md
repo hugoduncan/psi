@@ -489,3 +489,22 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 30, ERROR→clean-FAIL/SKIP class): (1)
+  corrupt-jar handling in `with-channel-hook-semantics-guard-test` — private
+  `valid-zip?` (ZipFile open catching IOException, the ZipException
+  superclass) added to the skip guard: a truncated/corrupt http-kit jar (or a
+  jar-path override pointing at a non-jar) now SKIPs visibly via
+  report-skip! ("… is not a valid zip archive", mirroring the missing-jar
+  arm) instead of throwing an uncaught ZipException → clojure.test ERROR
+  (verified: fabricated non-zip override → SKIP line, 0 errored; was 2
+  errored). (2) no-reg transit slurp guard in
+  `http-kit-defreq-analysis-level-resolution-test` — the discriminating-control
+  arm now binds transit-file, asserts existence (clean FAIL, mirror of the
+  reg-cache arm's slice-2 pattern) and slurps only under `when (.exists …)`,
+  so a failed jar --dependencies analysis (corrupt jar — never writes the
+  transit) surfaces as plain assertion FAILs, never a FileNotFoundException
+  ERROR (verified: corrupt-jar override → analysis-level proof 8 clean FAILs,
+  0 errored; was 1 ERROR). Verified: unit 10/48, integration 33/178 no SKIP
+  (both proofs ran; +1 exists assertion), corrupt-jar override → visible SKIP
+  + clean FAILs only, `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean,
+  `bb commit-check:file-lengths` exit 0.

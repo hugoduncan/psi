@@ -1328,7 +1328,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 30 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Make `with-channel-hook-semantics-guard-test` fail cleanly (or skip
+- [x] Make `with-channel-hook-semantics-guard-test` fail cleanly (or skip
       visibly) when the http-kit jar is present but NOT a valid zip (ERROR
       class; slices 20/24/29 standard "never an ERROR, always clean FAIL or
       visible SKIP"): the skip guard checks only `(.exists (io/file
@@ -1343,7 +1343,17 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       ZipFile open so a corrupt jar is a clean FAIL — never an uncaught
       exception. (clj-kondo-jar corrupt is NOT affected the same way: the
       subprocess fails non-zero → clean FAIL on the exit assertion.)
-- [ ] Guard the no-reg transit slurp in
+      — done (skip-guard branch): private `valid-zip?` added to
+      lint_config_integration_test.clj — `(with-open [_ (ZipFile. f)] true)`
+      catching IOException (the ZipException superclass — also covers a
+      directory at the path), so a corrupt jar is a visible SKIP
+      (`report-skip!` "with-channel hook semantics: … is not a valid zip
+      archive", mirroring the missing-jar arm), never an uncaught exception.
+      Verified 2026-08-16 with a fabricated non-zip file via the
+      `psi.lint-config-test.http-kit-jar` override: focused integration run →
+      `SKIP task-252 with-channel hook semantics: /tmp/ck252-corrupt.jar is
+      not a valid zip archive`, 0 errored (was 2 errored pre-fix)
+- [x] Guard the no-reg transit slurp in
       `http-kit-defreq-analysis-level-resolution-test` (ERROR class): the
       discriminating-control arm reads
       `(slurp (io/file no-reg-dir "v1/clj/org.httpkit.client.transit.json"))`
@@ -1356,3 +1366,11 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       guard for the no-reg transit (assert exists → clean FAIL) or wrap the
       slurp, so a failed jar analysis surfaces as plain assertion FAILs, never
       an uncaught exception.
+      — done (exists-guard branch, mirror of the reg-cache arm): the no-reg
+      arm now binds `transit-file` and asserts
+      `(is (.exists transit-file) …)` (clean FAIL) before slurping under
+      `(when (.exists transit-file) …)` — a failed jar analysis (corrupt jar)
+      surfaces as the plain assertion FAILs the exit assertion already
+      reports, never a FileNotFoundException ERROR. Verified 2026-08-16 with
+      the corrupt-jar override: focused integration run → analysis-level
+      proof 8 clean FAILs, `0 errored` (was 1 ERROR pre-fix)

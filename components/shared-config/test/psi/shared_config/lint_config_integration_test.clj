@@ -30,6 +30,21 @@
   (:import
    [java.util.zip ZipFile]))
 
+(defn- valid-zip?
+  "True when the file opens as a zip archive (slice-30 follow-up): the
+  semantics guard's skip guard previously checked only (.exists …), so a
+  truncated/corrupt jar (partial m2 download, or a
+  psi.lint-config-test.http-kit-jar override pointing at a non-jar file)
+  passed the guard and (ZipFile. …) threw an uncaught ZipException →
+  clojure.test ERROR with no assertion message. Opening the archive here —
+  catching IOException, the ZipException superclass (also covers a directory
+  at the path) — turns the corrupt-jar case into a visible SKIP via
+  report-skip!, mirroring the missing-jar arm, never an uncaught exception."
+  [f]
+  (try
+    (with-open [_ (ZipFile. (io/file f))] true)
+    (catch java.io.IOException _ false)))
+
 (deftest ^:integration with-channel-hook-semantics-guard-test
   (testing "the tracked with-channel hook impl is semantically identical to the
             pinned 2.8.0 jar's clj-kondo.exports export (slice-18 follow-up):
@@ -48,9 +63,19 @@
             whitespace-collapsing compare was blind to it) — fails loudly.
             Jar-absent → visible SKIP via report-skip!, mirroring the existing
             skip arms (http-kit jar is already injectable/nullable via
-            psi.lint-config-test.http-kit-jar / the derived m2 path)."
-    (if-let [reason (when-not (.exists (io/file http-kit-jar))
-                      (str http-kit-jar " not present"))]
+            psi.lint-config-test.http-kit-jar / the derived m2 path). A
+            corrupt/truncated jar (or a jar-path override pointing at a
+            non-jar file) also SKIPs visibly — the .exists check alone passes
+            a corrupt jar, and the ZipFile open would throw an uncaught
+            ZipException → clojure.test ERROR (slice-30 follow-up)."
+    (if-let [reason (cond
+                      (not (.exists (io/file http-kit-jar)))
+                      (str http-kit-jar " not present")
+
+                      (not (valid-zip? http-kit-jar))
+                      (str http-kit-jar " is not a valid zip archive")
+
+                      :else nil)]
       (do (report-skip! "with-channel hook semantics" reason)
           (is (str "skipped: " reason)))
       (let [jar-entry   "clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj"
@@ -232,14 +257,28 @@
                                                  "--config-dir" (str empty-config)
                                                  "--cache-dir" no-reg-dir)]
               (is (zero? exit))
-              (let [transit (slurp (io/file no-reg-dir
-                                            "v1/clj/org.httpkit.client.transit.json"))]
-                (is (str/includes? transit "~$request")
-                    "no-reg cache still carries the plain defn request")
-                (is (not (str/includes? transit "~$get"))
-                    "no-reg cache carries NO defreq-generated get")
-                (is (not (str/includes? transit "~$post"))
-                    "no-reg cache carries NO defreq-generated post"))))
+              (let [transit-file (io/file no-reg-dir
+                                          "v1/clj/org.httpkit.client.transit.json")]
+                ;; slice-30 follow-up: the slurp previously ran unconditionally
+                ;; — a failed jar --dependencies analysis (e.g. corrupt jar —
+                ;; the .exists skip guard passes it; the subprocess exits
+                ;; non-zero and never writes the transit) threw
+                ;; FileNotFoundException → clojure.test ERROR, masking the
+                ;; clean FAIL the exit assertion already reported. Mirror the
+                ;; reg-cache arm's exists guard (slice-2 pattern): assert
+                ;; existence (clean FAIL), then read only under `when`, so a
+                ;; failed jar analysis surfaces as plain assertion FAILs,
+                ;; never an uncaught exception.
+                (is (.exists transit-file)
+                    "no-reg transit exists (jar --dependencies analysis wrote the cache)")
+                (when (.exists transit-file)
+                  (let [transit (slurp transit-file)]
+                    (is (str/includes? transit "~$request")
+                        "no-reg cache still carries the plain defn request")
+                    (is (not (str/includes? transit "~$get"))
+                        "no-reg cache carries NO defreq-generated get")
+                    (is (not (str/includes? transit "~$post"))
+                        "no-reg cache carries NO defreq-generated post"))))))
           (testing "real AC1 file reports the two warnings against the no-reg cache
                     (proves the clean arm above is registration-driven, not
                     trivially clean — an empty cache is trivially clean per
