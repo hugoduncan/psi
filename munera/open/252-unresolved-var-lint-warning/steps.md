@@ -2093,3 +2093,52 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       suite 34 tests / 186 assertions, no SKIP (was 33/181; +1 test +5
       assertions), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
+
+## Slice 41 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Strengthen `http-kit-import-config-jar-export-guard-test`'s equality to
+      the full export minus the tracked-only `:lint-as` additive diff
+      (integration, lint_config_integration_test.clj:222): the slice-40 guard
+      asserts only `(= (:hooks export-config) (:hooks tracked-config))`, so
+      its stated purpose — "an http-kit bump that changes the jar's
+      clj-kondo.exports config.edn silently diverges" — is closed only for the
+      `:hooks` subset. A bump that adds a NEW top-level key to the export
+      (`:lint-as` upstream, `:namespaces`, `:config-in-ns`, a second top-level
+      group) silently diverges: the tracked copy lacks the key, the `:hooks`
+      equality stays green, the unit test's exact `:lint-as` equality stays
+      green (it asserts the unchanged tracked copy), and the tracked config —
+      the ACTUAL mechanism — no longer mirrors the pinned jar export. Fix:
+      replace the `:hooks` equality with `(= export-config (dissoc
+      tracked-config :lint-as))` — strictly stronger (covers `:hooks` AND any
+      other top-level key, since `:hooks` is a subset of the full map) while
+      preserving the additive-diff semantics (the tracked-only `:lint-as`
+      stays the unit test's exact-equality assertion; an export-side `:lint-as`
+      of its own FAILs loudly, demanding the reconciliation the R4 bump set
+      requires). Verify: jar-path override with a NEW top-level export key
+      (e.g. `:config-in-ns {}`) → 1 clean FAIL with the equality message (was
+      silent divergence); restore → integration suite 34 tests / 186
+      assertions, no SKIP; `bb lint` errors 0 / warnings 0; `bb fmt:check`
+      clean; `bb commit-check:file-lengths` exit 0
+- [ ] Extend `ci-execution-chain-guard-test` to assert the "Run Clojure tests"
+      CI step (`run: bb clojure:test`, ci.yml:162-163) — the unguarded link
+      that executes the :unit suite with the 10 unit invariants (import
+      registration, with-channel impl guard, root-config AC2, both pin tests,
+      lint-alias, gitignore text, bb.edn lint wrapper, tests.edn wiring):
+      slice-28's scope was explicitly "the lint gate and the three
+      ^:integration proofs" — it guards the Lint step, the "Run Clojure
+      integration tests" step, and bb.edn's clojure:test:integration task, but
+      NOT the unit-suite step, so a dropped/renamed "Run Clojure tests" step
+      (or a drift of `bb clojure:test`'s `:depends [clojure:test:unit
+      clojure:test:extensions]`, bb.edn:327-329) silently disables the BULK of
+      the regression surface in CI while every existing guard stays green —
+      the exact silent-drift class slice-28 closed for the other two steps.
+      Fix: in the existing `ci-run-steps`-based block, also assert
+      `(= "bb clojure:test" (get steps "Run Clojure tests"))` (the step name
+      is already line-paired by the helper; the name/run lines are adjacent in
+      ci.yml), and optionally assert bb.edn's `clojure:test` task still
+      `:depends` on `clojure:test:unit` (a drift to another suite would
+      silently drop the unit guards from `bb clojure:test`). Verify: step
+      renamed or run-value changed in a scratch copy → 1 clean FAIL; restored
+      → unit suite 10 tests / 59 assertions (60 with the new assertion), `bb
+      lint` errors 0 / warnings 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0
