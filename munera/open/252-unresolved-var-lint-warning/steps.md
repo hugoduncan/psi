@@ -1325,3 +1325,34 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       ERROR pre-fix); impl restored. Unit 10/48, integration 33/177 no SKIP;
       `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean;
       `bb commit-check:file-lengths` exit 0.
+
+## Slice 30 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Make `with-channel-hook-semantics-guard-test` fail cleanly (or skip
+      visibly) when the http-kit jar is present but NOT a valid zip (ERROR
+      class; slices 20/24/29 standard "never an ERROR, always clean FAIL or
+      visible SKIP"): the skip guard checks only `(.exists (io/file
+      http-kit-jar))` — a truncated/corrupt jar (partial m2 download, or a
+      `psi.lint-config-test.http-kit-jar` override pointing at a non-jar file)
+      passes the guard, then `(ZipFile. (io/file http-kit-jar))` throws
+      ZipException "zip END header not found" → clojure.test ERROR with no
+      assertion message (verified 2026-08-16: `-Dpsi.lint-config-test.http-kit-jar=/tmp/corrupt.zip`
+      → `2 errored`, "zip END header not found" uncaught). Fix: validate the
+      jar opens as a zip in the skip guard (try/catch ZipException → visible
+      SKIP via `report-skip!`, mirroring the missing-jar arm), or wrap the
+      ZipFile open so a corrupt jar is a clean FAIL — never an uncaught
+      exception. (clj-kondo-jar corrupt is NOT affected the same way: the
+      subprocess fails non-zero → clean FAIL on the exit assertion.)
+- [ ] Guard the no-reg transit slurp in
+      `http-kit-defreq-analysis-level-resolution-test` (ERROR class): the
+      discriminating-control arm reads
+      `(slurp (io/file no-reg-dir "v1/clj/org.httpkit.client.transit.json"))`
+      unconditionally — if the jar `--dependencies` analysis failed (corrupt
+      jar — verified 2026-08-16: FileNotFoundException "No such file or
+      directory" on the no-reg transit → ERROR; or any failure writing the
+      transit), the slurp throws instead of the arm reporting a clean FAIL.
+      The reg-cache arm already asserts transit existence before use
+      (`(is (.exists (io/file cache-dir ...)))`, slice-2 pattern); mirror that
+      guard for the no-reg transit (assert exists → clean FAIL) or wrap the
+      slurp, so a failed jar analysis surfaces as plain assertion FAILs, never
+      an uncaught exception.

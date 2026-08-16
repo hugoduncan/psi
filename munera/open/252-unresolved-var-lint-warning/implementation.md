@@ -487,3 +487,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   errored). All mutations restored after verification. Verified: unit 10/48,
   integration 33/177 no SKIP (proofs ran), `bb lint` errors: 0, warnings: 0,
   `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
+
+- implementation review 2026-08-16: added 2 steps to be addressed
