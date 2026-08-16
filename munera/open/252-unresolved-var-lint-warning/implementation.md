@@ -661,3 +661,17 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   support 435, integration 391 — all under the gate).
 
 - implementation review 2026-08-16: added 1 step to be addressed
+- addressed 1 review step (slice 37): steps.md Slice 23 section added — the
+  discontinuous slice numbering (Slice 22 → Slice 24 jump, no Slice 23 header)
+  reconciled by inserting "## Slice 23 — Implementation-review follow-ups
+  (2026-08-15)" between Slice 22 and Slice 24, documenting the two addressed
+  slice-23 items as [x]: (1) the commit-check/file-length split (804-line
+  lint_config_test.clj → lint_config_test.clj / lint_config_test_support.clj /
+  lint_config_integration_test.clj, no forwarding vars, 12 tests green,
+  commit-check:file-lengths exit 0) and (2) the repo-root REUSE (shared
+  psi.test-support.repo-root :markers/:prop/:required? opts, local copy
+  deleted, latent nil-parent walk bug fixed). Numbering now continuous 0-37;
+  slice-22 items' "(slice 23)" / "slice-23 divergence note" references resolve
+  to an actual section. Doc-only; no code/test changes. Verified: grep shows
+  continuous slice headers; git diff touches the task's own steps.md +
+  implementation.md only.

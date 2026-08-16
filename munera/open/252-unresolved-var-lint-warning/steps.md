@@ -954,6 +954,59 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       exercised via clojure -e; `bb lint` errors: 0 warnings: 0; `bb fmt:check`
       clean
 
+## Slice 23 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Reconcile the committed test file with the repo's own file-length gate
+      (commit-check fix): `bb commit-check:file-lengths` failed at the
+      slice-21 committed state — `lint_config_test.clj` was 804 lines, over
+      the gate's 800-line default for src/test files under components/ (the
+      pre-commit hooks and ci.yml never run the length check, so the failure
+      surfaced only at the committed state). Fixed by splitting into three
+      logically consistent files, per the explicit "break into multiple
+      logically consistent files; no forwarding vars" instruction:
+      `lint_config_test.clj` (9 unit invariants, 244 lines), the new
+      `lint_config_test_support.clj` (shared fixtures — repo-root, read-edn,
+      pins, jar paths, run-bounded, clj-kondo-main, report-skip!, parse-forms,
+      delete-recursively! — 375 lines; ns ends in -support, so kaocha's
+      .*-test$ ns-pattern never runs it), and the new
+      `lint_config_integration_test.clj` (3 ^:integration proofs, 246 lines).
+      No forwarding vars: every shared fixture is DEFINED once in the support
+      ns and :refer'd from the two test namespaces; the eight cross-ns
+      fixtures changed defn- → defn (they were private only because they were
+      file-local). tests.edn comment updated to name the new integration ns.
+      All 12 tests preserved and green (unit 9/39 + integration 3/25, 64
+      assertions); `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0. Sibling 251 not
+      double-implemented (remains design-only — its limit-raise proposal is a
+      separate human-reviewed policy question, and the delegation explicitly
+      directed splitting)
+- [x] Reuse the shared `psi.test-support.repo-root` (slice-22 item 2 — REUSE
+      branch, supersedes the slice-23 deliberate-divergence note): the shared
+      helper `bases/main/test/psi/test_support/repo_root.clj` gained three
+      backward-compatible opts — `:markers` (coll of repo-relative marker
+      paths, default `[["doc" "custom-providers.md"]]` — the no-arg call is
+      byte-for-byte the old behavior), `:prop` (system property that overrides
+      the walk entirely, injectability per the skill infra-dep criterion), and
+      `:required?` (fail-loud ex-info when the walk exhausts without finding
+      all markers, instead of silently returning the fs root). The
+      component-local `find-repo-root`/`repo-root` copy in
+      `lint_config_test_support.clj` is DELETED — `repo-root` now delegates to
+      the shared helper with the deps.edn+bb.edn marker set, the
+      `psi.lint-config-test.repo-root` override, and `:required?` — the
+      override/root logic lands in one place for all consumers (applies to
+      the support ns AND the current file per the follow-up note). Also fixed
+      a latent walk bug the extension surfaced: the old terminal
+      `(= dir (.getParentFile dir))` never triggers on macOS (parent of `/` is
+      nil), so a never-found walk recursed into nil — the new loop returns the
+      fs root at the nil-parent boundary and lets `:required?` throw there.
+      Verified: unit 9/39, integration 33/176 (both proofs ran, no SKIP), ai
+      user-models-test 20/139 + agent-session workflow-async-path-test 9/53
+      (the two existing shared-helper consumers, unchanged contract),
+      nested-CWD + property-override + fail-loud exercised via clojure -e;
+      `bb lint` errors: 0 warnings: 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0 (slice-23 split still under the
+      gate)
+
 ## Slice 24 — Implementation-review follow-ups (2026-08-15)
 
 - [x] Make `with-channel-hook-impl-guard-test` fail cleanly on a deleted impl
@@ -1817,7 +1870,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 37 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Reconcile the discontinuous slice numbering in steps.md — the sequence
+- [x] Reconcile the discontinuous slice numbering in steps.md — the sequence
       jumps from "## Slice 22" (line 900) to "## Slice 24" (line 957) with NO
       "## Slice 23" header, yet implementation.md records "addressed 1 review
       step (slice 23, commit-check fix)" and steps.md's own slice-22 items
@@ -1835,3 +1888,20 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       REUSE superseding the divergence note), or renumber so the sequence is
       continuous and implementation.md's slice-23 record has a matching
       steps.md section. Doc-only; no code/test changes
+      — done (add-a-slice-23-section branch): new "## Slice 23 —
+      Implementation-review follow-ups (2026-08-15)" section inserted between
+      Slice 22 and Slice 24, documenting the two addressed items as [x] — (1)
+      the commit-check/file-length fix (slice-23 addressing record: the
+      804-line `lint_config_test.clj` split into the three logically
+      consistent files `lint_config_test.clj` / `lint_config_test_support.clj`
+      / `lint_config_integration_test.clj`, no forwarding vars, 12 tests
+      green, `bb commit-check:file-lengths` exit 0) and (2) the repo-root
+      REUSE (slice-22-item-2 addressing record: shared
+      `psi.test-support.repo-root` gained `:markers`/`:prop`/`:required?`
+      opts, local copy deleted, latent nil-parent walk bug fixed) — the
+      numbering is now continuous (0-23, 24-37) and the slice trail reads
+      without a gap; the slice-22 items' "(slice 23)" / "slice-23 divergence
+      note" references now resolve to an actual section. Doc-only; no
+      code/test changes. Verified: `grep -n '^## Slice' steps.md` shows a
+      continuous 0-37 sequence with no missing headers; `git diff --stat`
+      touches the task's own steps.md + implementation.md only
