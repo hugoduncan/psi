@@ -1210,3 +1210,41 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `drain-failed?` on the old `"<stdout interrupted>"` string → false (the gap),
       on the new `{::drain-error "stdout: interrupted"}` map → true (closed); unit
       suite → 9 tests / 39 assertions pass
+
+## Slice 28 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Guard the CI execution chain that makes the regression surface
+      CI-enforceable — ci.yml's steps and bb.edn's clojure:test:integration
+      task are the only unguarded links: tests-edn-suite-wiring-test (slice
+      14) guards tests.edn's :integration suite and bb-edn-lint-task-wrapper-test
+      guards bb.edn's lint task, but nothing guards ci.yml's "Lint" step
+      (`run: bb lint`, ci.yml:89) or "Run Clojure integration tests" step
+      (`run: bb clojure:test:integration`, ci.yml:166) — the outer links that
+      actually execute the lint gate and the three ^:integration proofs
+      (design.md AC1 names `bb clojure:test:integration` as the CI-enforceable
+      regression surface) — nor bb.edn's clojure:test:integration task
+      (`(System/exit (run-scry-kaocha-suite! "integration"
+      ["--focus" "integration"]))`, bb.edn:307-309), so a dropped/renamed CI
+      step or a task drift to another suite/focus silently disables the entire
+      CI regression surface while every existing guard stays green — the exact
+      silent-drift class the task already closed for .gitignore / lint-alias /
+      bb.edn lint wrapper / tests.edn. Verified 2026-08-15: zero tests read
+      ci.yml anywhere in the repo (rg over components/ + bases/ +
+      extensions/). Fix: add unit assertions (same lint_config_test.clj ns —
+      read ci.yml as text like the .gitignore test, and bb.edn as EDN — no
+      subprocess, runs anywhere) asserting ci.yml contains the `bb lint` Lint
+      step and the `bb clojure:test:integration` integration step, and that
+      bb.edn's clojure:test:integration task still invokes
+      run-scry-kaocha-suite! with suite id "integration" (a drift to a
+      different suite/focus would silently stop the proofs from running)
+- [ ] Single-source the byte-identical `which-*` resolution in
+      lint_config_test_support.clj (reusable-existing-pattern flag — the same
+      class slice 27 closed for parse-forms): `which-clojure-bin`
+      (lines 181-186) and `which-git-bin` (lines 208-213) are structurally
+      identical `(some-> (shell/sh "which" X) (as-> r (when (zero? (:exit r))
+      (str/trim (:out r)))))` differing only in the binary name, and the ns's
+      own contract is "each fixture is DEFINED here once" — a future hardening
+      (quoting, error handling) or a regression would diverge silently between
+      the two sites. Fix: extract a single private `which-bin` helper taking
+      the binary name, with `which-clojure-bin`/`which-git-bin` delegating to
+      it; behavior unchanged (same which → trim → nil-on-nonzero contract).

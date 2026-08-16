@@ -443,3 +443,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   agent-session 16/94, work-on 11/61; integration 33/176 no SKIP (both proofs
   ran); tui harness + shared ns compile; `bb lint` errors: 0 warnings: 0;
   `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0.
+
+- implementation review 2026-08-15: added 2 steps to be addressed
