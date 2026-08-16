@@ -593,3 +593,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   (pre-existing environmental, unknown model; fails identically with this
   change stashed) and the workflow-statechart cancellation test (full-suite
   timing flake — passes focused 14/14 with this change, and on base).
+
+- implementation review 2026-08-16: added 4 steps to be addressed

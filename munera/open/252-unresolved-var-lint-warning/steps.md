@@ -1665,3 +1665,102 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       in runner output, 0 errored (was 2 errored); default layout →
       integration 33/179 no SKIP (both proofs ran; the -Spath arm still
       proves guard/exec agreement); `bb lint` errors: 0, warnings: 0.
+
+## Slice 35 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Remove the orphaned duplicate review note in implementation.md — the
+      slice-34 ADDRESSING commit (0f7aadd8d) re-added the note line
+      "- implementation review 2026-08-16: added 2 steps to be addressed"
+      even though the slice-34 REVIEW commit (094b63eea) had already written
+      it: implementation.md now carries the note TWICE consecutively (lines
+      561/563) with only ONE "addressed 2 review steps (slice 34)" paragraph
+      — the first copy (line 561) has no matching addressing paragraph. This
+      is the EXACT orphan pattern slice-33 removed ("never re-checked since
+      slice 31's note was written twice"; grep-verified: 21
+      "- implementation review" notes, the 561/563 pair is the only
+      consecutive duplicate). Same doc-consistency class slices 17-19/25/32/33
+      reconciled; the append-only local_memory record carries a duplicated
+      pass marker. Fix: delete the orphaned first copy (line 561) — keep the
+      note + its slice-34 addressing paragraph as one pair (mirror of
+      slice-33's deletion). Verify: every "- implementation review …" note
+      except the latest is immediately followed by its "addressed" paragraph
+      (grep the notes; the orphan is the only unpaired one).
+- [ ] Exists-guard the import config.edn read-edn in BOTH unit tests —
+      `http-kit-import-registration-test` (lint_config_test.clj:54) and
+      `with-channel-hook-impl-guard-test` (lint_config_test.clj:80) read
+      `.clj-kondo/imports/http-kit/http-kit/config.edn` via `read-edn` in
+      their let bindings, unguarded. Slice-24 DELIBERATELY declined the
+      parallel exists-guard for `http-kit-import-registration-test`, citing
+      the ^:integration `git ls-files --error-unmatch` index arm
+      (gitignore-http-kit-tracking-ground-truth-test) as coverage, and
+      slice-31 repeated that rationale — but the index arm checks the INDEX
+      only, NOT worktree presence: a plain `rm` of the config.edn leaves the
+      index entry intact (ls-files --error-unmatch stays green) while both
+      unit tests throw FileNotFoundException from the unguarded slurp →
+      clojure.test ERROR with no assertion message. The decline's coverage
+      premise is therefore wrong for the worktree-only deletion class, and
+      the `with-channel-hook-impl-guard-test` site (line 80) was never part
+      of slice-24's flagged item (which named only
+      http-kit-import-registration-test) — it has the same unguarded shape.
+      Verified 2026-08-16: config.edn moved aside (index intact) → focused
+      unit run `8 passed, 0 failed, 2 errored` (was 10/51 clean; scry :error
+      java.io.FileNotFoundException at lint_config_test.clj:54 and :80 — the
+      read-edn slurp in the let bindings; config.edn restored). The slice-30
+      no-reg transit arm, slice-31 root config, and slice-24 impl file all
+      exists-guard their slurps — these two import-config reads are the last
+      unguarded task-owned config slurps in the unit file. Fix: assert
+      `(.exists …)` first (clean FAIL with message), then read/parse only
+      under `when` — mirror of slice-31's root-config shape (and slice-24's
+      impl-file shape in the same test). Verify: config.edn moved aside → 2
+      plain assertion FAILs, 0 errored (was 2 ERRORs); restored → 10/51.
+- [ ] Make `root-config-ac2-invariant-test` fail cleanly on a PRESENT-but-
+      unparseable root config.edn (ERROR class; slice-34's present-but-
+      unparseable fix closed only the with_channel.clj tracked impl — the
+      root config read is the mirror blind spot): slice-31 exists-guards
+      DELETION, but a bad merge / hand-edit truncation / encoding corruption
+      (the file exists, so the exists-guard passes) makes `(read-edn
+      ".clj-kondo/config.edn")` throw inside the `(when (.exists cfg-file)
+      …)` → RuntimeException ("Unmatched delimiter: …") → clojure.test ERROR
+      with no assertion message. Verified 2026-08-16: config.edn replaced
+      with `{:linters :unresolved-symbol` → focused unit run `9 passed, 0
+      failed, 1 errored` (was 10/51 clean; scry :error RuntimeException
+      "Unmatched delimiter: …" from read-edn; restored after). bb lint also
+      fails loudly on a malformed root config (clj-kondo reads it), so the
+      drift is not silent — but the guard must report the corruption as a
+      plain assertion FAIL per the uniform ERROR-vs-FAIL standard (slice-24:
+      "the unit ERROR-vs-FAIL standard applies regardless"). The import
+      config.edn read (slice-35 item above) is the same class once its
+      deletion gap is closed. Fix: parse the root config through a guarded
+      read (mirror of slice-34's parseable? fixture — e.g. a guarded
+      `(try (read-edn …) (catch Exception _ nil))` asserted `some?` before
+      the AC2 assertions, with the assertions under `when`) so the corruption
+      class is a clean FAIL, never an uncaught exception. Verify: corrupt
+      config → 1 clean FAIL, 0 errored (was 1 ERROR); restored → 10/51.
+- [ ] Guard `with-channel-hook-semantics-guard-test`'s jar-export side
+      against a VALID-zip-with-corrupt-entry (ERROR class; slice-34's
+      present-but-unparseable fix explicitly deferred this side — "the
+      integration site's jar-export side keeps the direct parse-forms call —
+      pinned-jar data, zip-validated by the slice-30 valid-zip? arm"): the
+      slice-30 valid-zip? SKIP arm validates only the CONTAINER (ZipFile
+      open — central directory intact), so a corrupt entry INSIDE a valid zip
+      (bit rot, partial overwrite, bad artifact copy — a jar-path override
+      pointing at such a file is the documented injection use case) passes
+      the guard and then either (a) the entry `slurp` in the let binding
+      throws ZipException (inflate error) or (b) the direct `(parse-forms
+      jar-export)` in the compare throws on garbage-but-slurpable content —
+      both clojure.test ERRORs with no assertion message. Verified
+      2026-08-16: byte flipped in the with_channel.clj entry's deflate stream
+      of a copy of the pinned jar (ZipFile open succeeds — container valid;
+      entry slurp produces wrong bytes without throwing) →
+      `with-channel-hook-semantics-guard-test` ERROR (scry :error
+      RuntimeException "Unmatched delimiter: )" from parse-forms at the
+      compare arm; focused integration `32 passed, 0 failed, 1 errored`, was
+      33/179 no SKIP). This is the exact present-but-unparseable class
+      slice-34 closed on the TRACKED side, still open on the jar side.
+      Fix: parse jar-export through the shared `parseable?` fixture and
+      assert `some?` (clean FAIL with message) before the equality, or extend
+      the skip guard to entry-level integrity (read + parse the export in the
+      guard → visible SKIP via skip!, mirroring slice-30's corrupt-jar arm)
+      — never an uncaught exception. Verify: corrupt-entry jar override →
+      clean FAIL or visible SKIP, 0 errored (was 1 ERROR); restored →
+      33/179 no SKIP.
