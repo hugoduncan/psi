@@ -1431,3 +1431,51 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       failure is pre-existing at eab8902f2 (verified via stash: fails
       identically with this change absent — local-model env config, unrelated
       to task 252).
+
+## Slice 32 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Harden `gitignore-http-kit-import-tracking-test`'s ordering assertion
+      against a MISSING ignore-all line (ERROR-vs-FAIL class; slice 29 closed
+      only the symmetric missing-NEGATION case): the ordering assertion
+      `(is (and neg-idx (< ignore-idx neg-idx)) …)` nil-guards neg-idx but not
+      ignore-idx — with the ignore-all line absent (`**/.clj-kondo/imports/*`
+      deleted/renamed) and the negations present, `(< ignore-idx neg-idx)`
+      evaluates `(< nil 3)` → NullPointerException → clojure.test ERROR, and
+      the failure-path message `(inc ignore-idx)` would NPE likewise. Verified
+      2026-08-16: ignore-all line commented out → focused unit run
+      `3 passed, 2 failed, 1 errored` (was clean FAILs + ERROR; restored
+      after). The drift is real: the negations become no-ops, malli and the
+      whole import dir fall back to TRACKED (untracked malli config.edn would
+      enter commits) — the presence assertions fail cleanly but the unit
+      guard's own ordering property must report clean FAILs, never an NPE
+      ERROR (slice-24 standard: "reports exactly ONE plain assertion FAIL
+      with its message, never an ERROR"; slice-29 closed the negation arm,
+      the ignore-all arm is the mirror blind spot). Fix: `(is (and
+      ignore-idx neg-idx (< ignore-idx neg-idx)) …)` with the message's
+      `(inc ignore-idx)` nil-guarded (`(when ignore-idx …)`), mirroring
+      slice-29's short-circuit shape. The ^:integration check-ignore malli
+      arm backstops the drift (malli no longer ignored → exit 0 assertion
+      fails) but the unit ERROR-vs-FAIL standard applies regardless.
+- [ ] Single-source the three verbatim skip-reporting tails in
+      lint_config_integration_test.clj: `(do (report-skip! label reason)
+      (is (str "skipped: " reason)))` is copy-pasted in all three
+      ^:integration proofs (with-channel semantics guard, git ground truth,
+      analysis-level proof), differing only in the label argument. The
+      support ns's own contract ("each fixture is DEFINED here once — no
+      forwarding vars") and the slice-27/28 consolidation standard
+      (parse-forms inline copy → :refer'd fixture; which-clojure-bin/
+      which-git-bin byte-identical copies → single which-bin) apply. Fix:
+      add a shared `skip!` helper in lint_config_test_support.clj that
+      reports and returns the reason (support ns keeps no clojure.test dep —
+      e.g. `(defn skip! [label reason] (report-skip! label reason) reason)`),
+      and change the three call sites to `(is (skip! label reason))` — or
+      make report-skip! return the reason string and assert on it; behavior
+      unchanged.
+- [ ] Correct the stale `.gitignore` absolute line reference in
+      implementation.md's "Additional non-task paths" note — "`.gitignore`
+      line 4 (`**/.clj-kondo/imports/` — the exact negation target)":
+      slice 26's deletion of the typo'd line 3 moved the tracking rules up,
+      so the ignore-all pattern is now `.gitignore` line 3 (negations 4-5).
+      Same doc-consistency class slices 17-19/25 reconciled; the note
+      describes CURRENT state (not a historical record), so the reference is
+      live drift.

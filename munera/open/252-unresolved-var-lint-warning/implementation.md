@@ -529,3 +529,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   `delegate-review-task-implementation-completes-with-nullable-local-model-test`
   (unknown local model deepseek/deepseek-v4-flash) confirmed at base commit
   eab8902f2 via stash — unrelated to task 252.
+
+- implementation review 2026-08-16: added 3 steps to be addressed
