@@ -1814,3 +1814,24 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       integration suite 33 tests / 181 assertions no SKIP; `bb lint` errors:
       0, warnings: 0; `bb fmt:check` clean; `bb commit-check:file-lengths`
       exit 0 (integration file 391 lines, under the gate)
+
+## Slice 37 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Reconcile the discontinuous slice numbering in steps.md — the sequence
+      jumps from "## Slice 22" (line 900) to "## Slice 24" (line 957) with NO
+      "## Slice 23" header, yet implementation.md records "addressed 1 review
+      step (slice 23, commit-check fix)" and steps.md's own slice-22 items
+      reference "(slice 23)" for the file-length split and the "slice-23
+      divergence note" for the repo-root REUSE. The two slice-23 review items
+      (commit-check/file-length fix + repo-root reuse) were addressed — the
+      addressing records exist in implementation.md (slice-23 + slice-22-item-2
+      labels) — but steps.md never received a Slice 23 section, so the active
+      surface's slice numbering is discontinuous (0-22, 24-36) and a reader
+      following the slice trail hits a gap. Same doc-consistency class slices
+      17-19/25/32/33/35 reconciled (orphaned notes, stale refs, slice ranges);
+      never flagged by any prior slice. Fix: add a "## Slice 23 —
+      Implementation-review follow-ups (2026-08-15)" section documenting the
+      two addressed items (commit-check fix → file-length split; repo-root
+      REUSE superseding the divergence note), or renumber so the sequence is
+      continuous and implementation.md's slice-23 record has a matching
+      steps.md section. Doc-only; no code/test changes
