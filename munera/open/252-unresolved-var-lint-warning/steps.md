@@ -1113,3 +1113,54 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       unit guard (presence + LAST-ignore-all-ordering of lines 4-6) is
       index-based, not absolute-line-number-based, so it stays green (9 unit
       tests / 39 assertions pass)
+
+## Slice 27 — Implementation-review follow-ups (2026-08-15)
+
+- [ ] Reuse the shared `parse-forms` fixture in `with-channel-hook-impl-guard-test`
+      instead of inlining its exact implementation: `lint_config_test_support.clj`'s
+      ns contract is "each fixture is DEFINED here once and :refer'd into the test
+      namespaces — no forwarding vars", but the unit test's `when (.exists impl-file)`
+      branch re-implements `(binding [*read-eval* false] (read-string {:read-cond
+      :preserve} (str "[" (slurp impl-file) "]")))` — byte-for-byte the body of the
+      shared `parse-forms` fixture (same *read-eval* false + :read-cond :preserve
+      hardening, slice 21), which the unit ns does NOT :refer. The inline copy means
+      the unit suite never exercises the shared fixture on this path, and a future
+      `parse-forms` hardening (or a regression in it) diverges silently between the
+      two sites. Fix: add `parse-forms` to the `:refer` list in
+      `lint_config_test.clj` and replace the inline binding/read-string with
+      `(parse-forms (slurp impl-file))`; the parsed-form ns/defn assertions are
+      unchanged (verified identical semantics).
+      — (open)
+- [ ] Consolidate the task's `delete-recursively!` copy into shared test support,
+      or record the deliberate divergence: slice-12 added it to
+      `lint_config_test_support.clj`, making it one of SEVEN local copies of a
+      repo-wide repeated private pattern — pre-existing copies in
+      `components/tui/test/psi/tui/test_harness/tmux_rehydration.clj`,
+      `components/history/test/psi/history/git_test.clj`,
+      `components/history/test/psi/history/git_worktree_test.clj`,
+      `extensions/work-on/test/extensions/work_on_command_test.clj`,
+      `components/agent-session/test/psi/agent_session/test_support.clj` (public,
+      component-scoped), and
+      `components/agent-session/test/psi/agent_session/tool_output_integration_test.clj`
+      (private). Slice-22's repo-root consolidation set the precedent (shared
+      `psi.test-support` ns on both :unit and :integration classpaths is the natural
+      home — e.g. `psi.test-support.fs/delete-recursively!` or an extension of the
+      existing shared ns — with the seven copies migrating to it). The review skill's
+      reusable-existing-pattern flag applies: a new copy of a repeated pattern with a
+      shared home already established.
+      — (open)
+- [ ] Treat the interrupted-drain marker as a failed drain in `run-bounded` (or
+      record why not): `drain` returns `(str "<" label " interrupted>")` on
+      InterruptedException — a STRING — and `drain-failed?`
+      (`(= ::unavailable x)` ∨ `(map? x)`, support ns line 275) does not match it,
+      unlike the ExecutionException marker (`{::drain-error …}`) and `::unavailable`,
+      which both fail. So on the success path an interrupted drain silently returns
+      `{:exit 0 :out "<stdout interrupted>"}` (the marker accepted as real output),
+      and on the timeout path the marker passes through as `:out`/`:err` — the two
+      exceptional-drain paths are handled asymmetrically, inconsistent with slice-26's
+      designed invariant "every path yields the designed failure shape". Fix: return
+      a keyword/map marker for InterruptedException too (e.g. `::interrupted`, or a
+      `{::drain-error "label: interrupted"}`-shaped marker) so `drain-failed?` catches
+      it on both paths — or record the accepted gap (the main test thread is rarely
+      interrupted, so the marker-as-content path is nearly unreachable).
+      — (open)

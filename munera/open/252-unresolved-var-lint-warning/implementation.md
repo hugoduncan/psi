@@ -409,3 +409,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   matches nothing — deletion is behavior-preserving, no new repo policy.
   Verified: shared-config unit 9/39, integration 33/176 (both proofs ran, no
   SKIP), `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean.
+
+- implementation review 2026-08-15: added 3 steps to be addressed
