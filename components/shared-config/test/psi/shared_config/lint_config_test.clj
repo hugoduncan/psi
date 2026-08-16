@@ -24,6 +24,7 @@
    [psi.shared-config.lint-config-test-support
     :refer [http-client-entries
             http-kit-version
+            parse-forms
             read-edn
             repo-root]]))
 (deftest http-kit-import-registration-test
@@ -43,10 +44,15 @@
             the ^:integration proof ever loads the httpkit.with-channel
             namespace (the jar arm never fires analyze-call — no calls are
             analyzed), so a deleted or renamed hook impl is otherwise
-            undetectable by bb test/CI. Reads the impl as text with
-            *read-eval* false (a `#=` reader-eval form throws instead of
-            evaluating — slice-21) — no subprocess — and the assertion code
-            lives outside the import dir (AC2 confinement)."
+            undetectable by bb test/CI. Reads the impl through the shared
+            parse-forms fixture (*read-eval* false so a `#=` reader-eval form
+            throws instead of evaluating, :read-cond :preserve — slice-21) —
+            no subprocess — and the assertion code lives outside the import
+            dir (AC2 confinement). Slice-27: the parse uses the :refer'd
+            shared fixture rather than an inline copy, so the unit suite
+            exercises the same parse-forms the ^:integration semantics guard
+            relies on (a future hardening — or regression — cannot diverge
+            between the two sites)."
     (let [impl-rel  ".clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj"
           impl-file (io/file repo-root impl-rel)
           cfg       (read-edn ".clj-kondo/imports/http-kit/http-kit/config.edn")
@@ -65,9 +71,7 @@
       ;; depend on it) is guarded by `when`, so the deletion case reports
       ;; exactly ONE plain assertion FAIL with its message, never an ERROR.
       (when (.exists impl-file)
-        (let [forms (binding [*read-eval* false]
-                      (read-string {:read-cond :preserve}
-                                   (str "[" (slurp impl-file) "]")))]
+        (let [forms (parse-forms (slurp impl-file))]
           (testing "impl ns is httpkit.with-channel — matches the reference's namespace"
             (is (some (fn [f] (and (seq? f) (= 'ns (first f))
                                    (= 'httpkit.with-channel (second f))))

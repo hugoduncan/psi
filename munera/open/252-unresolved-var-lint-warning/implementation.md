@@ -411,3 +411,35 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 4 (`*
   SKIP), `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean.
 
 - implementation review 2026-08-15: added 3 steps to be addressed
+- addressed 3 review steps (slice 27): (1) `parse-forms` reuse in
+  `with-channel-hook-impl-guard-test` — the shared fixture is now :refer'd and
+  the inline binding/read-string replaced with `(parse-forms (slurp
+  impl-file))` (identical semantics — the fixture's body was byte-for-byte the
+  inline copy); the unit suite now exercises the same parse-forms the
+  ^:integration semantics guard relies on. (2) `delete-recursively!`
+  consolidation — new shared `bases/main/test/psi/test_support/fs.clj`
+  (`psi.test-support.fs/delete-recursively!`, reachable from every suite via
+  the `:test-paths` alias like psi.test-support.repo-root); all SEVEN local
+  copies migrated (tui tmux_rehydration, history git_test + git_worktree_test
+  incl. the with-null-context macro template, work-on work_on_command_test,
+  agent-session test_support [public fixture now delegates — external callers
+  query_graph_test/task_artifact_content_resolver_test unchanged], agent-session
+  tool_output_integration_test, shared-config lint_config_test_support [delegates,
+  mirroring the slice-22 repo-root delegation]). The shared implementation is
+  the behavioral superset of the seven copies (nil-safe; String/File via
+  io/file; .exists guard; delete-children-first walk returning nil).
+  **Caveat recorded**: the work-on extension's STANDALONE deps.edn `:test`
+  alias (extensions/work-on/deps.edn) does not include bases/main/test, so
+  work_on_command_test's new psi.test-support.fs require resolves only under
+  the repo-level test commands (bb clojure:test:extensions → `-M:test-paths`,
+  which includes bases/main/test); CI never uses the standalone alias. (3)
+  interrupted-drain marker — `drain`'s InterruptedException catch now returns
+  the same `{::drain-error "label: interrupted"}` map marker as
+  ExecutionException (was the `"<label interrupted>"` STRING that
+  `drain-failed?` — ::unavailable ∨ map? — did not match), so the two
+  exceptional-drain paths are symmetric under slice-26's designed invariant;
+  verified `drain-failed?` old-string → false (the gap), new-map → true
+  (closed). Verified: focused unit runs — shared-config 9/39, history 57/169,
+  agent-session 16/94, work-on 11/61; integration 33/176 no SKIP (both proofs
+  ran); tui harness + shared ns compile; `bb lint` errors: 0 warnings: 0;
+  `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0.

@@ -6,12 +6,8 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-output :as tool-output]
-   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
-
-(defn- delete-recursively!
-  [f]
-  (doseq [child (reverse (file-seq (io/file f)))]
-    (.delete ^java.io.File child)))
+   [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
+   [psi.test-support.fs :as test-fs]))
 
 (defn- large-bash-command []
   ;; Guaranteed to exceed default 1000-line/51200-byte policy.
@@ -119,6 +115,6 @@
 
   (testing "cleanup failure path is warning-only and does not throw"
     (let [root (tool-output/init-temp-store!)]
-      (delete-recursively! root)
+      (test-fs/delete-recursively! root)
       (is (boolean? (tool-output/cleanup-temp-store!)))
       (is (nil? (tool-output/temp-store-root))))))

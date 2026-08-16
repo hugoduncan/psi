@@ -1116,7 +1116,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 27 — Implementation-review follow-ups (2026-08-15)
 
-- [ ] Reuse the shared `parse-forms` fixture in `with-channel-hook-impl-guard-test`
+- [x] Reuse the shared `parse-forms` fixture in `with-channel-hook-impl-guard-test`
       instead of inlining its exact implementation: `lint_config_test_support.clj`'s
       ns contract is "each fixture is DEFINED here once and :refer'd into the test
       namespaces — no forwarding vars", but the unit test's `when (.exists impl-file)`
@@ -1130,8 +1130,16 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `lint_config_test.clj` and replace the inline binding/read-string with
       `(parse-forms (slurp impl-file))`; the parsed-form ns/defn assertions are
       unchanged (verified identical semantics).
-      — (open)
-- [ ] Consolidate the task's `delete-recursively!` copy into shared test support,
+      — done: `parse-forms` added to the `:refer` list in `lint_config_test.clj`;
+      the inline binding/read-string in `with-channel-hook-impl-guard-test` is
+      replaced with `(parse-forms (slurp impl-file))` (the shared fixture's body
+      is byte-for-byte the inline copy — *read-eval* false + :read-cond :preserve —
+      so semantics are identical, and the unit suite now exercises the SAME
+      parse-forms the ^:integration semantics guard relies on; a future hardening
+      or regression cannot diverge between the two sites); docstring updated to
+      name the shared fixture. Verified: unit suite → 9 tests / 39 assertions pass
+      (unchanged), integration 33/176 no SKIP
+- [x] Consolidate the task's `delete-recursively!` copy into shared test support,
       or record the deliberate divergence: slice-12 added it to
       `lint_config_test_support.clj`, making it one of SEVEN local copies of a
       repo-wide repeated private pattern — pre-existing copies in
@@ -1148,8 +1156,36 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       existing shared ns — with the seven copies migrating to it). The review skill's
       reusable-existing-pattern flag applies: a new copy of a repeated pattern with a
       shared home already established.
-      — (open)
-- [ ] Treat the interrupted-drain marker as a failed drain in `run-bounded` (or
+      — done (CONSOLIDATION branch): new shared
+      `bases/main/test/psi/test_support/fs.clj` (`psi.test-support.fs/delete-recursively!`)
+      — bases/main/test is on the :unit/:extensions/:integration suite classpaths via
+      the :test-paths alias (the same reachability psi.test-support.repo-root relies
+      on). All SEVEN copies migrated: tui tmux_rehydration (private defn- deleted,
+      calls → test-fs/), history git_test + git_worktree_test (private defn- deleted,
+      4 + 5 call sites incl. the with-null-context macro template → test-fs/),
+      work-on work_on_command_test (local defn + its agent-session-classpath
+      rationale docstring deleted, call → test-fs/), agent-session test_support
+      (public fixture now delegates to the shared helper — external callers
+      query_graph_test / task_artifact_content_resolver_test unchanged via
+      test-support/delete-recursively!), agent-session tool_output_integration_test
+      (private defn- deleted, call → test-fs/), shared-config lint_config_test_support
+      (the task's copy now delegates, mirroring the slice-22 repo-root delegation).
+      The shared implementation is the behavioral superset of the seven copies:
+      nil-safe (tui's guard), String/File via io/file conversion (history/
+      agent-session/work-on's (File. (str path)) + tui's (io/file f)), an .exists
+      guard (harmless no-op for tool-output's always-exists path), and a
+      delete-children-first recursive walk returning nil (shared-config's contract).
+      Caveat recorded in implementation.md: the work-on extension's STANDALONE
+      deps.edn `:test` alias (extensions/work-on/deps.edn) does not include
+      bases/main/test — the extension test now requires psi.test-support.fs only
+      under the repo-level test commands (bb clojure:test:extensions runs
+      `-M:test-paths`, which includes bases/main/test); CI never uses the standalone
+      alias. Verified: focused unit runs — shared-config 9/39, history 57/169,
+      agent-session (tool-output/query-graph/task-artifact) 16/94, work-on
+      extensions 11/61; integration 33/176 no SKIP (both proofs ran); tui harness +
+      shared ns compile (`require` check); `bb lint` errors: 0 warnings: 0;
+      `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0
+- [x] Treat the interrupted-drain marker as a failed drain in `run-bounded` (or
       record why not): `drain` returns `(str "<" label " interrupted>")` on
       InterruptedException — a STRING — and `drain-failed?`
       (`(= ::unavailable x)` ∨ `(map? x)`, support ns line 275) does not match it,
@@ -1163,4 +1199,14 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       `{::drain-error "label: interrupted"}`-shaped marker) so `drain-failed?` catches
       it on both paths — or record the accepted gap (the main test thread is rarely
       interrupted, so the marker-as-content path is nearly unreachable).
-      — (open)
+      — done (fix branch — the `{::drain-error …}` map marker, consistent with the
+      slice-26 ExecutionException marker): `drain`'s InterruptedException catch now
+      returns `{::drain-error (str label ": interrupted")}` — `drain-failed?`'s
+      `(map? x)` arm catches it on the success path (loud no-hang ex-info, message
+      generalized by slice-26 already) and the timeout path passes the marker through
+      in `:out`/`:err` exactly like the ExecutionException marker, so the two
+      exceptional-drain paths are now symmetric under the designed invariant;
+      `run-bounded`'s docstring updated to state the interrupted case. Verified:
+      `drain-failed?` on the old `"<stdout interrupted>"` string → false (the gap),
+      on the new `{::drain-error "stdout: interrupted"}` map → true (closed); unit
+      suite → 9 tests / 39 assertions pass

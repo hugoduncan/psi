@@ -22,6 +22,7 @@
    [clojure.java.io :as io]
    [clojure.java.shell :as shell]
    [clojure.string :as str]
+   [psi.test-support.fs :as test-fs]
    [psi.test-support.repo-root :as test-repo-root])
   (:import
    [java.util.concurrent TimeUnit]))
@@ -265,7 +266,12 @@
   carrying the exception message; the ex-info construction passes the marker
   through in :out/:err (the diagnostic shows WHY the drain failed, not just
   :unavailable) and the success path's failure check treats the marker as a
-  failed drain, so every path yields the designed failure shape."
+  failed drain, so every path yields the designed failure shape. An
+  interrupted drain returns the same {::drain-error …} marker (slice-27
+  follow-up: previously a \"<label interrupted>\" STRING that escaped
+  drain-failed? and silently passed as real output/content on both paths —
+  asymmetric with the ExecutionException marker, which both paths treat as a
+  failure); the marker is caught by drain-failed? on every path."
   [cmd]
   (let [pb (doto (ProcessBuilder. cmd)
              (.directory (io/file repo-root)))
@@ -275,8 +281,18 @@
         drain-failed? (fn [x] (or (= ::unavailable x) (map? x)))
         drain (fn [f label]
                 (try (deref f 500 ::unavailable)
+                     ;; slice-27 follow-up: InterruptedException returns the
+                     ;; SAME {::drain-error …} map marker as ExecutionException
+                     ;; (previously a "<label interrupted>" STRING, which
+                     ;; drain-failed? — ::unavailable ∨ map? — did not match,
+                     ;; so an interrupted drain silently passed as real output
+                     ;; on the success path and as :out/:err content on the
+                     ;; timeout path, asymmetrical with slice-26's designed
+                     ;; invariant that every exceptional drain yields the
+                     ;; failure shape). The map marker is caught by drain-failed?
+                     ;; on both paths.
                      (catch InterruptedException _
-                       (str "<" label " interrupted>"))
+                       {::drain-error (str label ": interrupted")})
                      (catch java.util.concurrent.ExecutionException e
                        {::drain-error (str label ": " (ex-message e))})))]
     (try
@@ -370,15 +386,13 @@
     (read-string {:read-cond :preserve} (str "[" s "]"))))
 
 (defn delete-recursively!
-  "Recursively delete a file/dir tree. clojure.java.io offers no recursive
-  delete and `.deleteOnExit` only removes empty dirs, so without this every
-  integration run leaks the temp cache tree under /tmp (slice-12 follow-up).
-  Returns nil."
+  "Recursively delete a file/dir tree. No-op when the path does not exist.
+  clojure.java.io offers no recursive delete and `.deleteOnExit` only removes
+  empty dirs, so without this every integration run leaks the temp cache tree
+  under /tmp (slice-12 follow-up). Delegates to the shared
+  psi.test-support.fs helper — the single definition site since the slice-27
+  consolidation (the seven repo-wide local copies, incl. this one, migrated
+  to it). Returns nil."
   [f]
-  (when (.exists f)
-    (when (.isDirectory f)
-      (doseq [child (.listFiles f)]
-        (delete-recursively! child)))
-    (.delete f))
-  nil)
+  (test-fs/delete-recursively! f))
 
