@@ -1583,3 +1583,53 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (both proofs ran); explicit m2-layout jar override → 3 tests / 27
       assertions, 0 failures, no SKIP (the -Spath arm still proves
       guard/exec agreement); unit suite 10 tests / 50 assertions pass
+
+## Slice 34 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Make both with_channel.clj guard sites fail cleanly on a PRESENT-but-
+      unparseable tracked impl (ERROR class; slices 20/24/29/30/31/32/33
+      standard "never an ERROR, always clean FAIL or visible SKIP"):
+      `with-channel-hook-impl-guard-test` (unit) and
+      `with-channel-hook-semantics-guard-test` (integration) guard DELETION
+      via exists-assertions (slices 24/29), but a corrupt/truncated tracked
+      `with_channel.clj` (bad merge, hand-edit truncation, encoding
+      corruption — the file exists, so both exists-guards pass) throws from
+      `parse-forms` (read-string "Unmatched delimiter: ]" / "Unexpected EOF")
+      inside the `when` → clojure.test ERROR with no assertion message.
+      Verified 2026-08-16: truncated with_channel.clj → unit
+      `9 passed, 0 failed, 1 errored` + integration `32 passed, 0 failed,
+      1 errored` (scry :error "Uncaught exception, not in assertion",
+      RuntimeException from parse-forms at lint_config_test_support.clj:409).
+      No repo-lint backstop: `.clj-kondo/` is NOT in the :lint alias path set
+      (verified deps.edn :main-opts), so bb lint never reads the file — these
+      guards are the ONLY protection for the tracked impl, and they ERROR on
+      the corruption class. Mirror of slice-30's corrupt-jar → visible-SKIP
+      hardening, tracked side. Fix: assert parseability at both sites —
+      e.g. a guarded parse `(try (parse-forms s) (catch Exception _ nil))`
+      asserted some? (clean FAIL with message) before/at the compare, or a
+      `parseable?` helper in lint_config_test_support.clj (single definition
+      site, mirror of skip!/parse-forms consolidation). Verify: truncated
+      impl → focused unit + integration runs report plain assertion FAILs
+      (0 errored); restored impl → unit 10/50, integration 33/178 no SKIP.
+- [ ] Add the `.exists` arm for `clojure-bin` to the analysis-level proof's
+      skip guard (ERROR class; slice-15's own rationale "a stale override or
+      which result is a visible SKIP, not a loud subprocess error"): the
+      guard cond checks `(nil? clojure-bin)` but NOT `(not (.exists (io/file
+      clojure-bin)))` — asymmetric with the git-bin guard (slice-15: both
+      nil? and .exists arms) and the http-kit/clj-kondo jar arms. A stale
+      `psi.lint-config-test.clojure-bin` override (the documented injection
+      use case — an editor/nrepl runner whose CLI path went stale) or a
+      `which clojure` result pointing at a since-deleted binary passes the
+      guard, then `ProcessBuilder.start` throws IOException (FileNotFound
+      wrapped) BEFORE run-bounded's try → clojure.test ERROR with no
+      assertion message. Verified 2026-08-16:
+      `-Dpsi.lint-config-test.clojure-bin=/nonexistent/clojure` → focused
+      integration run `2 errored` (java.io.IOException; slice-11 only
+      OBSERVED the nonexistent override at ns-load, never ran the suite with
+      it — the verification run used the real binary, so the ERROR path was
+      never exercised). Fix: add `(not (.exists (io/file clojure-bin)))` →
+      visible-SKIP arm (mirror of the git-bin arm, same message shape).
+      Verify: stale override → visible `SKIP task-252 analysis-level proof:
+      …` line, 0 errored (was 2 errored); default + real-override layouts
+      unchanged (33/178 no SKIP, the -Spath arm still proves guard/exec
+      agreement).
