@@ -2096,7 +2096,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 41 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Strengthen `http-kit-import-config-jar-export-guard-test`'s equality to
+- [x] Strengthen `http-kit-import-config-jar-export-guard-test`'s equality to
       the full export minus the tracked-only `:lint-as` additive diff
       (integration, lint_config_integration_test.clj:222): the slice-40 guard
       asserts only `(= (:hooks export-config) (:hooks tracked-config))`, so
@@ -2119,7 +2119,23 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       silent divergence); restore → integration suite 34 tests / 186
       assertions, no SKIP; `bb lint` errors 0 / warnings 0; `bb fmt:check`
       clean; `bb commit-check:file-lengths` exit 0
-- [ ] Extend `ci-execution-chain-guard-test` to assert the "Run Clojure tests"
+      — done: equality is now `(= export-config (dissoc tracked-config
+      :lint-as))` — the tracked config.edn must equal the pinned jar export
+      minus the tracked-only `:lint-as` additive diff, strictly stronger than
+      the slice-40 `:hooks`-subset equality (covers `:hooks` AND any other
+      top-level export key, since `:hooks` is a subset of the full map);
+      docstring/testing-string updated (additive-diff semantics preserved:
+      the tracked-only `:lint-as` stays the unit test's exact-equality
+      assertion, an export-side `:lint-as` or any NEW top-level export key
+      FAILs loudly). Verified 2026-08-16: drift drill — jar override with a
+      NEW top-level export key (`:config-in-ns {}` added to the jar's
+      `clj-kondo.exports/http-kit/http-kit/config.edn`) → focused integration
+      run `33 passed, 1 failed, 0 errored` (clean equality FAIL with its
+      message, was silent divergence pre-fix); restored → integration suite
+      34 tests / 186 assertions no SKIP (both proofs ran), unit 10 tests / 62
+      assertions (59 + 3 new), `bb lint` errors: 0, warnings: 0, `bb fmt:check`
+      clean, `bb commit-check:file-lengths` exit 0
+- [x] Extend `ci-execution-chain-guard-test` to assert the "Run Clojure tests"
       CI step (`run: bb clojure:test`, ci.yml:162-163) — the unguarded link
       that executes the :unit suite with the 10 unit invariants (import
       registration, with-channel impl guard, root-config AC2, both pin tests,
@@ -2141,4 +2157,17 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       renamed or run-value changed in a scratch copy → 1 clean FAIL; restored
       → unit suite 10 tests / 59 assertions (60 with the new assertion), `bb
       lint` errors 0 / warnings 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0
+      — done (both branches): `ci-execution-chain-guard-test` now asserts
+      `(= "bb clojure:test" (get steps "Run Clojure tests"))` (ci.yml:162-163)
+      in the `ci-run-steps`-based block, and a new testing block asserts
+      bb.edn's `clojure:test` task `:depends` retains `clojure:test:unit`
+      (some? task guard first, clean FAIL on a dropped task or dropped
+      depends; bb.edn:327-329); test docstring updated to name the unit-suite
+      step in the guarded surface. Verified 2026-08-16: step renamed in a
+      scratch copy → `12 passed, 1 failed, 0 errored` (clean FAIL with the
+      step message); bb.edn `:depends` reduced to `[clojure:test:extensions]`
+      → 1 clean FAIL (kaocha exit 1); restored → unit suite 10 tests / 62
+      assertions (59 + 3 new: step assertion + task some? + depends
+      assertion), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0

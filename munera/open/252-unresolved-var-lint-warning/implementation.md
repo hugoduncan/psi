@@ -737,3 +737,26 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   (pre-existing environmental, unknown model; fails identically at base).
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+
+- implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 41): (1) http-kit-import-config-jar-export-guard-test
+  equality strengthened to (= export-config (dissoc tracked-config :lint-as)) —
+  the tracked import config.edn must equal the pinned jar's clj-kondo.exports
+  export minus the tracked-only :lint-as additive diff (strictly stronger than
+  slice-40's :hooks-subset equality: covers :hooks AND any other top-level
+  export key); docstring/testing-string updated, additive-diff semantics
+  preserved (tracked-only :lint-as stays the unit test's exact-equality
+  assertion, an export-side :lint-as or new top-level key FAILs loudly).
+  Verified 2026-08-16: drift drill — jar override with a NEW top-level export
+  key (:config-in-ns {}) → focused integration run 33 passed / 1 failed / 0
+  errored (clean equality FAIL with message, was silent divergence); restored
+  → integration 34 tests / 186 assertions no SKIP (both proofs ran). (2)
+  ci-execution-chain-guard-test extended: asserts the "Run Clojure tests" CI
+  step runs `bb clojure:test` (ci.yml:162-163, the unit-suite link slice-28
+  scoped out) and bb.edn's clojure:test task :depends retains
+  clojure:test:unit (bb.edn:327-329, some? task guard first). Verified
+  2026-08-16: step renamed → 12 passed / 1 failed / 0 errored (clean FAIL with
+  step message); :depends reduced to [clojure:test:extensions] → 1 clean FAIL;
+  restored → unit 10 tests / 62 assertions (59 + 3 new), integration 34/186 no
+  SKIP, bb lint errors: 0, warnings: 0, bb fmt:check clean,
+  bb commit-check:file-lengths exit 0.

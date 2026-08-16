@@ -151,30 +151,37 @@
                         "tracked with_channel.clj differs from the pinned jar export")))))))))))
 
 (deftest ^:integration http-kit-import-config-jar-export-guard-test
-  (testing "the tracked import config.edn's :hooks equal the pinned 2.8.0 jar's
-            clj-kondo.exports export (slice-40 follow-up): the tracked import
-            dir holds TWO files — config.edn (the ACTUAL mechanism: the :lint-as
-            defreq registration AND the :hooks :analyze-call with-channel
-            mapping) and httpkit/with_channel.clj (the hook impl). Only the impl
-            has the ^:integration jar-export comparison
+  (testing "the tracked import config.edn equals the pinned 2.8.0 jar's
+            clj-kondo.exports export minus the tracked-only :lint-as additive
+            diff (slice-40 + slice-41 follow-ups): the tracked import dir holds
+            TWO files — config.edn (the ACTUAL mechanism: the :lint-as defreq
+            registration AND the :hooks :analyze-call with-channel mapping) and
+            httpkit/with_channel.clj (the hook impl). Only the impl has the
+            ^:integration jar-export comparison
             (with-channel-hook-semantics-guard-test); config.edn is asserted
             ONLY against hardcoded values
             (http-kit-import-registration-test's exact :lint-as / :hooks
             equalities read the UNCHANGED tracked copy, so they stay green on
             any bump-induced drift). On an http-kit version bump where the
             jar's export config.edn changes (hook renamed, new hook/entry
-            added), the tracked copy silently diverges: the unit assertions
-            keep passing (they assert the tracked copy, not the jar), the impl
-            semantics guard keeps passing (the impl file at the same path is
-            unchanged), and the hook is never exercised → silent drift, exactly
-            the slice-18 class. This test reads the jar's export config.edn
-            through a guarded read (slice-35 IOException-guard shape), parses
-            it as EDN through a guarded parse (clean FAIL, never an ERROR,
-            mirror of the parseable? shape), and asserts the tracked
-            config.edn's :hooks equal the export's :hooks — the :lint-as
-            additive diff stays the unit test's exact-equality assertion.
-            Jar-absent / corrupt-jar → visible SKIP via skip!, mirroring the
-            sibling guards."
+            added, a NEW top-level key), the tracked copy silently diverges:
+            the unit assertions keep passing (they assert the tracked copy,
+            not the jar), the impl semantics guard keeps passing (the impl
+            file at the same path is unchanged), and the hook is never
+            exercised → silent drift, exactly the slice-18 class. This test
+            reads the jar's export config.edn through a guarded read
+            (slice-35 IOException-guard shape), parses it as EDN through a
+            guarded parse (clean FAIL, never an ERROR, mirror of the
+            parseable? shape), and asserts the tracked config.edn equals the
+            export minus the tracked-only :lint-as additive diff — strictly
+            stronger than the slice-40 :hooks-only equality (covers :hooks
+            AND any other top-level key, since :hooks is a subset of the full
+            map) while preserving the additive-diff semantics: the tracked-
+            only :lint-as stays the unit test's exact-equality assertion, and
+            an export-side :lint-as of its own FAILs loudly, demanding the
+            reconciliation the R4 bump set requires. Jar-absent /
+            corrupt-jar → visible SKIP via skip!, mirroring the sibling
+            guards."
     (if-let [reason (cond
                       (not (.exists (io/file http-kit-jar)))
                       (str http-kit-jar " not present")
@@ -210,18 +217,22 @@
               (testing "tracked config.edn exists (mirror of the tracked impl
                         exists-guard in the sibling semantics test)"
                 (is (.exists tracked-file) (str tracked-rel " exists")))
-              (testing "tracked config.edn :hooks equal the jar export :hooks
-                        (the :lint-as defreq registration is the tracked-only
-                        additive diff — the unit test asserts it exactly)"
+              (testing "tracked config.edn equals the jar export minus the
+                        tracked-only :lint-as additive diff (the :lint-as defreq
+                        registration is the tracked-only additive — the unit
+                        test asserts it exactly; an export-side :lint-as or any
+                        other NEW top-level export key FAILs here, demanding
+                        reconciliation)"
                 (when (.exists tracked-file)
                   (let [tracked-config (try (edn/read-string (slurp tracked-file))
                                             (catch Exception _ nil))]
                     (testing "tracked config.edn parses as EDN"
                       (is (some? tracked-config) (str tracked-rel " parses as EDN")))
                     (when (some? tracked-config)
-                      (is (= (:hooks export-config) (:hooks tracked-config))
-                          (str tracked-rel " :hooks differ from the pinned jar "
-                               "export " jar-entry)))))))))))))
+                      (is (= export-config (dissoc tracked-config :lint-as))
+                          (str tracked-rel " differs from the pinned jar "
+                               "export " jar-entry " beyond the tracked-only "
+                               ":lint-as additive diff")))))))))))))
 
 (deftest ^:integration gitignore-http-kit-tracking-ground-truth-test
   (testing "git's own interpretation of the tracking negation matches the text

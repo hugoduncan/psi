@@ -466,23 +466,29 @@
             ":integration :focus-meta retains [:integration]")))))
 
 (deftest ci-execution-chain-guard-test
-  (testing "ci.yml + bb.edn still execute the lint gate and the ^:integration
-            proofs (slice-28 follow-up): tests-edn-suite-wiring-test guards
-            tests.edn's :integration suite and bb-edn-lint-task-wrapper-test
-            guards bb.edn's lint task, but nothing guards ci.yml's Lint step
-            (`run: bb lint`, ci.yml:89) or its Run Clojure integration tests
-            step (`run: bb clojure:test:integration`, ci.yml:166) — the outer
-            links that actually execute the lint gate and the three
-            ^:integration proofs (design.md AC1 names
+  (testing "ci.yml + bb.edn still execute the lint gate, the ^:integration
+            proofs, AND the :unit suite (slice-28 + slice-41 follow-ups):
+            tests-edn-suite-wiring-test guards tests.edn's :integration suite
+            and bb-edn-lint-task-wrapper-test guards bb.edn's lint task, but
+            nothing guards ci.yml's Lint step (`run: bb lint`, ci.yml:89), its
+            Run Clojure tests step (`run: bb clojure:test`, ci.yml:162-163 —
+            the CI link that executes the :unit suite with the 10 unit
+            invariants; slice-28's scope was explicitly the lint gate and the
+            three ^:integration proofs, so this step was left unguarded), or
+            its Run Clojure integration tests step (`run:
+            bb clojure:test:integration`, ci.yml:166) — the outer links that
+            actually execute the lint gate, the unit-suite regression surface,
+            and the three ^:integration proofs (design.md AC1 names
             `bb clojure:test:integration` as the CI-enforceable regression
             surface) — nor bb.edn's clojure:test:integration task
-            (bb.edn:307-309), so a dropped/renamed CI step or a task drift to
-            another suite/focus silently disables the entire CI regression
-            surface while every existing guard stays green — the exact
-            silent-drift class the task already closed for .gitignore /
-            lint-alias / bb.edn lint wrapper / tests.edn. Read ci.yml as text
-            (line-paired like the .gitignore test) and bb.edn as EDN — no
-            subprocess, runs anywhere."
+            (bb.edn:307-309) nor clojure:test's :depends on clojure:test:unit
+            (bb.edn:327-329), so a dropped/renamed CI step or a task drift to
+            another suite/focus silently disables the CI regression surface
+            while every existing guard stays green — the exact silent-drift
+            class the task already closed for .gitignore / lint-alias /
+            bb.edn lint wrapper / tests.edn. Read ci.yml as text (line-paired
+            like the .gitignore test) and bb.edn as EDN — no subprocess, runs
+            anywhere."
     (let [ci-file (io/file repo-root ".github/workflows/ci.yml")]
       ;; slice-31 follow-up: the slurp must NOT run in the let binding before
       ;; an exists assertion — a deleted ci.yml (the extreme of the exact
@@ -505,6 +511,11 @@
           (testing "Lint step runs `bb lint` (the local AC1 gate — ci.yml:89)"
             (is (= "bb lint" (get steps "Lint"))
                 "ci.yml Lint step runs `bb lint`"))
+          (testing "Run Clojure tests step runs `bb clojure:test` (the CI link
+                    that executes the :unit suite — the 10 unit invariants run
+                    there; ci.yml:162-163, slice-41 follow-up)"
+            (is (= "bb clojure:test" (get steps "Run Clojure tests"))
+                "ci.yml Run Clojure tests step runs `bb clojure:test`"))
           (testing "Run Clojure integration tests step runs
                     `bb clojure:test:integration` (the CI-enforceable
                     regression surface — the three ^:integration proofs run
@@ -552,5 +563,15 @@
               ;; cleanly with the assertion message (the ERROR-vs-FAIL standard:
               ;; exactly ONE plain assertion FAIL, never an ERROR).
               (is (= ["--focus" "integration"] (nth call 2 nil))
-                  "run-scry-kaocha-suite! keeps the --focus integration args"))))))))
+                  "run-scry-kaocha-suite! keeps the --focus integration args"))))))
+    (testing "bb.edn clojure:test task still :depends on clojure:test:unit — a
+              drift to another suite (or a dropped :depends) would silently
+              drop the unit invariants from `bb clojure:test`, the exact
+              command the CI \"Run Clojure tests\" step executes (bb.edn:327-329;
+              slice-41 follow-up)"
+      (let [task (get-in (read-edn "bb.edn") [:tasks 'clojure:test])]
+        (is (some? task) "bb.edn defines a :tasks clojure:test entry")
+        (when (some? task)
+          (is (some #{'clojure:test:unit} (:depends task))
+              "clojure:test :depends retains clojure:test:unit (the unit-suite guards run under bb clojure:test)"))))))
 
