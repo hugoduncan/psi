@@ -26,6 +26,7 @@
             http-kit-version
             parseable?
             read-edn
+            read-edn-or-nil
             repo-root]]))
 
 (defn- ci-run-steps
@@ -75,11 +76,14 @@
         ;; with no assertion message. Slice-35 item 3 closed the mirror blind
         ;; spot for the ROOT config and explicitly noted this import config
         ;; read is the same class once its deletion gap was closed. Guarded
-        ;; read (mirror of the root-config shape — `(try (read-edn …) (catch
-        ;; Exception _ nil))`): assert some? (clean FAIL with message), then
-        ;; the lint-as/hooks assertions run only under `when`, so the
-        ;; corruption class is a clean FAIL, never an uncaught exception.
-        (let [cfg (try (read-edn cfg-rel) (catch Exception _ nil))]
+        ;; read (mirror of the root-config shape): assert some? (clean FAIL
+        ;; with message), then the lint-as/hooks assertions run only under
+        ;; `when`, so the corruption class is a clean FAIL, never an uncaught
+        ;; exception. slice-45: the guarded-read shape is the shared
+        ;; read-edn-or-nil fixture (single definition site in the support ns —
+        ;; the slice-27/28/32 consolidation standard; this site's inlined
+        ;; `(try (read-edn …) (catch Exception _ nil))` copy was one of four).
+        (let [cfg (read-edn-or-nil cfg-rel)]
           (testing "import config parses as EDN"
             (is (some? cfg) (str cfg-rel " parses as EDN")))
           (when cfg
@@ -135,7 +139,10 @@
         ;; guarded-read shape as the root config and the sibling unit test:
         ;; assert some? (clean FAIL with message), then the :analyze-call
         ;; assertion runs only under `when` — never an uncaught exception.
-        (let [cfg (try (read-edn cfg-rel) (catch Exception _ nil))]
+        ;; slice-45: the guarded-read shape is the shared read-edn-or-nil
+        ;; fixture (single definition site in the support ns — this site's
+        ;; inlined copy was one of four).
+        (let [cfg (read-edn-or-nil cfg-rel)]
           (testing "import config parses as EDN"
             (is (some? cfg) (str cfg-rel " parses as EDN")))
           (when cfg
@@ -220,12 +227,13 @@
         ;; ERROR with no assertion message — slice-34's present-but-
         ;; unparseable fix closed only the with_channel.clj tracked impl; the
         ;; root config read is the mirror blind spot. Guarded read (mirror
-        ;; of slice-34's parseable? fixture — `(try (read-edn …) (catch
-        ;; Exception _ nil))`): assert some? (clean FAIL with message), then
-        ;; the AC2 assertions run only under `when`, so the corruption class
-        ;; is a clean FAIL, never an uncaught exception.
-        (let [cfg (try (read-edn ".clj-kondo/config.edn")
-                       (catch Exception _ nil))]
+        ;; of slice-34's parseable? fixture): assert some? (clean FAIL with
+        ;; message), then the AC2 assertions run only under `when`, so the
+        ;; corruption class is a clean FAIL, never an uncaught exception.
+        ;; slice-45: the guarded-read shape is the shared read-edn-or-nil
+        ;; fixture (single definition site in the support ns — this site's
+        ;; inlined copy was one of four).
+        (let [cfg (read-edn-or-nil ".clj-kondo/config.edn")]
           (testing "root config parses as EDN"
             (is (some? cfg) ".clj-kondo/config.edn parses as EDN"))
           (when cfg
@@ -288,14 +296,15 @@
           ;; with no assertion message — slice-38 closed only the DELETION
           ;; class for this read; the unparseable class is the mirror blind
           ;; spot slices 35/36 closed for the root config and the import
-          ;; config.edn sites (both gained the guarded-read shape
-          ;; `(try (read-edn …) (catch Exception _ nil))` + a some?
+          ;; config.edn sites (both gained the guarded-read shape + a some?
           ;; "parses as EDN" clean-FAIL assertion). Guarded read (mirror of
           ;; the root-config shape): assert some? (clean FAIL with message),
           ;; then the pin assertions run only under `when`, so the corruption
-          ;; class is a clean FAIL, never an uncaught exception.
-          (let [ext-cfg (try (read-edn "extensions/dev-http/deps.edn")
-                             (catch Exception _ nil))]
+          ;; class is a clean FAIL, never an uncaught exception. slice-45:
+          ;; the guarded-read shape is the shared read-edn-or-nil fixture
+          ;; (single definition site in the support ns — this site's inlined
+          ;; copy was one of four).
+          (let [ext-cfg (read-edn-or-nil "extensions/dev-http/deps.edn")]
             (testing "extensions/dev-http/deps.edn parses as EDN"
               (is (some? ext-cfg) "extensions/dev-http/deps.edn parses as EDN"))
             (when ext-cfg

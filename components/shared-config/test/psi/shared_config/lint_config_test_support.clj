@@ -4,10 +4,12 @@
   file-length gate).
 
   Single-sources every fixture the lint-config test namespaces share: repo-root
-  discovery (with the psi.lint-config-test.repo-root override), EDN reading,
+  discovery (with the psi.lint-config-test.repo-root override), EDN reading
+  (plain read-edn + the guarded read-edn-or-nil — slice-45 consolidation),
   the pinned http-kit/clj-kondo versions and jar paths (each overridable via
   its own system property, mirroring repo-root), the pinned-JVM-clj-kondo
-  subprocess runner (timeout-bounded, see run-bounded), the visible SKIP
+  subprocess runner (timeout-bounded, see run-bounded; a start failure is
+  converted into the loud ex-info with :cmd — slice-45), the visible SKIP
   reporter for jar/clojure/git-absent ^:integration arms, and the parsed-form
   compare used by both hook guards (plus its guarded parseable? variant for
   present-but-unparseable tracked input). The analysis-level proof's recursive
@@ -63,6 +65,28 @@
    (edn/read-string (slurp (io/file repo-root rel-path))))
   ([rel-path opts]
    (edn/read-string opts (slurp (io/file repo-root rel-path)))))
+
+(defn read-edn-or-nil
+  "Guarded read of a repo-relative EDN file via the shared read-edn fixture:
+  returns the parsed EDN, or nil when the file is absent/unreadable/unparseable
+  (slice-45 follow-up): the `(try (read-edn rel) (catch Exception _ nil))`
+  guarded-read shape was inlined at FOUR unit sites
+  (http-kit-import-registration-test, with-channel-hook-impl-guard-test,
+  root-config-ac2-invariant-test, http-kit-pin-sourced-from-deps-edn-test's
+  extension block) and the ^:integration jar-export guard used a DIVERGENT raw
+  `(try (edn/read-string (slurp tracked-file)) (catch Exception _ nil))`
+  (lint_config_integration_test.clj) that bypassed the shared read-edn fixture
+  entirely — no repo-root resolution, no opts, no future hardening — the exact
+  duplicated-shape class slices 27/28/32 consolidated (parse-forms inline copy
+  → parseable?, which-* byte-identical copies → which-bin, 3× skip-reporting
+  tail → skip!) under this ns's 'each fixture is DEFINED here once' contract.
+  Single definition site (mirror of parseable?): a future hardening of the
+  guarded-read shape (reader opts, *read-eval* binding, error capture) or a
+  regression lands in one place, and the integration site inherits read-edn's
+  repo-root resolution + any hardening."
+  [rel-path]
+  (try (read-edn rel-path)
+       (catch Exception _ nil)))
 
 (def http-kit-version
   "Pinned http-kit version for the analysis-level proof: derived from deps.edn
@@ -283,13 +307,22 @@
   follow-up: previously a \"<label interrupted>\" STRING that escaped
   drain-failed? and silently passed as real output/content on both paths —
   asymmetric with the ExecutionException marker, which both paths treat as a
-  failure); the marker is caught by drain-failed? on every path."
+  failure); the marker is caught by drain-failed? on every path.
+
+  A process-START failure is converted into the loud ex-info carrying :cmd and
+  the exception message (slice-45 follow-up): .start sits INSIDE the try, so
+  the wrong-format sub-class of the slice-43 EACCES/directory closure — a
+  present-but-wrong-format binary at either injection seam (chmod +x TEXT
+  file, wrong-arch binary, corrupted binary with the exec bit set — the
+  .isFile/.canExecute skip-guard arms are access-mode only and pass it) —
+  surfaces with context on every platform, never a bare uncaught clojure.test
+  ERROR with no assertion message. (Linux CI JVM throws IOException \"error=8,
+  Exec format error\" at .start; macOS .start succeeds and the subprocess
+  exits 126/127 → clean assertion FAILs, the platform divergence the skip
+  guards cannot pre-check.)"
   [cmd]
   (let [pb (doto (ProcessBuilder. cmd)
              (.directory (io/file repo-root)))
-        proc (.start pb)
-        out-f (future (slurp (.getInputStream proc)))
-        err-f (future (slurp (.getErrorStream proc)))
         drain-failed? (fn [x] (or (= ::unavailable x) (map? x)))
         drain (fn [f label]
                 (try (deref f 500 ::unavailable)
@@ -308,42 +341,68 @@
                      (catch java.util.concurrent.ExecutionException e
                        {::drain-error (str label ": " (ex-message e))})))]
     (try
-      (if-not (.waitFor proc process-timeout-ms TimeUnit/MILLISECONDS)
-        (let [;; kill the process first so the pipe streams close and the
-              ;; draining futures complete; then capture whatever partial
-              ;; output was produced before the bound was hit. (Derefing
-              ;; before the kill would block — the streams stay open while
-              ;; the process lives.)
-              _           (when (.isAlive proc) (.destroyForcibly proc))
-              partial-out (drain out-f "stdout")
-              partial-err (drain err-f "stderr")]
-          (throw (ex-info (str "subprocess exceeded " process-timeout-ms
-                               " ms and was killed: " (pr-str cmd))
-                          {:cmd cmd
-                           :out (if (= ::unavailable partial-out)
-                                  :unavailable partial-out)
-                           :err (if (= ::unavailable partial-err)
-                                  :unavailable partial-err)})))
-        (let [out (drain out-f "stdout")
-              err (drain err-f "stderr")]
-          (when (or (drain-failed? out) (drain-failed? err))
-            (throw (ex-info (str "subprocess exited but its stdout/stderr could "
-                                 "not be drained within the bound — a descendant "
-                                 "process is holding the pipe open or the stream "
-                                 "read failed: " (pr-str cmd))
-                            {:cmd cmd
-                             :out (if (= ::unavailable out) :unavailable out)
-                             :err (if (= ::unavailable err) :unavailable err)})))
-          {:exit (.exitValue proc) :out out :err err}))
-      (finally
-        (when (.isAlive proc)
-          (.destroyForcibly proc))
-        ;; bounded drain so the finally can never hang the suite either
-        ;; (slice-21: the previously-unbounded @out-f/@err-f here would block
-        ;; forever on the pipe-holding-descendant path; a completed future
-        ;; returns instantly, so the bound only bites in the pathological case)
-        (drain out-f "stdout")
-        (drain err-f "stderr")))))
+      ;; slice-45 follow-up: (.start pb) moved INSIDE the try — a
+      ;; present-but-wrong-format binary at either injection seam (a chmod +x
+      ;; TEXT file, wrong-arch binary, corrupted binary with the exec bit set
+      ;; — the .isFile/.canExecute skip-guard arms are access-mode only:
+      ;; .canExecute returns true for any exec-bit regular file, verified
+      ;; 2026-08-16) previously threw IOException at .start, OUTSIDE the try →
+      ;; an uncaught clojure.test ERROR with no assertion message, the
+      ;; exec-format sub-class of the slice-43 EACCES/directory closure:
+      ;; Linux CI JVM throws "error=8, Exec format error" (ENOEXEC) while
+      ;; macOS .start succeeds and the subprocess exits 126/127 → clean FAIL —
+      ;; the platform divergence slice-43 named only EACCES/directory and
+      ;; recorded the move-.start-inside-the-try fallback that was never
+      ;; taken. The outer catch converts the start IOException into the loud
+      ;; ex-info carrying :cmd (+ the exception message), so the wrong-format
+      ;; class surfaces with context on every platform, never a bare uncaught
+      ;; ERROR.
+      (let [proc (.start pb)
+            out-f (future (slurp (.getInputStream proc)))
+            err-f (future (slurp (.getErrorStream proc)))]
+        (try
+          (if-not (.waitFor proc process-timeout-ms TimeUnit/MILLISECONDS)
+            (let [;; kill the process first so the pipe streams close and the
+                  ;; draining futures complete; then capture whatever partial
+                  ;; output was produced before the bound was hit. (Derefing
+                  ;; before the kill would block — the streams stay open while
+                  ;; the process lives.)
+                  _           (when (.isAlive proc) (.destroyForcibly proc))
+                  partial-out (drain out-f "stdout")
+                  partial-err (drain err-f "stderr")]
+              (throw (ex-info (str "subprocess exceeded " process-timeout-ms
+                                   " ms and was killed: " (pr-str cmd))
+                              {:cmd cmd
+                               :out (if (= ::unavailable partial-out)
+                                      :unavailable partial-out)
+                               :err (if (= ::unavailable partial-err)
+                                      :unavailable partial-err)})))
+            (let [out (drain out-f "stdout")
+                  err (drain err-f "stderr")]
+              (when (or (drain-failed? out) (drain-failed? err))
+                (throw (ex-info (str "subprocess exited but its stdout/stderr could "
+                                     "not be drained within the bound — a descendant "
+                                     "process is holding the pipe open or the stream "
+                                     "read failed: " (pr-str cmd))
+                                {:cmd cmd
+                                 :out (if (= ::unavailable out) :unavailable out)
+                                 :err (if (= ::unavailable err) :unavailable err)})))
+              {:exit (.exitValue proc) :out out :err err}))
+          (finally
+            (when (.isAlive proc)
+              (.destroyForcibly proc))
+            ;; bounded drain so the finally can never hang the suite either
+            ;; (slice-21: the previously-unbounded @out-f/@err-f here would block
+            ;; forever on the pipe-holding-descendant path; a completed future
+            ;; returns instantly, so the bound only bites in the pathological case)
+            (drain out-f "stdout")
+            (drain err-f "stderr"))))
+      (catch java.io.IOException e
+        (throw (ex-info (str "failed to start subprocess: " (pr-str cmd)
+                             " — " (.getMessage e))
+                        {:cmd cmd
+                         :message (.getMessage e)}
+                        e))))))
 
 (defn clj-kondo-main
   "Run the pinned clj-kondo as a subprocess from the repo root with the given

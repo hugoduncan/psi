@@ -818,3 +818,26 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 45): (1) exec-format sub-class closed at the
+  infra-binary boundary — `(.start pb)` moved INSIDE run-bounded's try (the
+  slice-43-recorded branch (a) fallback, the item's own robust locus — no
+  portable pre-start format check exists); an outer `(catch IOException e …)`
+  converts any start failure into the loud ex-info
+  `"failed to start subprocess: <cmd> — <message>"` carrying `{:cmd :message}`
+  with the IOException as cause, so the wrong-format class (chmod +x text
+  file / wrong-arch / corrupted exec-bit binary — .isFile/.canExecute guard
+  arms are access-mode only) surfaces with context on every platform — Linux
+  CI "error=8, Exec format error" now a contextual ex-info, never a bare
+  uncaught ERROR; macOS .start still succeeds → clean FAILs (verified: chmod
+  +x text file at clojure-bin override → 33 passed / 1 failed / 0 errored;
+  directory-at-cmd scratch → ex-info with :cmd + IOException cause). (2)
+  guarded-read shape consolidated into a single support-ns fixture
+  (`read-edn-or-nil`, mirror of parseable?) — the four inlined
+  `(try (read-edn …) (catch Exception _ nil))` unit copies replaced + the
+  integration jar-export guard's divergent raw `(try (edn/read-string (slurp
+  tracked-file)) (catch Exception _ nil))` replaced with
+  `(read-edn-or-nil tracked-rel)` (inherits repo-root resolution + any future
+  read-edn hardening; the jar-export STRING parse stays edn/read-string — not
+  a file read). Verified: unit 10/69, integration 34/186 no SKIP (both proofs
+  ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+  `bb commit-check:file-lengths` exit 0

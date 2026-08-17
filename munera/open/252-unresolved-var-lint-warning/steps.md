@@ -2456,7 +2456,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 45 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Close the exec-format sub-class at the infra-binary boundary — slice-43
+- [x] Close the exec-format sub-class at the infra-binary boundary — slice-43
       closed the START ERROR class for EACCES (chmod-cleared) and directory
       inputs via the `(or (not (.isFile …)) (not (.canExecute …)))` guard
       arms, but `.canExecute` is ACCESS-MODE only (verified 2026-08-16: a
@@ -2495,7 +2495,35 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       0 errored; restore → unit 10/69, integration 34/186 no SKIP (both
       proofs ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
-- [ ] Consolidate the guarded-read shape into a single support-ns fixture —
+      — done (branch (a) — the recorded robust-locus fallback, per the item's
+      own "no portable pre-start format check exists, so (a) is the robust
+      locus"): `(.start pb)` moved INSIDE run-bounded's try — the let now
+      binds only the ProcessBuilder + the drain fns; the process + drain
+      futures are bound in an inner try under the outer one, and an outer
+      `(catch java.io.IOException e …)` converts any start IOException into
+      the loud ex-info `"failed to start subprocess: <cmd> — <message>"`
+      carrying `{:cmd cmd :message …}` with the IOException as cause — so the
+      wrong-format class surfaces with context on every platform (Linux CI
+      "error=8, Exec format error" now a contextual ex-info, never a bare
+      uncaught ERROR with no assertion message), while macOS `.start` still
+      succeeds and the doomed subprocess exits 126/127 → clean assertion FAILs
+      (unchanged, verified below). The start IOException is the only
+      IOException source inside the try (drain swallows its futures'
+      ExecutionExceptions into markers; waitFor/destroyForcibly do not throw
+      IOException), so the outer catch is precise. Verified 2026-08-16:
+      directory-at-cmd scratch (`run-bounded ["/tmp"]`, the macOS-compatible
+      start-IOException trigger — EACCES at exec) → loud ex-info with
+      `{:cmd ["/tmp"] :message "… Exec failed, error: 13 (Permission denied)"}`
+      and IOException cause, was a bare uncaught start ERROR; chmod +x text
+      file at the `psi.lint-config-test.clojure-bin` override → integration
+      focused run 33 passed / 1 failed / 0 errored (clean FAILs from the
+      doomed exit-127 subprocess, the documented macOS shape — was the same
+      clean FAIL class pre-fix, never an ERROR/hang); normal `echo hello` →
+      `{:exit 0 :out "hello\n" :err ""}` in 7 ms (unchanged); restore → unit
+      10/69, integration 34/186 no SKIP (both proofs ran), `bb lint` errors:
+      0, warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths`
+      exit 0
+- [x] Consolidate the guarded-read shape into a single support-ns fixture —
       the `(try (read-edn rel) (catch Exception _ nil))` shape is now inlined
       at FOUR unit sites (root-config-ac2-invariant-test, http-kit-import-
       registration-test, with-channel-hook-impl-guard-test, http-kit-pin-
@@ -2519,3 +2547,22 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       and messages), integration 34/186 no SKIP (both proofs ran), `bb lint`
       errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
+      — done: new `read-edn-or-nil` fixture in lint_config_test_support.clj
+      (single definition site, mirror of parseable? — `(try (read-edn rel)
+      (catch Exception _ nil))` delegating to the shared read-edn, so repo-
+      root resolution + any future read-edn hardening are inherited); all
+      FOUR inlined unit copies replaced
+      (`(read-edn-or-nil cfg-rel)` ×2, `(read-edn-or-nil
+      ".clj-kondo/config.edn")`, `(read-edn-or-nil
+      "extensions/dev-http/deps.edn")`) and the integration jar-export
+      guard's divergent raw `(try (edn/read-string (slurp tracked-file))
+      (catch Exception _ nil))` replaced with `(read-edn-or-nil
+      tracked-rel)` (the tracked-rel path resolves through the shared
+      fixture's repo-root — same file, plus the fixture's opts/hardening
+      inheritance). The jar-export SIDE of that guard still parses the jar
+      entry STRING with `(edn/read-string jar-export)` — not a file read, so
+      read-edn-or-nil does not apply there. Each site's rationale comment
+      updated to name the shared fixture (slice-45 note). Verified 2026-08-16:
+      unit 10/69 unchanged (same assertion counts and messages), integration
+      34/186 no SKIP (both proofs ran), `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0

@@ -24,6 +24,7 @@
             git-bin
             http-kit-jar
             parseable?
+            read-edn-or-nil
             repo-root
             run-bounded
             skip!]]
@@ -234,9 +235,20 @@
                         test asserts it exactly; an export-side :lint-as or any
                         other NEW top-level export key FAILs here, demanding
                         reconciliation)"
+                ;; slice-45 follow-up: the tracked-config read previously used
+                ;; a DIVERGENT raw `(try (edn/read-string (slurp tracked-file))
+                ;; (catch Exception _ nil))` that bypassed the shared read-edn
+                ;; fixture entirely — no repo-root resolution, no opts, no
+                ;; future hardening — the exact duplicated-shape class slices
+                ;; 27/28/32 consolidated elsewhere. The shared read-edn-or-nil
+                ;; fixture (single definition site in the support ns, mirror
+                ;; of parseable?) now owns the guarded-read shape here too, so
+                ;; the integration site inherits read-edn's repo-root
+                ;; resolution and any future hardening; the clean-FAIL
+                ;; semantics are unchanged (nil → the some? assertion below
+                ;; fails with its message, never an uncaught exception).
                 (when (.exists tracked-file)
-                  (let [tracked-config (try (edn/read-string (slurp tracked-file))
-                                            (catch Exception _ nil))]
+                  (let [tracked-config (read-edn-or-nil tracked-rel)]
                     (testing "tracked config.edn parses as EDN"
                       (is (some? tracked-config) (str tracked-rel " parses as EDN")))
                     (when (some? tracked-config)
