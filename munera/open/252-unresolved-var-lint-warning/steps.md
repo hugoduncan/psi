@@ -2355,7 +2355,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 44 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Close the unreadable-regular-file sub-class at the four slice-42
+- [x] Close the unreadable-regular-file sub-class at the four slice-42
       text-slurp sites (+ the fifth transit slurp): slice-42's `.isFile`
       hardening closed the missing AND directory classes at
       with-channel-hook-impl-guard-test `(parseable? (slurp impl-file))`,
@@ -2383,7 +2383,32 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       site in the integration guards likewise; restore → unit 10/69,
       integration 34/186 no SKIP, `bb lint` errors 0 / warnings 0,
       `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
-- [ ] Align the analysis-level proof's jar skip arms with the slice-30
+      — done (2026-08-16): all four slice-42 site guards + the transit site
+      now assert and guard with `(and (.isFile f) (.canRead f))` — the
+      canRead conjunct closes the chmod-000 unreadable-regular-file class
+      slice-42's own item text named ("IOException on permission-denied")
+      but its .isFile fix did not close (mirror of slice-43's .canExecute
+      binary arm). Sites: `with-channel-hook-impl-guard-test` (assertion
+      message "impl file … is a regular readable file"; when-guard updated
+      likewise), `with-channel-hook-semantics-guard-test` ("tracked impl …
+      is a regular readable file"; the `(when (and (some? jar-export) (.isFile
+      tracked-file) …))` guard updated likewise),
+      `gitignore-http-kit-import-tracking-test` (".gitignore is a regular
+      readable file"), `ci-execution-chain-guard-test` ("ci.yml is a regular
+      readable file"), and the no-reg transit slurp in
+      `http-kit-defreq-analysis-level-resolution-test` (`.exists` →
+      isFile+canRead; "no-reg transit is a regular readable file"). The
+      `http-kit-import-config-jar-export-guard-test` tracked-config slurp is
+      NOT in the item's four+one scope — its `(try (edn/read-string (slurp
+      …)) (catch Exception _ nil))` guarded-read already clean-FAILs the
+      unreadable class (slice-42's recorded "accidentally clean-FAIL" note).
+      Verified 2026-08-16: chmod-000 impl file → unit `9 passed, 1 failed,
+      0 errored` (clean FAIL "is a regular readable file", was ERROR);
+      chmod-000 tracked impl → integration `33 passed, 1 failed, 0 errored`
+      (clean FAIL, was ERROR); restore → unit 10/69, integration 34/186 no
+      SKIP (both proofs ran), `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [x] Align the analysis-level proof's jar skip arms with the slice-30
       visible-SKIP convention: the two sibling ^:integration guards
       (with-channel-hook-semantics-guard-test, http-kit-import-config-
       jar-export-guard-test) skip VISIBLY on a corrupt/truncated http-kit jar
@@ -2407,3 +2432,24 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       clean FAILs from the subprocess); restore → integration 34/186 no SKIP,
       unit 10/69, `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
+      — done (valid-zip? arms branch — the fix, not the divergence record):
+      the analysis-level proof's skip guard gained
+      `(not (valid-zip? (io/file http-kit-jar)))` and
+      `(not (valid-zip? (io/file clj-kondo-jar)))` arms (each after its
+      `.exists` arm, message "… is not a valid zip archive" — the sibling
+      slice-30 message shape; valid-zip? opens the archive catching
+      IOException, the ZipException superclass — also covers a directory at
+      the path), so a corrupt jar / non-jar override at either documented
+      injection seam is now a visible SKIP (via skip!/report-skip!), never
+      clean FAILs from a doomed subprocess (the jar `--dependencies` arm
+      exits non-zero / the corrupt analyzer jar has no clj-kondo.main → the
+      -Spath and lint arms FAIL). Verified 2026-08-16: corrupt http-kit-jar
+      override → all three http-kit-jar-dependent proofs skip visibly
+      (`SKIP task-252 analysis-level proof: /tmp/ck252-corrupt.jar is not a
+      valid zip archive` — was clean FAILs from the subprocess), 0 errored,
+      0 failed; corrupt clj-kondo-jar override →
+      `SKIP task-252 analysis-level proof: /tmp/ck252-corrupt-clj-kondo.jar
+      is not a valid zip archive` while the two http-kit-jar-dependent sibling
+      proofs still run; restore → integration 34/186 no SKIP (both proofs
+      ran), unit 10/69, `bb lint` errors: 0, warnings: 0, `bb fmt:check`
+      clean, `bb commit-check:file-lengths` exit 0

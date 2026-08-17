@@ -800,3 +800,19 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice 44): (1) unreadable-regular-file sub-class
+  closed at all five slurp sites — the four slice-42 text-slurp guards
+  (with-channel-hook-impl-guard-test, with-channel-hook-semantics-guard-test,
+  gitignore-http-kit-import-tracking-test, ci-execution-chain-guard-test) and
+  the no-reg transit slurp now assert + guard with `(and (.isFile f)
+  (.canRead f))`, closing the chmod-000 permission-denied class slice-42
+  named but did not close (mirror of slice-43's .canExecute binary arm; the
+  import-config-jar-export tracked-config slurp is already clean-FAIL via its
+  try-wrapped guarded read). (2) analysis-level proof's jar skip arms aligned
+  with the sibling slice-30 visible-SKIP convention — valid-zip? arms for both
+  http-kit-jar and clj-kondo-jar (corrupt jar / non-jar override at either
+  injection seam → visible SKIP, never clean FAILs from a doomed subprocess).
+  Verified: unit 10/69, integration 34/186 no SKIP (both proofs ran);
+  corrupt-jar overrides → visible SKIP lines, 0 errored, 0 failed; chmod-000
+  sites → clean FAILs, 0 errored; `bb lint` errors: 0, warnings: 0,
+  `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0

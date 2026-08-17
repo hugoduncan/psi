@@ -108,11 +108,12 @@
                   FAIL. Mirror slice-24's shape: assert existence first, read/
                   compare only under `when` — a deleted tracked impl is a single
                   plain assertion FAIL here, never an ERROR)"
-          (is (.isFile tracked-file) (str tracked-rel " is a regular file")))
+          (is (and (.isFile tracked-file) (.canRead tracked-file))
+              (str tracked-rel " is a regular readable file")))
         (testing "tracked impl is semantically identical to the jar export
                   (parsed-form compare — whitespace/indentation-insensitive,
                   string-literal-sensitive; see parse-forms)"
-          (when (and (some? jar-export) (.isFile tracked-file))
+          (when (and (some? jar-export) (.isFile tracked-file) (.canRead tracked-file))
             ;; slice-42 follow-up: `.isFile` (not `.exists`) in the guard and
             ;; the exists assertion above — .exists returns true for a
             ;; DIRECTORY, so a directory at the tracked path would pass an
@@ -363,8 +364,41 @@
                           (not (.exists (io/file http-kit-jar)))
                           (str http-kit-jar " not present")
 
+                          ;; slice-44 follow-up: mirror of the sibling guards'
+                          ;; slice-30 visible-SKIP convention — the two sibling
+                          ;; ^:integration guards
+                          ;; (with-channel-hook-semantics-guard-test,
+                          ;; http-kit-import-config-jar-export-guard-test) skip
+                          ;; VISIBLY on a corrupt/truncated http-kit jar via
+                          ;; this valid-zip? arm, but this proof's guard checked
+                          ;; only (.exists …) for BOTH jars, so the same
+                          ;; environmental condition (a corrupt jar / non-jar
+                          ;; override at psi.lint-config-test.http-kit-jar — the
+                          ;; documented injection seam) passed the guard and the
+                          ;; proof FAILed multiple clean assertions (the jar
+                          ;; --dependencies subprocess exits non-zero) instead
+                          ;; of the sibling visible SKIP. .exists passes a
+                          ;; corrupt jar (the jar-analysis subprocess then fails
+                          ;; non-zero → clean assertion FAILs); valid-zip?
+                          ;; (opens the archive, catching IOException — the
+                          ;; ZipException superclass) turns the corrupt-jar case
+                          ;; into the sibling visible SKIP, never clean FAILs
+                          ;; from a doomed subprocess.
+                          (not (valid-zip? (io/file http-kit-jar)))
+                          (str http-kit-jar " is not a valid zip archive")
+
                           (not (.exists (io/file clj-kondo-jar)))
-                          (str clj-kondo-jar " not present (pinned clj-kondo artifact)"))
+                          (str clj-kondo-jar " not present (pinned clj-kondo artifact)")
+
+                          ;; slice-44 follow-up: same valid-zip? visible-SKIP
+                          ;; arm for the pinned clj-kondo jar — a corrupt
+                          ;; analyzer jar (or a non-jar override at
+                          ;; psi.lint-config-test.clj-kondo-jar) has no
+                          ;; clj-kondo.main, so the -Spath and lint arms would
+                          ;; FAIL cleanly from the doomed subprocess instead of
+                          ;; the sibling visible SKIP.
+                          (not (valid-zip? (io/file clj-kondo-jar)))
+                          (str clj-kondo-jar " is not a valid zip archive"))
 
                         ;; slice-33 follow-up: clj-kondo-local-repo throws a clear
                         ;; ex-info when the guarded jar path is not in the standard
@@ -471,9 +505,19 @@
                 ;; existence (clean FAIL), then read only under `when`, so a
                 ;; failed jar analysis surfaces as plain assertion FAILs,
                 ;; never an uncaught exception.
-                (is (.exists transit-file)
-                    "no-reg transit exists (jar --dependencies analysis wrote the cache)")
-                (when (.exists transit-file)
+                ;; slice-44 follow-up: `.exists` → `(and (.isFile …)
+                ;; (.canRead …))` — .exists passes for a directory AND a
+                ;; chmod-000 unreadable regular file, and the slurp would
+                ;; throw IOException (Is a directory / Permission denied)
+                ;; outside any try → clojure.test ERROR (the permission-denied
+                ;; class slice-42 named but did not close at this site, the
+                ;; fifth exists-checked-but-unguarded slurp). The isFile+
+                ;; canRead predicate closes missing + directory + unreadable
+                ;; in one shape (mirror of the four slice-42 text-slurp site
+                ;; guards), so the slurp below never sees an unreadable path.
+                (is (and (.isFile transit-file) (.canRead transit-file))
+                    "no-reg transit is a regular readable file (jar --dependencies analysis wrote the cache)")
+                (when (and (.isFile transit-file) (.canRead transit-file))
                   (let [transit (slurp transit-file)]
                     (is (str/includes? transit "~$request")
                         "no-reg cache still carries the plain defn request")

@@ -152,7 +152,17 @@
         ;; the slurp boundary). .isFile is false for both missing AND
         ;; directory — closes both classes in one predicate; the when-guard
         ;; below uses the same predicate so the slurp never sees a directory.
-        (is (.isFile impl-file) (str impl-rel " is a regular file")))
+        ;; slice-44 follow-up: `(and (.isFile …) (.canRead …))` — .isFile
+        ;; returns TRUE for a chmod-000 unreadable regular file (it IS a
+        ;; regular file), and the unguarded slurp would throw IOException
+        ;; (Permission denied) outside any try → clojure.test ERROR, the
+        ;; permission-denied class slice-42's own item text named
+        ;; ("IOException on permission-denied") but the .isFile fix did not
+        ;; close; slice-43's .canExecute binary mirror has no .canRead slurp
+        ;; counterpart. The canRead conjunct closes missing + directory +
+        ;; unreadable in one predicate, mirror of slice-43's .canExecute arm.
+        (is (and (.isFile impl-file) (.canRead impl-file))
+            (str impl-rel " is a regular readable file")))
       ;; slice-24 follow-up: the slurp must NOT run in a let binding before the
       ;; exists assertion — a deleted/renamed impl would otherwise throw
       ;; FileNotFoundException at read time and surface as a clojure.test ERROR
@@ -169,7 +179,7 @@
       ;; fixture (guarded parse, nil on unparseable — single definition site in
       ;; the support ns) turns the corruption class into this clean assertion
       ;; FAIL, never an ERROR.
-      (when (.isFile impl-file)
+      (when (and (.isFile impl-file) (.canRead impl-file))
         (let [forms (parseable? (slurp impl-file))]
           (testing "impl parses as Clojure forms"
             (is (some? forms)
@@ -362,8 +372,18 @@
         ;; the slurp boundary). .isFile is false for both missing AND
         ;; directory — closes both classes in one predicate; the when-guard
         ;; below uses the same predicate so the slurp never sees a directory.
-        (is (.isFile gitignore-file) ".gitignore is a regular file"))
-      (when (.isFile gitignore-file)
+        ;; slice-44 follow-up: `(and (.isFile …) (.canRead …))` — .isFile
+        ;; returns TRUE for a chmod-000 unreadable regular file (it IS a
+        ;; regular file), and the unguarded slurp would throw IOException
+        ;; (Permission denied) outside any try → clojure.test ERROR, the
+        ;; permission-denied class slice-42's own item text named but the
+        ;; .isFile fix did not close (slice-43's .canExecute binary mirror has
+        ;; no .canRead slurp counterpart). The canRead conjunct closes
+        ;; missing + directory + unreadable in one predicate, mirror of
+        ;; slice-43's .canExecute arm.
+        (is (and (.isFile gitignore-file) (.canRead gitignore-file))
+            ".gitignore is a regular readable file"))
+      (when (and (.isFile gitignore-file) (.canRead gitignore-file))
         (let [ignore-all "**/.clj-kondo/imports/*"
               negations ["!.clj-kondo/imports/http-kit/"
                          "!.clj-kondo/imports/http-kit/**"]
@@ -538,8 +558,18 @@
         ;; open at the slurp boundary). .isFile is false for both missing AND
         ;; directory — closes both classes in one predicate; the when-guard
         ;; below uses the same predicate so the slurp never sees a directory.
-        (is (.isFile ci-file) ".github/workflows/ci.yml is a regular file"))
-      (when (.isFile ci-file)
+        ;; slice-44 follow-up: `(and (.isFile …) (.canRead …))` — .isFile
+        ;; returns TRUE for a chmod-000 unreadable regular file (it IS a
+        ;; regular file), and the unguarded slurp would throw IOException
+        ;; (Permission denied) outside any try → clojure.test ERROR, the
+        ;; permission-denied class slice-42's own item text named but the
+        ;; .isFile fix did not close (slice-43's .canExecute binary mirror has
+        ;; no .canRead slurp counterpart). The canRead conjunct closes
+        ;; missing + directory + unreadable in one predicate, mirror of
+        ;; slice-43's .canExecute arm.
+        (is (and (.isFile ci-file) (.canRead ci-file))
+            ".github/workflows/ci.yml is a regular readable file"))
+      (when (and (.isFile ci-file) (.canRead ci-file))
         (let [steps (ci-run-steps
                      (str/split-lines (slurp ci-file)))]
           (testing "Lint step runs `bb lint` (the local AC1 gate — ci.yml:89)"
