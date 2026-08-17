@@ -2352,3 +2352,58 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       silent pass with all four assertions); the real deps.edn alias is clean
       (unit suite 10 tests / 69 assertions pass, 68 + the new flag
       assertion)
+
+## Slice 44 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Close the unreadable-regular-file sub-class at the four slice-42
+      text-slurp sites (+ the fifth transit slurp): slice-42's `.isFile`
+      hardening closed the missing AND directory classes at
+      with-channel-hook-impl-guard-test `(parseable? (slurp impl-file))`,
+      with-channel-hook-semantics-guard-test `(parseable? (slurp tracked-file))`,
+      gitignore-http-kit-import-tracking-test `(str/split-lines (slurp
+      gitignore-file))`, and ci-execution-chain-guard-test `(ci-run-steps
+      (str/split-lines (slurp ci-file)))` — but `.isFile` returns TRUE for a
+      chmod-000 regular file (it IS a regular file), and the slice-42 item's
+      own class text named "IOException on permission-denied": an unreadable
+      file at any of the four paths passes `.isFile` and the unguarded slurp
+      throws IOException (Permission denied) outside any try → clojure.test
+      ERROR with no assertion message. Slice-43 closed the chmod-cleared
+      class at the BINARY boundary via `.canExecute` — the slurp boundary has
+      no mirror. The no-reg transit slurp in
+      http-kit-defreq-analysis-level-resolution-test (`(slurp transit-file)`
+      under `.exists`) is the fifth exists-checked-but-unguarded slurp —
+      slice-42's list named four; this site keeps the pre-slice-42 `.exists`
+      shape, which passes for a directory AND an unreadable file. Fix: extend
+      the four slice-42 site guards to `(and (.isFile f) (.canRead f))` —
+      single predicate closing missing + directory + unreadable, mirror of
+      slice-43's `.canExecute` arm — and switch the transit site's `.exists`
+      to the same shape. Verify: chmod-000 the impl file → focused unit
+      `9 passed, 1 failed, 0 errored` (clean FAIL "is a regular file" or the
+      canRead message, was 1 ERROR with no assertion message); chmod-000 a
+      site in the integration guards likewise; restore → unit 10/69,
+      integration 34/186 no SKIP, `bb lint` errors 0 / warnings 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [ ] Align the analysis-level proof's jar skip arms with the slice-30
+      visible-SKIP convention: the two sibling ^:integration guards
+      (with-channel-hook-semantics-guard-test, http-kit-import-config-
+      jar-export-guard-test) skip VISIBLY on a corrupt/truncated http-kit jar
+      (`valid-zip?` arm, slice-30) — but http-kit-defreq-analysis-level-
+      resolution-test's skip guard checks only `(not (.exists …))` for BOTH
+      http-kit-jar and clj-kondo-jar, so the same environmental condition (a
+      corrupt jar / non-jar override at psi.lint-config-test.http-kit-jar or
+      psi.lint-config-test.clj-kondo-jar — the documented injection seams)
+      passes the guard and the proof FAILs multiple clean assertions (the jar
+      `--dependencies` subprocess exits non-zero / the corrupt analyzer jar
+      has no clj-kondo.main → the -Spath and lint arms FAIL) instead of the
+      sibling visible SKIP. The transit-arm comment documents the
+      corrupt-jar → FAIL path but the sibling-guard divergence was never
+      reconciled. Fix: add `(not (valid-zip? (io/file http-kit-jar)))` and
+      `(not (valid-zip? (io/file clj-kondo-jar)))` arms to the proof's skip
+      guard (valid-zip? is already defined in the same ns; mirror of the
+      sibling arms → visible SKIP line), or explicitly record the FAIL as the
+      intentional divergence in the addressing note. Verify: corrupt-jar
+      override at psi.lint-config-test.http-kit-jar → visible
+      `SKIP task-252 analysis-level proof: …` line, 0 errored, 0 failed (was
+      clean FAILs from the subprocess); restore → integration 34/186 no SKIP,
+      unit 10/69, `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
