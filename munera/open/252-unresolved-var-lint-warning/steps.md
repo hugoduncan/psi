@@ -2692,3 +2692,82 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       34/189 (186 + 3 new file-set assertions) no SKIP (both proofs ran),
       unit 10/75, `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
+
+## Slice 47 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Close the `gitignore-http-kit-tracking-ground-truth-test` not-ignored arm's
+      vacuity — `git check-ignore` (with or without `-v`) NEVER reports paths
+      tracked in the index, so the arm proves the negation works only by
+      accident of the file being tracked, and a broken/removed negation keeps
+      every assertion green. Verified 2026-08-16 (git 2.55.0): the tracked
+      `.clj-kondo/imports/http-kit/http-kit/config.edn` — which DOES match
+      `.gitignore:3: **/.clj-kondo/imports/*` — exits 1 (not reported) with and
+      without `-v`, exactly like the tracked component import files; a scratch
+      repo confirms the rule: a tracked file under a matching ignore pattern
+      exits 1, an untracked sibling in the same ignored dir exits 0. The
+      ground-truth test's first arm (`(not (zero? exit))` on the tracked
+      config.edn) therefore passes whether or not the negation lines exist —
+      the file is tracked, so check-ignore never reports it — and removing /
+      re-ordering / shadowing the negation lines (the exact slice-13 drift this
+      test exists to catch) keeps arm 1 (exit 1 via tracked), arm 2 (malli
+      still ignored via the base rule), and arm 3 (ls-files — still tracked)
+      green: the ^:integration ground-truth does NOT test git's interpretation
+      of the negation; only the TEXT test (gitignore-http-kit-import-tracking-
+      test) guards the lines. Two further exit-code traps in the same test:
+      (a) `git check-ignore -v` on an UNTRACKED path whose last matching rule
+      is a NEGATION prints the negation pattern and exits 0 (verified:
+      `PROBE.edn` under the http-kit dir → `.gitignore:5:!.clj-kondo/imports/
+      http-kit/**`, exit 0; plain `check-ignore` without -v → exit 1) — so with
+      `-v` an exit of 0 means "a pattern matched", NOT "path is ignored", and
+      the negated-vs-ignored distinction lives ONLY in the printed pattern
+      content; (b) `(not (zero? exit))` conflates git's fatal exit 128
+      (verified: `check-ignore -v` outside a repo / on an invalid absolute
+      path → 128) with the intended not-ignored exit 1 — a fatal git failure
+      would falsely pass the "not ignored" arm. Fix: (1) probe an UNTRACKED
+      (nonexistent — check-ignore evaluates paths regardless of existence, no
+      file creation needed) path under the http-kit import dir, e.g.
+      `.clj-kondo/imports/http-kit/http-kit/__tracking_probe__.edn`, with
+      plain `git check-ignore` (NO `-v`) asserting `(= 1 exit)` — a removed/
+      broken negation makes the probe exit 0 → clean FAIL with message; (2)
+      add a `-v` arm on the same probe asserting the effective rule is the
+      NEGATION pattern `!.clj-kondo/imports/http-kit/**` (a shadowing re-ignore
+      added BELOW the negations — last-match-wins — surfaces the base
+      `**/.clj-kondo/imports/*` rule instead → clean FAIL); (3) tighten the
+      existing malli arm to `(= 0 exit)` (fatal 128 → clean FAIL, was false
+      pass) and keep the ls-files arm (its `(zero? exit)` already distinguishes
+      128). Verify: scratch copy with the negation lines removed → probe arm 1
+      clean FAIL (exit 0, was green); scratch copy with a trailing
+      `**/.clj-kondo/imports/*` re-ignore → -v arm clean FAIL (base rule, was
+      green); restore → integration 34 tests / ≥189 assertions no SKIP (both
+      proofs ran), unit 10/75, `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [ ] Give the slice-44 `.isFile+.canRead` readable-regular-file predicate a
+      single definition site in lint_config_test_support.clj (the task's own
+      slice-27/28/32 consolidation standard: parse-forms → parseable?,
+      which-* → which-bin, 3× skip-reporting tails → skip!): the predicate is
+      currently INLINED at ~11 sites as 22 occurrences — 18 in
+      lint_config_test.clj (with-channel-hook-impl-guard-test,
+      gitignore-http-kit-import-tracking-test, bb-edn-lint-task-wrapper-test,
+      tests-edn-suite-wiring-test, ci-execution-chain-guard-test's ci.yml +
+      bb.edn blocks; each site pairs the `(is (and (.isFile …) (.canRead …))
+      …)` assertion with the identical `(when (and (.isFile …) (.canRead …))
+      …)` guard) and 4 in lint_config_integration_test.clj
+      (with-channel-hook-semantics-guard-test's tracked impl assertion+guard,
+      http-kit-defreq-analysis-level-resolution-test's no-reg transit
+      assertion+guard) — while the support ns's own docstring commits to
+      "each fixture is DEFINED here once". A future hardening of the predicate
+      (symlink check, length bound, error capture — the permission-denied /
+      directory / missing classes slices 42/44/46 closed one predicate at a
+      time) or a regression must touch 22 inlined sites and can diverge
+      silently between them. Fix: add `readable-regular-file?` (File → bool,
+      `(and (.isFile f) (.canRead f))`) to lint_config_test_support.clj
+      (:refer'd into both test namespaces like parseable?/read-edn-or-nil) and
+      replace all 22 inlined occurrences — assertion and when-guard — with it
+      (the `.exists`-guarded sites whose guarded read already turns the
+      directory/unreadable classes into clean FAILs — e.g. the import
+      config.edn exists assertions feeding read-edn-or-nil — may stay `.exists`
+      per their own rationale, but the slurp-adjacent predicate sites must
+      share the fixture). Verify: pure refactor — unit 10 tests / 75
+      assertions unchanged, integration 34/189 no SKIP (both proofs ran),
+      `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
