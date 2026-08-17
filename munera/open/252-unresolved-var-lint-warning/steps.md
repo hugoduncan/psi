@@ -2453,3 +2453,69 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       proofs still run; restore → integration 34/186 no SKIP (both proofs
       ran), unit 10/69, `bb lint` errors: 0, warnings: 0, `bb fmt:check`
       clean, `bb commit-check:file-lengths` exit 0
+
+## Slice 45 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Close the exec-format sub-class at the infra-binary boundary — slice-43
+      closed the START ERROR class for EACCES (chmod-cleared) and directory
+      inputs via the `(or (not (.isFile …)) (not (.canExecute …)))` guard
+      arms, but `.canExecute` is ACCESS-MODE only (verified 2026-08-16: a
+      chmod +x TEXT file returns `canExecute: true` / `isFile: true`), so a
+      present-but-wrong-format binary at either injection seam — a shell
+      script without a shebang, a wrong-arch binary, a corrupted binary with
+      the exec bit set — passes both guards and reaches
+      `run-bounded`'s `(.start pb)` (lint_config_test_support.clj:290), which
+      sits in the let binding OUTSIDE the try. The outcome is
+      PLATFORM-DIVERGENT for the same input: on Linux CI (GitHub Actions
+      ubuntu — the environment that actually runs the ^:integration proofs)
+      the JVM throws `IOException "error=8, Exec format error"` (ENOEXEC) at
+      `.start` → uncaught → clojure.test ERROR with no assertion message, the
+      exact class slice-43 closed for EACCES/directory; on macOS
+      (verified 2026-08-16: chmod +x text file AND random-bytes binary at the
+      seam) `.start` succeeds and the subprocess exits 126/127 → clean FAIL
+      on the exit assertions. slice-43's item text named only "EACCES — a
+      non-executable file, or a directory" as the start IOException classes;
+      the wrong-format sub-class was not in scope, and slice-43 recorded the
+      boundary-level fallback branch ("move `(.start pb)` inside run-bounded's
+      try and convert a start failure into the loud ex-info carrying :cmd")
+      that was not taken. Fix (either branch): (a) take the recorded fallback —
+      move `(.start pb)` inside run-bounded's try and convert any start
+      IOException into the loud ex-info carrying :cmd (+ the exception
+      message), so the wrong-format class surfaces with context on every
+      platform, never a bare uncaught ERROR with no assertion message; or (b)
+      extend both binary skip-guard conds with a start-probe / format check
+      (mirror of the slice-30 valid-zip? present-but-unusable → visible SKIP
+      shape; note no portable pre-start format check exists, so (a) is the
+      robust locus); or (c) record the platform divergence as the accepted
+      design (Linux CI ERROR class — weakest). Verify: chmod +x text file at
+      the `psi.lint-config-test.clojure-bin` override → on macOS currently
+      clean FAILs from the doomed subprocess (exit 127); on Linux CI an
+      uncaught IOException ERROR; after fix → the designed loud failure shape
+      with :cmd (branch (a)) or visible SKIP (branch (b)) on both platforms,
+      0 errored; restore → unit 10/69, integration 34/186 no SKIP (both
+      proofs ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+- [ ] Consolidate the guarded-read shape into a single support-ns fixture —
+      the `(try (read-edn rel) (catch Exception _ nil))` shape is now inlined
+      at FOUR unit sites (root-config-ac2-invariant-test, http-kit-import-
+      registration-test, with-channel-hook-impl-guard-test, http-kit-pin-
+      sourced-from-deps-edn-test's extension block) and the ^:integration
+      jar-export guard's tracked-config read uses a DIVERGENT raw form
+      `(try (edn/read-string (slurp tracked-file)) (catch Exception _ nil))`
+      (lint_config_integration_test.clj:238) that bypasses the shared
+      `read-edn` fixture entirely — the exact duplicated-shape class slices
+      27/28/32 consolidated (parse-forms inline copy → :refer'd parseable?,
+      which-* byte-identical copies → which-bin, 3× skip-reporting tail →
+      skip!) under the support ns's "each fixture is DEFINED here once"
+      contract; a future hardening of the guarded-read shape (reader opts,
+      *read-eval* binding, error capture) or a regression would diverge
+      silently across the four sites, and the integration site would not
+      inherit a read-edn hardening at all. Fix: add a guarded-read fixture
+      (e.g. `read-edn-or-nil`, single definition site in
+      lint_config_test_support.clj, mirror of parseable?) and replace the
+      four inlined copies + the integration site's raw edn/read-string slurp
+      (which also gains the shared fixture's repo-root resolution and any
+      future hardening). Verify: unit 10/69 unchanged (same assertion counts
+      and messages), integration 34/186 no SKIP (both proofs ran), `bb lint`
+      errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0

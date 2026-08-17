@@ -816,3 +816,5 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   corrupt-jar overrides → visible SKIP lines, 0 errored, 0 failed; chmod-000
   sites → clean FAILs, 0 errored; `bb lint` errors: 0, warnings: 0,
   `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+
+- implementation review 2026-08-16: added 2 steps to be addressed
