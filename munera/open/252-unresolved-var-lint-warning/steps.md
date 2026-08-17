@@ -2272,3 +2272,55 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       duplicate "added … steps to be addressed" notes remain (the 739/741
       pair was the only one; slices 33/35's removals held). Doc-only — 2
       lines deleted from implementation.md, no code/test changes
+
+## Slice 43 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Close the subprocess-START ERROR class at the infra-binary boundary —
+      `run-bounded`'s `(.start pb)` (lint_config_test_support.clj:290) sits in
+      the let binding OUTSIDE the try, so a ProcessBuilder.start IOException
+      (EACCES — a non-executable file, or a directory, at the binary path)
+      propagates uncaught → clojure.test ERROR with no assertion message. The
+      skip-guard arms check `nil?` + `(.exists …)` only (slices 15/34):
+      `.exists` returns true for a non-executable file AND for a directory, so
+      both pass the guard and the ERROR fires — the mirror of slice-42's
+      `.isFile` closure at the slurp boundary, still open at the ProcessBuilder
+      boundary (slice-34 closed only the nonexistent-binary case). Affected
+      sites: clojure-bin in `http-kit-defreq-analysis-level-resolution-test`
+      (guard arm lint_config_integration_test.clj:329-330, executed in the
+      body AND the -Spath arm) and git-bin in
+      `gitignore-http-kit-tracking-ground-truth-test` (:266-269). Verified
+      2026-08-16: chmod-644 non-executable file at the
+      `psi.lint-config-test.clojure-bin` override → focused integration run
+      `33 passed, 1 errored` (IOException "Permission denied" from
+      ProcessBuilder.start, confirmed in .scry-results; the designed shape is
+      the visible SKIP, was ERROR). Fix: extend both binary skip-guard arms
+      with an executable check — `(or (not (.isFile (io/file bin)))
+      (not (.canExecute (io/file bin))))` (`.isFile` closes the directory
+      class, `.canExecute` closes the chmod-cleared class; mirror of the
+      slice-30 valid-zip? corrupt-jar arm's present-but-unusable → visible
+      SKIP shape) — or, fallback, move `(.start pb)` inside run-bounded's try
+      and convert a start failure into the loud ex-info carrying :cmd (still
+      ERROR-shaped, but with context; the SKIP arm is the standard). Verify:
+      non-executable clojure-bin override → visible `SKIP task-252
+      analysis-level proof: …` line, 0 errored (was 1 ERROR); non-executable
+      git-bin override → visible SKIP, 0 errored; restored → unit 10/68,
+      integration 34/186 no SKIP, `bb lint` errors 0 / warnings 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [ ] Add `--cache-dir` to the lint-alias masking-flag list —
+      `lint-alias-lints-extensions-test`'s forbidden-flag doseq is
+      `["--cache" "--config" "--config-dir" "--dependencies"]` with EXACT
+      string matching, so a drift adding `--cache-dir <dir>` to the :lint
+      alias's :main-opts is invisible: "--cache" does not match
+      "--cache-dir" (exact-match), and "--cache-dir" is not in the list. A
+      fresh `--cache-dir` means the http-kit jar is never analyzed (empty
+      cache) → the two dev-http warnings vanish → the exact design-step-9
+      masking this test exists to close (the same class as `--cache false`,
+      which IS listed — a cache-disabling drift via --cache-dir is the
+      unguarded sibling). Verified 2026-08-16 (scratch main-opts evaluation):
+      `["-m" "clj-kondo.main" "--lint" "bb.edn" "extensions" "--cache-dir"
+      "/tmp/fresh-cache"]` → all four existing assertions pass while
+      "--cache-dir" is present (blind spot confirmed; the actual deps.edn
+      alias is clean today). Fix: add "--cache-dir" to the doseq list (one
+      string). Verify: synthetic main-opts containing "--cache-dir" →
+      1 clean FAIL (was silent pass); restored → unit 10/68, `bb lint` errors
+      0 / warnings 0, `bb fmt:check` clean
