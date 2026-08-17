@@ -780,3 +780,21 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
 
 - implementation review 2026-08-16: added 2 steps to be addressed
+
+- addressed 2 review steps (slice 43): (1) subprocess-START ERROR class closed
+  — both infra-binary skip-guard conds (clojure-bin in the analysis-level
+  proof, git-bin in the git ground-truth proof) gained the
+  `(or (not (.isFile (io/file bin))) (not (.canExecute (io/file bin))))` →
+  visible-SKIP arm ("… is not an executable file") between the .exists arm and
+  the jar arms — .isFile closes the directory class, .canExecute closes the
+  chmod-cleared class (previously a chmod-644 binary or a directory passed the
+  .exists arm and ERRORed at ProcessBuilder.start "Permission denied" outside
+  run-bounded's try; verified 2026-08-16: both non-executable overrides → the
+  designed SKIP lines, 0 errored, was 1 ERROR each); (2) "--cache-dir" added to
+  lint-alias-lints-extensions-test's forbidden-flag doseq (exact-match on
+  --cache did not catch the sibling; a fresh --cache-dir means the jar is never
+  analyzed → the two warnings vanish, the design-step-9 masking class — now a
+  clean FAIL on synthetic main-opts containing --cache-dir, was silent pass).
+  Verified: unit 10 tests / 69 assertions (68 + the new flag), integration 34
+  tests / 186 assertions no SKIP (both proofs ran), `bb lint` errors: 0,
+  warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0

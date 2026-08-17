@@ -2275,7 +2275,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 43 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Close the subprocess-START ERROR class at the infra-binary boundary —
+- [x] Close the subprocess-START ERROR class at the infra-binary boundary —
       `run-bounded`'s `(.start pb)` (lint_config_test_support.clj:290) sits in
       the let binding OUTSIDE the try, so a ProcessBuilder.start IOException
       (EACCES — a non-executable file, or a directory, at the binary path)
@@ -2306,7 +2306,23 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       git-bin override → visible SKIP, 0 errored; restored → unit 10/68,
       integration 34/186 no SKIP, `bb lint` errors 0 / warnings 0,
       `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
-- [ ] Add `--cache-dir` to the lint-alias masking-flag list —
+      — done (executable-check arm branch, both binaries): the clojure-bin and
+      git-bin skip-guard conds each gained `(or (not (.isFile (io/file bin)))
+      (not (.canExecute (io/file bin))))` → visible-SKIP arm (message
+      `(str bin " is not an executable file")`) between the .exists arm and
+      the jar arms — .isFile closes the directory class, .canExecute closes
+      the chmod-cleared class, mirror of the slice-30 valid-zip?
+      present-but-unusable → visible SKIP shape. Verified 2026-08-16:
+      chmod-644 non-executable clojure-bin override →
+      `SKIP task-252 analysis-level proof: /tmp/ck252-nonexec-clojure is not
+      an executable file` in runner output, 0 errored (was 1 ERROR); chmod-644
+      non-executable git-bin override → `SKIP task-252 git check-ignore ground
+      truth: /tmp/ck252-nonexec-git is not an executable file`, 0 errored;
+      restored → unit 10 tests / 69 assertions (68 + the new --cache-dir
+      assertion, slice-43 item 2), integration 34 tests / 186 assertions no
+      SKIP (both proofs ran), `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [x] Add `--cache-dir` to the lint-alias masking-flag list —
       `lint-alias-lints-extensions-test`'s forbidden-flag doseq is
       `["--cache" "--config" "--config-dir" "--dependencies"]` with EXACT
       string matching, so a drift adding `--cache-dir <dir>` to the :lint
@@ -2324,3 +2340,15 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       string). Verify: synthetic main-opts containing "--cache-dir" →
       1 clean FAIL (was silent pass); restored → unit 10/68, `bb lint` errors
       0 / warnings 0, `bb fmt:check` clean
+      — done: "--cache-dir" added to the doseq list (now
+      `["--cache" "--cache-dir" "--config" "--config-dir" "--dependencies"]`)
+      and the testing block's docstring updated to name the --cache-dir
+      masking class (a fresh cache dir means the jar is never analyzed — the
+      same masking as --cache false; exact-match on --cache does not catch
+      the sibling). Verified 2026-08-16 via scratch: the 5-flag doseq against
+      the synthetic main-opts `["-m" "clj-kondo.main" "--lint" "bb.edn"
+      "extensions" "--cache-dir" "/tmp/fresh-cache"]` now throws
+      `Assert failed: :lint :main-opts must not contain --cache-dir` (was
+      silent pass with all four assertions); the real deps.edn alias is clean
+      (unit suite 10 tests / 69 assertions pass, 68 + the new flag
+      assertion)

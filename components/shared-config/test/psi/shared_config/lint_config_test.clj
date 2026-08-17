@@ -312,16 +312,20 @@
           ":lint :main-opts contains \"extensions\" (the dev-http test file lives under it)")
       (is (some #{"bb.edn"} main-opts)
           ":lint :main-opts contains \"bb.edn\"")
-      (testing "no cache-disabling / config-override flags (slice-15 follow-up:
-                lint-alias-lints-extensions-test's path presence assertions are
-                blind to a drift that makes AC1 trivially clean — adding
-                --cache false (with no cache the two warnings vanish — exactly
-                design-step 9's masking), --config/--config-dir overrides, or
+      (testing "no cache-disabling / config-override flags (slice-15 + slice-43
+                follow-ups: lint-alias-lints-extensions-test's path presence
+                assertions are blind to a drift that makes AC1 trivially clean —
+                adding --cache false (with no cache the two warnings vanish —
+                exactly design-step 9's masking), --cache-dir <dir> (a fresh
+                cache dir means the http-kit jar is never analyzed — the same
+                masking class; slice-43: exact-match on --cache does not catch
+                the --cache-dir sibling), --config/--config-dir overrides, or
                 --dependencies to the alias's :main-opts silently disables the
                 lint proof while every other test still passes. bb-edn-lint-task-wrapper-test
                 closes this for the bb.edn WRAPPER only ((shell \"clojure -M:lint\")
                 exact), not for the alias itself)"
-        (doseq [flag ["--cache" "--config" "--config-dir" "--dependencies"]]
+        (doseq [flag ["--cache" "--cache-dir" "--config" "--config-dir"
+                      "--dependencies"]]
           (is (not (some #{flag} main-opts))
               (str ":lint :main-opts must not contain " flag " (masks the AC1 warnings)")))))))
 

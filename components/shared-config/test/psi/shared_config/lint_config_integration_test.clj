@@ -269,6 +269,21 @@
                       (not (.exists (io/file git-bin)))
                       (str git-bin " not present")
 
+                      ;; slice-43 follow-up: .exists alone passes a
+                      ;; non-executable file (chmod-cleared) AND a directory at
+                      ;; the path — both then ERROR at ProcessBuilder.start
+                      ;; (IOException "Permission denied" / "Is a directory")
+                      ;; BEFORE run-bounded's try, a clojure.test ERROR with no
+                      ;; assertion message (the mirror of slice-42's .isFile
+                      ;; slurp-boundary closure, still open at the subprocess
+                      ;; boundary; slice-34 closed only the nonexistent-binary
+                      ;; case). .isFile closes the directory class, .canExecute
+                      ;; closes the chmod-cleared class — present-but-unusable →
+                      ;; visible SKIP, mirror of the slice-30 valid-zip? arm.
+                      (or (not (.isFile (io/file git-bin)))
+                          (not (.canExecute (io/file git-bin))))
+                      (str git-bin " is not an executable file")
+
                       :else nil)]
       (is (skip! "git check-ignore ground truth" reason))
       (let [http-kit-rel ".clj-kondo/imports/http-kit/http-kit/config.edn"
@@ -328,6 +343,22 @@
                           ;; shape.
                           (not (.exists (io/file clojure-bin)))
                           (str clojure-bin " not present")
+
+                          ;; slice-43 follow-up: mirror of the git-bin arm —
+                          ;; .exists alone passes a non-executable file
+                          ;; (chmod-cleared) or a directory at the binary path,
+                          ;; both then ERROR at ProcessBuilder.start (IOException
+                          ;; "Permission denied" / "Is a directory") BEFORE
+                          ;; run-bounded's try → clojure.test ERROR with no
+                          ;; assertion message. .isFile closes the directory
+                          ;; class, .canExecute closes the chmod-cleared class
+                          ;; (verified 2026-08-16: chmod-644 clojure-bin override
+                          ;; → 1 errored, was the designed SKIP shape) —
+                          ;; present-but-unusable → visible SKIP, mirror of the
+                          ;; slice-30 valid-zip? arm.
+                          (or (not (.isFile (io/file clojure-bin)))
+                              (not (.canExecute (io/file clojure-bin))))
+                          (str clojure-bin " is not an executable file")
 
                           (not (.exists (io/file http-kit-jar)))
                           (str http-kit-jar " not present")
