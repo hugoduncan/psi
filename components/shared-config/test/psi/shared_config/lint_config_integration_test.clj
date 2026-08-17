@@ -255,7 +255,72 @@
                       (is (= export-config (dissoc tracked-config :lint-as))
                           (str tracked-rel " differs from the pinned jar "
                                "export " jar-entry " beyond the tracked-only "
-                               ":lint-as additive diff")))))))))))))
+                               ":lint-as additive diff"))))))
+              (testing "tracked import dir file SET equals the jar export-dir
+                        entry set (slice-46 follow-up: the slice-40→41
+                        bump-drift class at the FILE level — the two
+                        ^:integration jar-export guards compare the CONTENT of
+                        the two known tracked files against their pinned-jar
+                        counterparts (config.edn full-map equality minus the
+                        tracked-only :lint-as above, parsed-form
+                        with_channel.clj equality in the sibling semantics
+                        guard), but NEITHER enumerates the jar's
+                        clj-kondo.exports/http-kit/http-kit/ entry SET vs the
+                        tracked import dir's file set (currently exactly
+                        config.edn + httpkit/with_channel.clj, verified
+                        against the pinned 2.8.0 jar). A http-kit bump ADDING
+                        a new export file that config.edn does not reference
+                        keeps both content equalities green while the tracked
+                        dir silently misses the file — the tracked dir's
+                        purpose per plan decision 2 is a faithful copy of the
+                        jar's clj-kondo.exports + the tracked-only :lint-as
+                        additive — and a STALE tracked file (an orphan hook
+                        file committed under the import dir, no longer in the
+                        jar) is likewise invisible to both content guards.
+                        This is the exact slice-40 item's shape ('a bump
+                        adding a NEW top-level export key silently diverges
+                        while the :hooks equality stays green') at the
+                        file-set level. Enumerate the jar's export-dir entries
+                        (ZipFile entries under the prefix, non-directory,
+                        relativized) and assert set-equality with the tracked
+                        dir's file set (file-seq filtered to files,
+                        relativized). Jar-absent/corrupt → the valid-zip? SKIP
+                        arm above already covers the container; an
+                        entry-enumeration failure → the guarded read returns
+                        nil → the some? assertion below fails cleanly, never an
+                        uncaught ZipException → clojure.test ERROR (mirror of
+                        the sibling arms' clean FAIL/visible SKIP standard)."
+                (let [tracked-dir-rel ".clj-kondo/imports/http-kit/http-kit"
+                      tracked-dir     (io/file repo-root tracked-dir-rel)
+                      jar-dir-prefix  "clj-kondo.exports/http-kit/http-kit/"
+                      jar-files       (try
+                                        (with-open [zf (ZipFile. (io/file http-kit-jar))]
+                                          (->> (enumeration-seq (.entries zf))
+                                               (map str)
+                                               (filter #(str/starts-with? % jar-dir-prefix))
+                                               (remove #(str/ends-with? % "/"))
+                                               (map #(subs % (count jar-dir-prefix)))
+                                               set))
+                                        (catch java.io.IOException _ nil))]
+                  (is (some? jar-files)
+                      (str "the pinned http-kit jar's export-dir entry "
+                           "enumeration under " jar-dir-prefix " succeeded"))
+                  (when (some? jar-files)
+                    (testing "tracked import dir exists and is a directory"
+                      (is (.isDirectory tracked-dir)
+                          (str tracked-dir-rel " is a directory")))
+                    (when (.isDirectory tracked-dir)
+                      (let [tracked-files (->> (file-seq tracked-dir)
+                                               (filter #(.isFile %))
+                                               (map #(str (.relativize (.toPath tracked-dir)
+                                                                       (.toPath %))))
+                                               set)]
+                        (is (= jar-files tracked-files)
+                            (str "tracked import dir file set " tracked-dir-rel
+                                 " equals the jar export-dir entry set under "
+                                 jar-dir-prefix " (a http-kit bump adding/"
+                                 "removing an export file, or a stale tracked "
+                                 "file, must be reconciled)"))))))))))))))
 
 (deftest ^:integration gitignore-http-kit-tracking-ground-truth-test
   (testing "git's own interpretation of the tracking negation matches the text

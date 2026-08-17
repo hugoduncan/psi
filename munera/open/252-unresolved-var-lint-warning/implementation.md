@@ -842,3 +842,22 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
   `bb commit-check:file-lengths` exit 0
 - implementation review 2026-08-16: added 2 steps to be addressed
+- addressed 2 review steps (slice-46): (1) guarded the five unguarded
+  tests.edn/bb.edn test-body read-edn sites — added the 2-arity
+  `[rel-path opts]` read-edn-or-nil overload (tests.edn needs the
+  #kaocha/v1 reader; guarded-read shape stays in one place) and applied the
+  slice-44 `.isFile+.canRead` predicate → `when` → read-edn-or-nil (some?
+  clean-FAIL) shape to bb-edn-lint-task-wrapper-test (1 site),
+  tests-edn-suite-wiring-test (1 site), ci-execution-chain-guard-test (3
+  sites hoisted into one guarded read). Moved-aside tests.edn → clean FAIL
+  (was ERROR); corrupt bb.edn → 2 clean FAILs, 0 errors (was ERRORs); note:
+  edn/read-string reads only the FIRST form, so an appended corrupt tail is
+  silently ignored — corruption must break the first form. (2) added the
+  jar-export FILE-SET enumeration arm to
+  http-kit-import-config-jar-export-guard-test (jar export-dir entries vs
+  tracked import-dir file set, set-equality). Scratch jar with an extra
+  export file → clean FAIL with the file-set message (was silent
+  divergence); stale extra tracked file → same clean FAIL. Restored: unit
+  10/75 (69+6 new assertions), integration 34/189 (186+3), no SKIP,
+  `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean,
+  `bb commit-check:file-lengths` exit 0

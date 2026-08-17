@@ -2569,7 +2569,7 @@ Treat this file as the active surface; tick items as they complete, noting shas/
 
 ## Slice 46 — Implementation-review follow-ups (2026-08-16)
 
-- [ ] Close the unguarded test-body read-edn sites for tests.edn and bb.edn
+- [x] Close the unguarded test-body read-edn sites for tests.edn and bb.edn
       (ERROR-vs-FAIL class; the mirror of slices 31/35/36/38/39's exists +
       guarded-read hardening, never yet applied to these five sites):
       `tests-edn-suite-wiring-test` reads `(read-edn "tests.edn"
@@ -2615,7 +2615,30 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       (was ERRORs); restored → unit 10/69, integration 34/186 no SKIP (both
       proofs ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
-- [ ] Close the jar-export FILE-SET enumeration gap at the tracked import dir
+      — done 2026-08-16: 2-arity `[rel-path opts]` overload added to
+      read-edn-or-nil in lint_config_test_support.clj (delegates to
+      `(read-edn rel-path opts)` — the guarded-read shape stays in ONE
+      place); all FIVE test-body reads guarded with the slice-44
+      `(and (.isFile f) (.canRead f))` predicate asserted first (clean FAIL
+      with message), then read only under `when` via read-edn-or-nil (assert
+      some? "parses as EDN" clean-FAIL, then the assertions under `when`) —
+      bb-edn-lint-task-wrapper-test (1 site), tests-edn-suite-wiring-test
+      (1 site, via the new opts arity for the #kaocha/v1 reader),
+      ci-execution-chain-guard-test (3 sites HOISTED into one guarded read
+      wrapping the clojure:test:integration / clojure:test:unit /
+      clojure:test :depends arms). Verified 2026-08-16: moved-aside tests.edn
+      → direct clojure.test run (kaocha itself cannot load without its
+      tests.edn config) 10 tests / 1 failure / 0 errors — clean FAIL
+      "tests.edn is a regular readable file", was FileNotFoundException
+      ERROR; corrupt bb.edn (first form broken with `{:tasks {`) → 10 tests /
+      2 failures / 0 errors — clean FAILs "bb.edn parses as EDN", was
+      "Unmatched delimiter" ERRORs (an APPENDED corrupt tail is silently
+      ignored — edn/read-string reads only the FIRST form, so the corruption
+      must break the first form); restored → unit 10/75 (69 + 6 new
+      guarded-read assertions), integration 34/189 no SKIP, `bb lint` errors:
+      0, warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths`
+      exit 0
+- [x] Close the jar-export FILE-SET enumeration gap at the tracked import dir
       (the slice-40→41 bump-drift class at the file level): the two
       ^:integration jar-export guards compare the CONTENT of the two known
       tracked files against their pinned-jar counterparts —
@@ -2652,3 +2675,20 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       → same clean FAIL; restored → integration 34/186 no SKIP (both proofs
       ran), unit 10/69, `bb lint` errors: 0, warnings: 0, `bb fmt:check`
       clean, `bb commit-check:file-lengths` exit 0
+      — done 2026-08-16: file-set enumeration arm added to
+      `http-kit-import-config-jar-export-guard-test` (the else-branch let,
+      after the config.edn equality block) — the jar's export-dir entries
+      (ZipFile entries under the `clj-kondo.exports/http-kit/http-kit/`
+      prefix, directory entries removed, prefix relativized → set, guarded
+      read → nil on IOException → clean FAIL, never an uncaught ZipException)
+      vs the tracked import dir's file set (file-seq filtered to files,
+      relativized via `.toPath` — `io/file` is java.io.File and has no
+      relativize method — the slice-44 `.isDirectory` predicate closes the
+      missing/dir classes) → set-equality assertion. Verified 2026-08-16:
+      scratch jar override (2.8.0 + `httpkit/new_hook.clj` added via zip) →
+      focused integration 33 passed / 1 failed / 0 errored (clean FAIL with
+      the file-set message, was silent divergence); stale extra tracked file
+      (`httpkit/stale_hook.clj`) → same clean FAIL; restored → integration
+      34/189 (186 + 3 new file-set assertions) no SKIP (both proofs ran),
+      unit 10/75, `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0

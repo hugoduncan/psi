@@ -464,14 +464,36 @@
             clean while every other test still passes. Read bb.edn as EDN — no
             subprocess, runs anywhere. (bb.edn task names are symbols, so the
             entry's key is `lint`, not :lint.)"
-    (let [bb   (read-edn "bb.edn")
-          task (:task (get-in bb [:tasks 'lint]))]
-      (is (some? task) "bb.edn defines a :tasks lint entry")
-      (testing "the task is the exact trivial shell wrapper (no --cache false,
-                no --config override, no native-binary switch)"
-        (is (= '(shell "clojure -M:lint") task)
-            (str "lint task drifts from `(shell \"clojure -M:lint\")`: "
-                 (pr-str task)))))))
+    (let [bb-file (io/file repo-root "bb.edn")]
+      ;; slice-46 follow-up: the read-edn slurp must NOT run in the let binding
+      ;; before a file assertion — a PRESENT-but-unparseable bb.edn (bad merge,
+      ;; hand-edit truncation — the marker check is `.exists` only and NOTHING
+      ;; parses bb.edn at ns-load; the support ns reads only deps.edn for the
+      ;; version defs) loads the ns fine and this test-body read would throw
+      ;; ("Unmatched delimiter: …") inside the let → clojure.test ERROR with
+      ;; no assertion message — the exact slice-38/39 class closed for the
+      ;; extension deps.edn (exists-guard closed, unparseable class open),
+      ;; never applied to the five tests.edn/bb.edn test-body reads. Mirror
+      ;; the root-config shape: assert the slice-44 predicate
+      ;; `(and (.isFile …) (.canRead …))` — closes missing + directory +
+      ;; unreadable in one — cleanly first, then read only under `when` via
+      ;; the shared read-edn-or-nil fixture (assert some? "parses as EDN"
+      ;; clean-FAIL, then the assertions under `when`).
+      (testing "bb.edn is a regular readable file"
+        (is (and (.isFile bb-file) (.canRead bb-file))
+            "bb.edn is a regular readable file"))
+      (when (and (.isFile bb-file) (.canRead bb-file))
+        (let [bb (read-edn-or-nil "bb.edn")]
+          (testing "bb.edn parses as EDN"
+            (is (some? bb) "bb.edn parses as EDN"))
+          (when bb
+            (let [task (:task (get-in bb [:tasks 'lint]))]
+              (is (some? task) "bb.edn defines a :tasks lint entry")
+              (testing "the task is the exact trivial shell wrapper (no --cache
+                        false, no --config override, no native-binary switch)"
+                (is (= '(shell "clojure -M:lint") task)
+                    (str "lint task drifts from `(shell \"clojure -M:lint\")`: "
+                         (pr-str task)))))))))))
 
 (deftest tests-edn-suite-wiring-test
   (testing "tests.edn keeps the shared-config test dir wired into the suites
@@ -486,35 +508,57 @@
             same silent-drift class the task already guards for .gitignore /
             lint-alias / pins. Read tests.edn as EDN with the #kaocha/v1 tag
             reader — no subprocess, runs anywhere."
-    (let [cfg    (read-edn "tests.edn" {:readers {'kaocha/v1 identity}})
-          suites (:tests cfg)
-          by-id  (fn [id] (first (filter #(= id (:id %)) suites)))
-          unit   (by-id :unit)
-          intg   (by-id :integration)]
-      (is (some? unit) "tests.edn has a :unit suite")
-      (is (some? intg) "tests.edn has an :integration suite")
-      (testing ":capture-output? is false at TOP level (slice-15 follow-up:
-                the ^:integration SKIP lines — the visible-skip mechanism from
-                slice 9 — are swallowed by kaocha's capture-output plugin while
-                :capture-output? is true; kaocha 1.91.1392 honors
-                :capture-output? at the root config only, so a per-suite
-                setting would be silently dropped. The tests.edn :unit and
-                :integration suites carry no capture setting — the root value
-                is the only one that takes effect)"
-        (is (false? (:capture-output? cfg))
-            "tests.edn top-level :capture-output? is false (SKIP lines reach runner output)"))
-      (testing ":unit suite lists components/shared-config/test (runs the unit
-                invariants) and skips the ^:integration tests"
-        (is (some #{"components/shared-config/test"} (:test-paths unit))
-            ":unit :test-paths contains components/shared-config/test")
-        (is (= [:integration] (:skip-meta unit))
-            ":unit :skip-meta retains [:integration] — the ^:integration proofs stay out of bb test"))
-      (testing ":integration suite lists components/shared-config/test with
-                :focus-meta [:integration] (the ^:integration proofs actually run)"
-        (is (some #{"components/shared-config/test"} (:test-paths intg))
-            ":integration :test-paths contains components/shared-config/test")
-        (is (= [:integration] (:focus-meta intg))
-            ":integration :focus-meta retains [:integration]")))))
+    (let [cfg-file (io/file repo-root "tests.edn")]
+      ;; slice-46 follow-up: the read-edn slurp must NOT run in the let binding
+      ;; before a file assertion — tests.edn is NOT a repo-root marker (the
+      ;; marker set is root deps.edn + bb.edn), so a whole-file deletion of
+      ;; tests.edn does NOT fail ns-load — the exact rationale slice-38 applied
+      ;; to the extension deps.edn read — and the test whose whole purpose is
+      ;; to guard tests.edn suite wiring then throws FileNotFoundException in
+      ;; its let binding → clojure.test ERROR with the suite assertions
+      ;; unreachable. Mirror the root-config shape: assert the slice-44
+      ;; predicate `(and (.isFile …) (.canRead …))` cleanly first (closes
+      ;; missing + directory + unreadable in one), then read only under `when`
+      ;; via the shared read-edn-or-nil fixture (assert some? "parses as EDN"
+      ;; clean-FAIL, then the suite assertions under `when`). The
+      ;; read-edn-or-nil OPTS arity (slice-46) carries the #kaocha/v1 tag
+      ;; reader through the single definition site.
+      (testing "tests.edn is a regular readable file"
+        (is (and (.isFile cfg-file) (.canRead cfg-file))
+            "tests.edn is a regular readable file"))
+      (when (and (.isFile cfg-file) (.canRead cfg-file))
+        (let [cfg (read-edn-or-nil "tests.edn" {:readers {'kaocha/v1 identity}})]
+          (testing "tests.edn parses as EDN"
+            (is (some? cfg) "tests.edn parses as EDN"))
+          (when cfg
+            (let [suites (:tests cfg)
+                  by-id  (fn [id] (first (filter #(= id (:id %)) suites)))
+                  unit   (by-id :unit)
+                  intg   (by-id :integration)]
+              (is (some? unit) "tests.edn has a :unit suite")
+              (is (some? intg) "tests.edn has an :integration suite")
+              (testing ":capture-output? is false at TOP level (slice-15 follow-up:
+                        the ^:integration SKIP lines — the visible-skip mechanism from
+                        slice 9 — are swallowed by kaocha's capture-output plugin while
+                        :capture-output? is true; kaocha 1.91.1392 honors
+                        :capture-output? at the root config only, so a per-suite
+                        setting would be silently dropped. The tests.edn :unit and
+                        :integration suites carry no capture setting — the root value
+                        is the only one that takes effect)"
+                (is (false? (:capture-output? cfg))
+                    "tests.edn top-level :capture-output? is false (SKIP lines reach runner output)"))
+              (testing ":unit suite lists components/shared-config/test (runs the unit
+                        invariants) and skips the ^:integration tests"
+                (is (some #{"components/shared-config/test"} (:test-paths unit))
+                    ":unit :test-paths contains components/shared-config/test")
+                (is (= [:integration] (:skip-meta unit))
+                    ":unit :skip-meta retains [:integration] — the ^:integration proofs stay out of bb test"))
+              (testing ":integration suite lists components/shared-config/test with
+                        :focus-meta [:integration] (the ^:integration proofs actually run)"
+                (is (some #{"components/shared-config/test"} (:test-paths intg))
+                    ":integration :test-paths contains components/shared-config/test")
+                (is (= [:integration] (:focus-meta intg))
+                    ":integration :focus-meta retains [:integration]")))))))))
 
 (deftest ci-execution-chain-guard-test
   (testing "ci.yml + bb.edn still execute the lint gate, the ^:integration
@@ -596,83 +640,113 @@
             (is (= "bb clojure:test:integration"
                    (get steps "Run Clojure integration tests"))
                 "ci.yml integration step runs `bb clojure:test:integration`")))))
-    (testing "bb.edn clojure:test:integration task still routes to
-              run-scry-kaocha-suite! with the integration suite and focus — a
-              drift to another suite/focus (or a dropped task) would silently
-              stop the proofs from running while the tests.edn wiring stays
-              green (bb.edn:307-309)"
-      (let [task (:task (get-in (read-edn "bb.edn") [:tasks 'clojure:test:integration]))]
-        (is (some? task) "bb.edn defines a :tasks clojure:test:integration entry")
-        ;; slice-39 follow-up: `(second task)` must NOT run in the let binding
-        ;; before any assertion — a drift of the clojure:test:integration task
-        ;; to a NON-seqable value (:task 42, :task :disabled, :task true —
-        ;; (second 42) / (second :foo) / (second true) all throw
-        ;; IllegalArgumentException "Don't know how to create ISeq from …")
-        ;; would make the guard ERROR with no assertion message, the exact
-        ;; drift class it exists to catch surfacing as the ERROR-vs-FAIL class
-        ;; slices 20/24/29 closed elsewhere — while a seqable-but-wrong task
-        ;; (e.g. a string, whose `second` returns a char) already FAILs
-        ;; cleanly via the `(seq? task)` assertion. Assert `(seq? task)`
-        ;; cleanly first, then bind/assert `call` under `(when (seq? task)
-        ;; …)`: a non-seqable task value is a single plain FAIL with the seq?
-        ;; assertion message, never an uncaught exception.
-        (is (seq? task) "the task is a call form")
-        (when (seq? task)
-          (let [call (second task)]   ; (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))
-            (is (= 'System/exit (first task))
-                "task wraps the call in System/exit (scry exit-code propagation)")
-            (is (seq? call) "the System/exit argument is a call form")
-            (when (seq? call)
-              (is (= 'run-scry-kaocha-suite! (first call))
-                  "clojure:test:integration invokes run-scry-kaocha-suite!")
-              (is (= "integration" (second call))
-                  "run-scry-kaocha-suite! receives the integration suite id")
-              ;; slice-29 follow-up: `(nth call 2)` on a drift that DROPS the focus
-              ;; args (e.g. a two-element (run-scry-kaocha-suite! "integration"))
-              ;; throws IndexOutOfBoundsException → clojure.test ERROR with no
-              ;; assertion message — the exact regression this guard exists to catch
-              ;; surfacing as the exact ERROR-vs-FAIL class slices 20/24 closed
-              ;; elsewhere. `(nth call 2 nil)` reads out-of-bounds as nil and FAILs
-              ;; cleanly with the assertion message (the ERROR-vs-FAIL standard:
-              ;; exactly ONE plain assertion FAIL, never an ERROR).
-              (is (= ["--focus" "integration"] (nth call 2 nil))
-                  "run-scry-kaocha-suite! keeps the --focus integration args"))))))
-    (testing "bb.edn clojure:test:unit task still routes to
-              run-scry-kaocha-suite! with the unit suite id (slice-42
-              follow-up): slices 28/29/39 structurally asserted the
-              clojure:test:integration task's routing, and slice-41 closed the
-              \"Run Clojure tests\" CI step + clojure:test's :depends name —
-              but clojure:test:unit's OWN routing (bb.edn:295-300) had no
-              mirror assertion, so a suite-id drift (\"unit\" → \"extensions\")
-              or a runner swap silently drops the 10 unit invariants from
-              `bb clojure:test` — the exact command the asserted CI step runs —
-              while the step assertion, the :depends name assertion, tests.edn's
-              :unit config, and all lint/integration guards stay green. Mirror
-              the integration-task shape: some?/seq? guards first (slice-39
-              non-seqable-safe), then System/exit wrap + runner symbol + suite
-              id. The unit task's args are `(into [] *command-line-args*)`, NOT
-              a hardcoded focus — assert the suite id and runner symbol only."
-      (let [task (:task (get-in (read-edn "bb.edn") [:tasks 'clojure:test:unit]))]
-        (is (some? task) "bb.edn defines a :tasks clojure:test:unit entry")
-        (is (seq? task) "the task is a call form")
-        (when (seq? task)
-          (let [call (second task)]   ; (System/exit (run-scry-kaocha-suite! "unit" (into [] *command-line-args*)))
-            (is (= 'System/exit (first task))
-                "task wraps the call in System/exit (scry exit-code propagation)")
-            (is (seq? call) "the System/exit argument is a call form")
-            (when (seq? call)
-              (is (= 'run-scry-kaocha-suite! (first call))
-                  "clojure:test:unit invokes run-scry-kaocha-suite!")
-              (is (= "unit" (second call))
-                  "run-scry-kaocha-suite! receives the unit suite id"))))))
-    (testing "bb.edn clojure:test task still :depends on clojure:test:unit — a
-              drift to another suite (or a dropped :depends) would silently
-              drop the unit invariants from `bb clojure:test`, the exact
-              command the CI \"Run Clojure tests\" step executes (bb.edn:327-329;
-              slice-41 follow-up)"
-      (let [task (get-in (read-edn "bb.edn") [:tasks 'clojure:test])]
-        (is (some? task) "bb.edn defines a :tasks clojure:test entry")
-        (when (some? task)
-          (is (some #{'clojure:test:unit} (:depends task))
-              "clojure:test :depends retains clojure:test:unit (the unit-suite guards run under bb clojure:test)"))))))
+    (let [bb-file (io/file repo-root "bb.edn")]
+      ;; slice-46 follow-up: the three bb.edn read-edn slurps must NOT run in
+      ;; the let bindings before a file assertion — bb.edn IS a repo-root
+      ;; marker, but the marker check is `.exists` only
+      ;; (psi.test-support.repo-root), so a PRESENT-but-unparseable bb.edn
+      ;; (bad merge, hand-edit truncation — the file exists, the marker check
+      ;; passes, and NOTHING parses bb.edn at ns-load; the support ns reads
+      ;; only deps.edn for the version defs) loads the ns fine and the three
+      ;; test-body reads (:604/:655/:673 — the clojure:test:integration,
+      ;; clojure:test:unit, and clojure:test :depends arms) throw ("Unmatched
+      ;; delimiter: …") inside the let/when → clojure.test ERROR with no
+      ;; assertion message — the exact slice-39 mirror for the extension
+      ;; deps.edn (exists-guard closed, unparseable class still open). Mirror
+      ;; the root-config shape: assert the slice-44 predicate
+      ;; `(and (.isFile …) (.canRead …))` — closes missing + directory +
+      ;; unreadable in one — cleanly first, then read ONCE under `when` via
+      ;; the shared read-edn-or-nil fixture (assert some? "parses as EDN"
+      ;; clean-FAIL, then all three task assertions under `when`). The root
+      ;; deps.edn reads are load-backed and out of scope (the support ns
+      ;; parses deps.edn at ns-load, so both deletion AND corruption classes
+      ;; fail ns-load before any test-body read runs — loud, though as a load
+      ;; ERROR).
+      (testing "bb.edn is a regular readable file"
+        (is (and (.isFile bb-file) (.canRead bb-file))
+            "bb.edn is a regular readable file"))
+      (when (and (.isFile bb-file) (.canRead bb-file))
+        (let [bb (read-edn-or-nil "bb.edn")]
+          (testing "bb.edn parses as EDN"
+            (is (some? bb) "bb.edn parses as EDN"))
+          (when bb
+            (testing "bb.edn clojure:test:integration task still routes to
+                      run-scry-kaocha-suite! with the integration suite and focus — a
+                      drift to another suite/focus (or a dropped task) would silently
+                      stop the proofs from running while the tests.edn wiring stays
+                      green (bb.edn:307-309)"
+              (let [task (:task (get-in bb [:tasks 'clojure:test:integration]))]
+                (is (some? task) "bb.edn defines a :tasks clojure:test:integration entry")
+                ;; slice-39 follow-up: `(second task)` must NOT run in the let binding
+                ;; before any assertion — a drift of the clojure:test:integration task
+                ;; to a NON-seqable value (:task 42, :task :disabled, :task true —
+                ;; (second 42) / (second :foo) / (second true) all throw
+                ;; IllegalArgumentException "Don't know how to create ISeq from …")
+                ;; would make the guard ERROR with no assertion message, the exact
+                ;; drift class it exists to catch surfacing as the ERROR-vs-FAIL class
+                ;; slices 20/24/29 closed elsewhere — while a seqable-but-wrong task
+                ;; (e.g. a string, whose `second` returns a char) already FAILs
+                ;; cleanly via the `(seq? task)` assertion. Assert `(seq? task)`
+                ;; cleanly first, then bind/assert `call` under `(when (seq? task)
+                ;; …)`: a non-seqable task value is a single plain FAIL with the seq?
+                ;; assertion message, never an uncaught exception.
+                (is (seq? task) "the task is a call form")
+                (when (seq? task)
+                  (let [call (second task)]   ; (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))
+                    (is (= 'System/exit (first task))
+                        "task wraps the call in System/exit (scry exit-code propagation)")
+                    (is (seq? call) "the System/exit argument is a call form")
+                    (when (seq? call)
+                      (is (= 'run-scry-kaocha-suite! (first call))
+                          "clojure:test:integration invokes run-scry-kaocha-suite!")
+                      (is (= "integration" (second call))
+                          "run-scry-kaocha-suite! receives the integration suite id")
+                      ;; slice-29 follow-up: `(nth call 2)` on a drift that DROPS the focus
+                      ;; args (e.g. a two-element (run-scry-kaocha-suite! "integration"))
+                      ;; throws IndexOutOfBoundsException → clojure.test ERROR with no
+                      ;; assertion message — the exact regression this guard exists to catch
+                      ;; surfacing as the exact ERROR-vs-FAIL class slices 20/24 closed
+                      ;; elsewhere. `(nth call 2 nil)` reads out-of-bounds as nil and FAILs
+                      ;; cleanly with the assertion message (the ERROR-vs-FAIL standard:
+                      ;; exactly ONE plain assertion FAIL, never an ERROR).
+                      (is (= ["--focus" "integration"] (nth call 2 nil))
+                          "run-scry-kaocha-suite! keeps the --focus integration args"))))))
+            (testing "bb.edn clojure:test:unit task still routes to
+                      run-scry-kaocha-suite! with the unit suite id (slice-42
+                      follow-up): slices 28/29/39 structurally asserted the
+                      clojure:test:integration task's routing, and slice-41 closed the
+                      \"Run Clojure tests\" CI step + clojure:test's :depends name —
+                      but clojure:test:unit's OWN routing (bb.edn:295-300) had no
+                      mirror assertion, so a suite-id drift (\"unit\" → \"extensions\")
+                      or a runner swap silently drops the 10 unit invariants from
+                      `bb clojure:test` — the exact command the asserted CI step runs —
+                      while the step assertion, the :depends name assertion, tests.edn's
+                      :unit config, and all lint/integration guards stay green. Mirror
+                      the integration-task shape: some?/seq? guards first (slice-39
+                      non-seqable-safe), then System/exit wrap + runner symbol + suite
+                      id. The unit task's args are `(into [] *command-line-args*)`, NOT
+                      a hardcoded focus — assert the suite id and runner symbol only."
+              (let [task (:task (get-in bb [:tasks 'clojure:test:unit]))]
+                (is (some? task) "bb.edn defines a :tasks clojure:test:unit entry")
+                (is (seq? task) "the task is a call form")
+                (when (seq? task)
+                  (let [call (second task)]   ; (System/exit (run-scry-kaocha-suite! "unit" (into [] *command-line-args*)))
+                    (is (= 'System/exit (first task))
+                        "task wraps the call in System/exit (scry exit-code propagation)")
+                    (is (seq? call) "the System/exit argument is a call form")
+                    (when (seq? call)
+                      (is (= 'run-scry-kaocha-suite! (first call))
+                          "clojure:test:unit invokes run-scry-kaocha-suite!")
+                      (is (= "unit" (second call))
+                          "run-scry-kaocha-suite! receives the unit suite id"))))))
+            (testing "bb.edn clojure:test task still :depends on clojure:test:unit — a
+                      drift to another suite (or a dropped :depends) would silently
+                      drop the unit invariants from `bb clojure:test`, the exact
+                      command the CI \"Run Clojure tests\" step executes (bb.edn:327-329;
+                      slice-41 follow-up)"
+              (let [task (get-in bb [:tasks 'clojure:test])]
+                (is (some? task) "bb.edn defines a :tasks clojure:test entry")
+                (when (some? task)
+                  (is (some #{'clojure:test:unit} (:depends task))
+                      "clojure:test :depends retains clojure:test:unit (the unit-suite guards run under bb clojure:test)"))))))))))
 

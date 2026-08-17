@@ -83,10 +83,21 @@
   Single definition site (mirror of parseable?): a future hardening of the
   guarded-read shape (reader opts, *read-eval* binding, error capture) or a
   regression lands in one place, and the integration site inherits read-edn's
-  repo-root resolution + any hardening."
-  [rel-path]
-  (try (read-edn rel-path)
-       (catch Exception _ nil)))
+  repo-root resolution + any hardening.
+
+  The 2-arity [rel-path opts] overload delegates to `(read-edn rel-path opts)`
+  (slice-46 follow-up): the tests.edn read needs the `#kaocha/v1` tag reader
+  (`{:readers {'kaocha/v1 identity}}`), and the five test-body read-edn sites
+  (tests.edn + bb.edn ×4 — the tests-edn-suite-wiring-test /
+  bb-edn-lint-task-wrapper-test / ci-execution-chain-guard-test reads) gained
+  the guarded shape, so the opts arity keeps the guarded-read shape in ONE
+  place instead of forking a guarded (edn/read-string opts …) copy."
+  ([rel-path]
+   (try (read-edn rel-path)
+        (catch Exception _ nil)))
+  ([rel-path opts]
+   (try (read-edn rel-path opts)
+        (catch Exception _ nil))))
 
 (def http-kit-version
   "Pinned http-kit version for the analysis-level proof: derived from deps.edn
