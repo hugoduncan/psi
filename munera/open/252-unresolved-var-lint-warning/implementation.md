@@ -841,3 +841,4 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   a file read). Verified: unit 10/69, integration 34/186 no SKIP (both proofs
   ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
   `bb commit-check:file-lengths` exit 0
+- implementation review 2026-08-16: added 2 steps to be addressed

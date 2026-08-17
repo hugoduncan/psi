@@ -2566,3 +2566,89 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       unit 10/69 unchanged (same assertion counts and messages), integration
       34/186 no SKIP (both proofs ran), `bb lint` errors: 0, warnings: 0,
       `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+
+## Slice 46 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Close the unguarded test-body read-edn sites for tests.edn and bb.edn
+      (ERROR-vs-FAIL class; the mirror of slices 31/35/36/38/39's exists +
+      guarded-read hardening, never yet applied to these five sites):
+      `tests-edn-suite-wiring-test` reads `(read-edn "tests.edn"
+      {:readers {'kaocha/v1 identity}})` in the let binding
+      (lint_config_test.clj:489), `bb-edn-lint-task-wrapper-test` reads
+      `(read-edn "bb.edn")` (:467), and `ci-execution-chain-guard-test`
+      reads bb.edn three times in let bindings (:604/:655/:673 — the
+      clojure:test:integration, clojure:test:unit, and clojure:test :depends
+      arms). tests.edn is NOT a repo-root marker (the marker set is root
+      deps.edn + bb.edn), so a whole-file deletion of tests.edn does NOT fail
+      ns-load — the exact rationale slice-38 applied to the extension
+      deps.edn read ("the file is NOT a repo-root marker … so ns-load does
+      not fail on its deletion") — and the test whose whole purpose is to
+      guard tests.edn suite wiring then throws FileNotFoundException in its
+      let binding → clojure.test ERROR with the suite assertions unreachable.
+      bb.edn IS a marker, but the marker check is `.exists` only
+      (psi.test-support.repo-root), so a PRESENT-but-unparseable bb.edn (bad
+      merge, hand-edit truncation — the file exists, the marker check
+      passes, and NOTHING parses bb.edn at ns-load; the support ns reads
+      only deps.edn for the version defs) loads the ns fine and the four
+      bb.edn test-body reads throw ("Unmatched delimiter: …") inside the
+      let/when → clojure.test ERROR with no assertion message — the exact
+      slice-39 mirror for the extension deps.edn (exists-guard closed,
+      unparseable class still open). The three root deps.edn reads
+      (:259/:269/:328 — clj-kondo-pin-sourced-from-deps-edn-test,
+      http-kit-pin-sourced-from-deps-edn-test's root block,
+      lint-alias-lints-extensions-test) are NOT in scope: the support ns
+      parses deps.edn at ns-load for http-kit-version/clj-kondo-version, so
+      both the deletion AND corruption classes fail ns-load before any
+      test-body read runs (loud, though as a load ERROR). Fix (the five
+      sites): bind the file, assert `(and (.isFile f) (.canRead f))` first
+      (slice-44 predicate — closes missing + directory + unreadable in one),
+      then read only under `when` via the shared read-edn-or-nil fixture
+      (assert some? "parses as EDN" clean-FAIL, then the suite assertions
+      under `when cfg` — mirror of the root-config shape). Note the
+      read-edn-or-nil fixture (lint_config_test_support.clj) currently has
+      only the 1-arity; the tests.edn read needs the `#kaocha/v1` tag reader,
+      so add the 2-arity `[rel-path opts]` overload delegating to
+      `(read-edn rel-path opts)` — the slice-45 single-definition-site
+      contract means the guarded-read shape stays in ONE place. Verify:
+      moved-aside tests.edn → focused unit 9 passed / 1 failed / 0 errored
+      (clean FAIL, was ERROR); corrupt bb.edn → 1+ clean FAILs, 0 errored
+      (was ERRORs); restored → unit 10/69, integration 34/186 no SKIP (both
+      proofs ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+- [ ] Close the jar-export FILE-SET enumeration gap at the tracked import dir
+      (the slice-40→41 bump-drift class at the file level): the two
+      ^:integration jar-export guards compare the CONTENT of the two known
+      tracked files against their pinned-jar counterparts —
+      `http-kit-import-config-jar-export-guard-test`
+      (lint_config_integration_test.clj:165) asserts full-map config.edn
+      equality minus the tracked-only :lint-as (slice-41), and
+      `with-channel-hook-semantics-guard-test` (:50) asserts parsed-form
+      with_channel.clj equality (slice-18) — but NEITHER enumerates the jar's
+      `clj-kondo.exports/http-kit/http-kit/` entry SET vs the tracked import
+      dir's file set (currently exactly config.edn +
+      httpkit/with_channel.clj, verified against the pinned 2.8.0 jar). A
+      http-kit bump ADDING a new export file that config.edn does not
+      reference keeps both content equalities green while the tracked dir
+      silently misses the file — the tracked dir's purpose per plan decision
+      2 is a faithful copy of the jar's clj-kondo.exports + the tracked-only
+      :lint-as additive — and a STALE tracked file (an orphan hook file
+      committed under the import dir, no longer in the jar) is likewise
+      invisible to both content guards. This is the exact slice-40 item's
+      shape ("a bump adding a NEW top-level export key silently diverges
+      while the :hooks equality stays green") at the file-set level; slice-41
+      strengthened the map equality but the entry list was never guarded.
+      Fix: in `http-kit-import-config-jar-export-guard-test` (or a sibling
+      arm), enumerate the jar's export-dir entries (ZipFile entries under
+      the `clj-kondo.exports/http-kit/http-kit/` prefix, non-directory,
+      relativized) and assert set-equality with the tracked import dir's
+      file set (relative paths under
+      `.clj-kondo/imports/http-kit/http-kit/`, file-seq filtered to files,
+      relativized). Jar-absent/corrupt → the existing valid-zip? SKIP arm
+      already covers the container; an entry-enumeration failure → clean
+      FAIL/visible SKIP mirroring the sibling arms. Verify: scratch jar
+      override with an extra export file (e.g. `httpkit/new_hook.clj`) →
+      focused integration 33 passed / 1 failed / 0 errored (clean FAIL with
+      the file-set message, was silent divergence); stale extra tracked file
+      → same clean FAIL; restored → integration 34/186 no SKIP (both proofs
+      ran), unit 10/69, `bb lint` errors: 0, warnings: 0, `bb fmt:check`
+      clean, `bb commit-check:file-lengths` exit 0
