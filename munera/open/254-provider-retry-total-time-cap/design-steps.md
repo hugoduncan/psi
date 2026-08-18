@@ -263,7 +263,7 @@
 
 ## Ambiguity review 2026-08-18 (current session, second turn — post-follow-up design state)
 
-- [ ] **Pin how the give-up predicate detects "explicitly configured" `:auto-retry-max-retries`.**
+- [x] **Pin how the give-up predicate detects "explicitly configured" `:auto-retry-max-retries`.**
   Approach 4 makes the count-cap branch fire "only when the operator has **explicitly configured**
   `:auto-retry-max-retries`", but the config resolution path never preserves that distinction:
   `default-config` always supplies the key (3 today, raised to 20), and turn-runtime reads it via a
@@ -273,7 +273,7 @@
   `count-cap-set?` / explicitness signal plumbed into ctx `:config`, or a sentinel default that
   reads as "unset"), so behavior-preserving explicit small caps still gate while the default cannot
   prematurely fire under fast `Retry-After` (prior inconsistency step).
-- [ ] **Pin the count-only-mode default behavior when the total-time budget is disabled.**
+- [x] **Pin the count-only-mode default behavior when the total-time budget is disabled.**
   Approach 1's disable semantics make `:auto-retry-max-retries` the sole limiter when
   `:auto-retry-total-timeout-ms` is nil/absent/<= 0. With the default `:auto-retry-max-retries`
   raised from 3 to 20 (Approach 4) as a "nominal safety value" for the budget-active case, an
@@ -285,7 +285,7 @@
 
 ## Inconsistency review 2026-08-18 (current session, third turn — post-follow-up design state)
 
-- [ ] **Reconcile the raise of the default `:auto-retry-max-retries` to 20 with the explicit-only
+- [x] **Reconcile the raise of the default `:auto-retry-max-retries` to 20 with the explicit-only
   count-cap gating.** Approach 4 raises the default from 3 to 20 "as a nominal safety value"
   justified by the budget-active window ("never reached within the default window"). But Approach 4
   also gates the count-cap branch to fire **only when the operator explicitly configures**

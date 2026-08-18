@@ -309,7 +309,7 @@ safety cap (not the default limiter).
    per-attempt delays** — including provider-supplied `Retry-After` delays, which
    fully override the exponential backoff and are not bounded by
    `:auto-retry-max-delay-ms`. A fast `Retry-After` (e.g. 1 s) would otherwise let
-   the attempt count reach a fixed default cap (say 20) at ~20 s — well inside the
+   the attempt count reach a fixed default cap at ~20 s — well inside the
    10-minute window — giving up with `:exhausted-reason :count-cap` instead of at
    the deadline, contradicting Goal/AC1 ("up to 10 minutes") regardless of
    provider delay. Consequently the count-cap branch fires only when the operator
@@ -317,12 +317,38 @@ safety cap (not the default limiter).
    behaviour-preserving hard cap for explicit small values) or when the total-time
    budget is disabled (count-only mode); with the budget active and no explicit
    override, the count-cap does not gate and the deadline alone bounds the window.
-   The declared default value of `:auto-retry-max-retries` is raised from `3` to
-   `20` as a nominal safety value, but it is **non-limiting while the total-time
-   budget is active** — the earlier "never reached within the default window"
-   rationale holds only for the exponential schedule and is superseded by the
-   explicit-cap semantics above. This makes Goal/AC1 ("retries for up to a total
-   of 10 minutes") hold regardless of the per-attempt delay source.
+   This makes Goal/AC1 ("retries for up to a total of 10 minutes") hold regardless
+   of the per-attempt delay source.
+
+   **Detecting "explicitly configured" via a sentinel default.** The default value
+   of `:auto-retry-max-retries` in `default-config` becomes the sentinel `nil`,
+   meaning "unset / no explicit operator cap". Because the effective config is
+   `(merge default-config caller-config)` (`components/agent-session/src/psi/agent_session/context.clj`),
+   `default-config` keys are always present in `ctx :config`, so key presence alone
+   cannot distinguish a default from an operator-set value; the sentinel `nil`
+   makes that distinction directly — the effective `:auto-retry-max-retries` is
+   non-`nil` exactly when the operator (or a caller's config map) supplied a value,
+   and `nil` when only the default is present. The give-up predicate resolves the
+   count cap as: `nil` (no explicit cap) → the count-cap branch never fires while
+   the total-time budget is active; a non-`nil` value → it is an explicit operator
+   hard cap and the count-cap branch fires as today. This is behaviour-preserving
+   for every existing caller that sets a small explicit cap (all current retry
+   tests and count-limit configs pass a concrete value, which reads as explicit),
+   while the default can never prematurely fire under fast `Retry-After`. The
+   existing inline fallback `(long (get-in ctx [:config :auto-retry-max-retries] 3))`
+   (`turn-runtime/core.clj`) is replaced by reading the merged value with `nil`
+   treated as "no cap" (not coerced to a long — `(long nil)` throws), so a sentinel
+   default never reaches the count comparison.
+
+   **Count-only default (budget disabled).** When the total-time budget is disabled
+   (`:auto-retry-total-timeout-ms` nil/absent or `<= 0`) and no explicit
+   `:auto-retry-max-retries` is set (effective value `nil`), the sole give-up
+   limiter is a count-only fallback default of **3** — the prior count-only
+   default, preserved unchanged. There is no silent 3→20 change to the count-only
+   path: operators relying on count-only defaults get exactly the same 3-attempt
+   give-up they do today. The fallback is applied only in the budget-disabled,
+   cap-unset case (e.g. the predicate resolves `(or explicit-cap count-only-default
+   3)`); with the budget active the count-only fallback is never consulted.
 
 5. **`Retry-After` interaction**: when a `Retry-After` header supplies a
    per-attempt delay, respect it as today. Because `retry-metadata-for` runs
@@ -369,6 +395,13 @@ safety cap (not the default limiter).
 - An explicitly configured small `:auto-retry-max-retries` still acts as a hard
   cap on attempt count; setting `:auto-retry-total-timeout-ms` to `nil`/absent
   or `<= 0` disables the time budget so a strict count-only mode is expressible.
+- The default `:auto-retry-max-retries` is the sentinel `nil` ("unset"): with the
+  total-time budget active the count-cap does not gate (the deadline alone bounds
+  the window, so the default never prematurely fires under fast `Retry-After`),
+  while an explicitly configured value (non-`nil`) still acts as a hard cap; in
+  count-only mode (budget disabled) with no explicit cap the sole limiter is the
+  preserved count-only fallback default of `3` — no silent change to the
+  count-only path.
 - The deadline field `:retry-deadline-ms` is a top-level session field (sibling
   of `:retry-attempt`) in `agent-session-schema`, cleared by
   `clear-active-retry!` / `retry-clear-needed?` on true window close (success /
