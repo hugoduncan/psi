@@ -186,3 +186,21 @@
   asserting `:error-kind :overloaded` for a 529 stub. Correct the mapping (e.g.
   "529 → `:provider-unavailable`, with `:overloaded` only when the payload says
   'overloaded'") or qualify it so design.md and the code agree.
+
+## Architecture review 2026-08-18 (current session, first turn)
+
+- [ ] **Reconcile the window-scoped deadline with the inter-attempt `clear-active-retry!`.**
+  `clear-active-retry!` runs after **every** non-final retry sleep, not only at window
+  close (turn-runtime/core.clj non-final path: `(when-not (= false (:provider-retry-sleep? ctx))
+  (clear-active-retry! ...))`, line ~643; final-path calls at ~571 and ~611). The design's
+  Clearing section says to add `:retry-deadline-ms` to `clear-active-retry!`/`retry-clear-needed?`
+  so it is "cleared once on window close" — but if `clear-active-retry!` clears it, the deadline
+  is wiped after the first sleep, so on the next failed attempt the give-up predicate's window-open
+  detection (`:retry-deadline-ms` absent → compute `now + :auto-retry-total-timeout-ms`) opens a
+  **fresh 10-minute window on every attempt**, defeating the single-window budget. Note the loop
+  carries `:retry-attempt` via its `recur` binding precisely because the same mid-window clear
+  resets it to 0 in canonical state. Decide how the deadline survives inter-attempt cleanup:
+  thread it through the loop binding alongside `:retry-attempt` (and clear canonical
+  `:retry-deadline-ms` only on true final close / turn end), or split a window-scoped clear out of
+  the per-sleep cleanup. The design must state how the deadline is not recomputed at each attempt
+  given `clear-active-retry!` fires mid-window.
