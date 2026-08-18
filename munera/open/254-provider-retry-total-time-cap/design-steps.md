@@ -122,3 +122,48 @@
   `clear-active-retry!` / `retry-clear-needed?` clearing logic (which must include
   it, per ambiguity step 1), and the loop read-back — pin it explicitly so the
   schema edit, the clearing path, and the predicate's read agree.
+
+## Ambiguity review 2026-08-18 (current session, second turn)
+
+- [ ] **Specify how the truncated final sleep is scheduled through the single
+  give-up predicate.** Approach 2's overshoot branch ("next full delay would
+  overshoot → sleep the remaining portion (deadline − now) and then give up
+  `:retry-exhausted` / `:exhausted-reason :deadline`") and the immediate "now ≥
+  deadline" branch both produce the same terminal signal
+  (`:retry-exhausted` / `:exhausted-reason :deadline`), yet only the overshoot
+  case must actually *sleep* the truncated remainder and record/emit the
+  truncated delay. But per the loop flow (turn-runtime/core.clj:614-641),
+  `mark-active-retry!` and the `provider_retry_scheduled` event run only on the
+  **non-final** retry path; a `:retry-exhausted` final goes straight to
+  `clear-active-retry!` + `execution-result` with no sleep and no truncated
+  recording. The resolved inconsistency step pinned *what* delay is recorded, but
+  not *how the loop performs the truncated sleep and records/emits its truncated
+  delay* when the predicate returns the same uniform terminal as the immediate
+  deadline case. Pin whether the overshoot case is a distinct non-final outcome
+  that carries the truncated delay through the retry path, or the final branch
+  itself sleeps the remainder before returning — and how the loop distinguishes
+  "finalize now (no sleep)" from "sleep remainder, record truncated delay, then
+  finalize".
+- [ ] **State the outcome when cancellation interrupts the truncated final
+  sleep.** Approach 2's overshoot branch gives up with
+  `:retry-exhausted :deadline` after sleeping the remaining window, and that
+  truncated sleep uses the interruptible seam (`interruptible-sleep-for-retry!`
+  / `:provider-retry-sleep-fn`), which the current loop treats as cancellable
+  (`sleep-for-retry!` → `:retry-cancelled`, turn-runtime/core.clj:637-657). If a
+  cancel (active-turn abort or `:provider-retry-abort-requested?`) arrives during
+  that truncated final sleep, does the outcome become `:retry-cancelled`
+  (consistent with the cancellation constraint and the existing cancelled path)
+  or stay `:retry-exhausted :deadline` (as the overshoot branch states)? The
+  "cancelled immediately" constraint and the hardcoded `:deadline` give-up can
+  conflict here; specify the precedence.
+- [ ] **Pin whether the window-opening deadline is persisted when the window
+  opens on an immediate count-cap give-up.** Approach 2's "ensure the deadline is
+  present" step says the window-opening failure "compute[s] and persist[s]" the
+  deadline, while also stating it persists "in the same session-update that marks
+  the first retry active" — which a window-opening failure that immediately gives
+  up on the count cap (never schedules a retry, so `mark-active-retry!` never
+  runs) does not do. Specify whether the deadline is (a) computed in memory only
+  for the predicate and persisted solely with `mark-active-retry!` (a count-cap
+  give-up at window-open writes nothing), or (b) persisted by the ensure-step
+  regardless (a redundant canonical write immediately cleared by
+  `clear-active-retry!`).
