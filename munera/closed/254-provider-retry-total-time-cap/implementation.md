@@ -117,3 +117,21 @@
 - ambiguity review 2026-08-18 (plan re-review, first turn): no new actionable ambiguity feedback. Re-verified plan.md/steps.md against the committed implementation — config resolution (budget-active?/explicit-cap/count-cap, never (long nil)), give-up-decision branch order (non-retryable → retry-disabled → count-cap → deadline → overshoot :final-sleep-ms), deadline threading via recur + :clear-deadline? lifecycle (per-sleep preserve, success/final-give-up/cancel clear), cancel-path unconditional clear, truncated-final routing + test-mode finalize clear, Retry-After floor/truncation, count-only fallback 3, :max-retries reporting, schema placement — all consistent with retry.clj / core.clj execute-prepared-request! / model.clj (config :250/:247, schema :178, retry-after-delay-ms :535-552). Both prior plan-review steps (non-positive integer Retry-After floor; cancel-during-truncated-final-sleep test) verified resolved in the follow-up. No new design-steps added.
 - inconsistency review 2026-08-18 (plan re-review, second turn): no new actionable inconsistency feedback. Cross-verified plan.md tests 1-8 against the committed test suite — budget-active deadline termination (total-time-window-governs-termination-test, [2000 3000] overshoot), truncated-final recording, explicit-cap hard-cap (:count-cap), count-only fallback 3 (4 attempts), oversized Retry-After truncated to deadline, cancel-clears-deadline, stale-deadline-opens-fresh-window, deadline-preserved-inter-attempt, plus the two resolved follow-up tests (non-positive integer Retry-After floor; cancel-during-truncated-final-sleep, [2000 3000] + :retry-cancelled + no stale deadline). Test counts in steps.md (14 / 18 / model-test 11) match the deftest totals. No plan↔steps↔implementation↔design contradiction found. Both prior plan-review design-steps verified resolved; no new design-steps added.
 - implementation review 2026-08-18: added 3 steps to be addressed.
+- implementation-review-follow-up 2026-08-18 (3/3 steps done): addressed the 3 implementation-review steps.
+  - **`mark-active-retry!` nil-deadline write (retry.clj).** `mark-active-retry!` now assoc's
+    `:retry-deadline-ms` only when non-nil (`cond->` guarded by `(some? retry-deadline-ms)`), so
+    count-only mode (budget disabled → deadline nil) no longer writes a spurious top-level
+    `:retry-deadline-ms nil` into canonical session state. All existing tests assert `nil?` on the
+    field after window close (absent or nil both pass); no test asserted the spurious write.
+  - **session-state model test.** Added `retry-deadline-schema-test` (model_test.clj): `valid-session?`
+    accepts a populated top-level `:retry-deadline-ms` (int 600000), accepts the nil value (count-only
+    mode), and rejects a non-int value. Model-test 11 → 12.
+  - **CHANGELOG [Unreleased].** Added a `### Changed` entry covering the user-visible retry change:
+    new `:auto-retry-total-timeout-ms` key (default 600000, disable semantics), default give-up moved
+    from ~3 attempts (~14 s) to a 10-minute total window, `:auto-retry-max-retries` default now
+    sentinel `nil` (explicit values still hard-cap; count-only fallback 3 preserved), and
+    `:exhausted-reason` (`:count-cap | :deadline`) on retry-outcome + `provider_request_finished`;
+    cancellation unchanged.
+  - **Validation.** `bb test --focus psi.session-state.model-test` (12), `psi.turn-runtime.response-mode-retry-test` (14),
+    `psi.turn-runtime.response-mode-test` (18) all green; clj-kondo clean on retry.clj + model_test.clj.
+    No change to the give-up predicate, deadline lifecycle, or cancellation mechanics.

@@ -53,6 +53,19 @@
                            :reset-at 42000}}
              (:retry s))))))
 
+(deftest retry-deadline-schema-test
+  (testing "agent-session-schema accepts populated top-level :retry-deadline-ms (int)"
+    (is (session/valid-session?
+         (assoc (session/initial-session) :retry-deadline-ms 600000))))
+
+  (testing "agent-session-schema accepts nil :retry-deadline-ms (count-only mode value)"
+    (is (session/valid-session?
+         (assoc (session/initial-session) :retry-deadline-ms nil))))
+
+  (testing "agent-session-schema rejects non-int :retry-deadline-ms"
+    (is (not (session/valid-session?
+              (assoc (session/initial-session) :retry-deadline-ms "600000"))))))
+
 (deftest agent-session-schema-temperature-test
   (testing "agent-session-schema accepts optional :temperature"
     (is (session/valid-session?

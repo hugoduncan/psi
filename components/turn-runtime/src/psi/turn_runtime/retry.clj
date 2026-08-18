@@ -107,12 +107,16 @@
 
 (defn mark-active-retry!
   [ctx session-id retry-metadata next-retry-attempt retry-deadline-ms progress-queue]
+  ;; Assoc the deadline only when non-nil: count-only mode (budget disabled)
+  ;; passes nil and must not write a spurious top-level `:retry-deadline-ms nil`
+  ;; into canonical session state for the window.
   (ss/apply-root-state-update-in!
    ctx
-   (ss/session-update session-id #(assoc %
-                                         :retry-attempt next-retry-attempt
-                                         :retry retry-metadata
-                                         :retry-deadline-ms retry-deadline-ms)))
+   (ss/session-update session-id
+                      #(cond-> (assoc %
+                                      :retry-attempt next-retry-attempt
+                                      :retry retry-metadata)
+                         (some? retry-deadline-ms) (assoc :retry-deadline-ms retry-deadline-ms))))
   (emit-retry-updated-progress! progress-queue session-id))
 
 (defn retry-clear-needed?
