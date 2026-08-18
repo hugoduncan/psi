@@ -191,3 +191,217 @@
         (is (= ["provider_request_started" "provider_request_finished"]
                (mapv :type (provider-events ctx session-id))))
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-total-time-window-governs-termination-test
+  ;; The total-time window (sentinel-nil count cap, budget active) bounds the
+  ;; retry loop: termination happens at the injected-clock deadline, not at a
+  ;; default count cap, and the final sleep is truncated to the remaining window.
+  (let [clock          (atom 0)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 5000
+                                                            :auto-retry-base-delay-ms 2000
+                                                            :auto-retry-max-delay-ms 60000}})
+        ctx            (assoc ctx0
+                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                              :provider-retry-sleep-fn (fn [delay-ms]
+                                                         (swap! clock + (long delay-ms))))
+        prepared       (prepared-request ctx session-id)
+        attempts*      (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)
+            events  (provider-events ctx session-id)
+            scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
+        (is (= 2 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))
+        (is (true? (:exhausted? outcome)))
+        ;; budget-active default path has no count limiter to report
+        (is (nil? (:max-retries outcome)))
+        ;; full first sleep, then truncated final sleep to the deadline (5000)
+        (is (= [2000 3000] (mapv :delay-ms scheduled)))
+        (is (= [2000 5000] (mapv :resume-at scheduled)))
+        (is (= :exponential-backoff (:delay-source (last scheduled))))
+        ;; authoritative terminal event after the truncated sleep
+        (is (= :retry-exhausted (:failure-reason (last events))))
+        (is (= :deadline (:exhausted-reason (last events))))
+        (is (true? (:final? (last events))))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
+        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-explicit-count-cap-still-bounds-test
+  ;; An explicitly configured small :auto-retry-max-retries remains a hard cap
+  ;; even with the total-time budget active (:exhausted-reason :count-cap, no
+  ;; truncated final sleep).
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false
+                                                  :config {:auto-retry-max-retries 1}})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)
+            events  (provider-events ctx session-id)]
+        (is (= 2 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :count-cap (:exhausted-reason outcome)))
+        (is (= 1 (:max-retries outcome)))
+        (is (= :retry-exhausted (:failure-reason (last events))))
+        (is (= :count-cap (:exhausted-reason (last events))))))))
+
+(deftest execute-prepared-request-count-only-fallback-three-test
+  ;; Budget disabled (total-timeout <= 0) with no explicit cap uses the preserved
+  ;; count-only fallback of 3 as the sole give-up limiter.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false
+                                                  :config {:auto-retry-total-timeout-ms 0}})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= 4 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :count-cap (:exhausted-reason outcome)))
+        (is (= 3 (:max-retries outcome)))))))
+
+(deftest execute-prepared-request-retry-after-deadline-bounded-test
+  ;; A provider Retry-After delay is respected per attempt but an oversized one is
+  ;; truncated to the remaining window: give-up :deadline at the deadline.
+  (let [clock          (atom 0)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 5000}})
+        ctx            (assoc ctx0
+                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                              :provider-retry-sleep-fn (fn [delay-ms]
+                                                         (swap! clock + (long delay-ms))))
+        prepared       (prepared-request ctx session-id)
+        attempts*      (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (assoc (error-turn "rate limit exceeded")
+                           :assistant-message {:role "assistant"
+                                               :content [{:type :error :text "rate limit exceeded"}]
+                                               :stop-reason :error
+                                               :error-message "rate limit exceeded"
+                                               :http-status 429
+                                               :provider-error/headers {"Retry-After" "10"}
+                                               :timestamp (java.time.Instant/now)}))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome   (:execution-result/retry-outcome result)
+            events    (provider-events ctx session-id)
+            scheduled (first (filter #(= "provider_retry_scheduled" (:type %)) events))]
+        (is (= 1 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))
+        (is (= :retry-after (:delay-source scheduled)))
+        ;; oversized 10s Retry-After truncated to the 5s remaining window
+        (is (= 5000 (:delay-ms scheduled)))
+        (is (= 5000 (:resume-at scheduled)))
+        (is (= :retry-exhausted (:failure-reason (last events))))
+        (is (= :deadline (:exhausted-reason (last events))))
+        (is (true? (:final? (last events))))))))
+
+(deftest execute-prepared-request-cancel-clears-deadline-test
+  ;; Cancellation during a pending backoff returns :retry-cancelled and clears the
+  ;; window deadline via its own unconditional clear (not the per-sleep preserve).
+  (let [cancelled?      (atom false)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 600000}})
+        ctx             (assoc ctx0
+                               :provider-retry-cancelled? (fn [_session-id] @cancelled?)
+                               :provider-retry-sleep-fn
+                               (fn [_delay-ms]
+                                 (reset! cancelled? true)))
+        prepared        (prepared-request ctx session-id)
+        attempts*       (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= :retry-cancelled (:failure-reason outcome)))
+        (is (true? (:cancelled? outcome)))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
+        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-deadline-preserved-inter-attempt-test
+  ;; The window deadline survives the inter-attempt (per-sleep) clear: it is
+  ;; present in canonical state during a retry sleep, and a later success window
+  ;; close clears it.
+  (let [deadline-in-sleep* (atom nil)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 600000}})
+        ctx             (assoc ctx0
+                               :now-fn #(java.time.Instant/ofEpochMilli 0)
+                               :provider-retry-sleep-fn
+                               (fn [_delay-ms]
+                                 (reset! deadline-in-sleep*
+                                         (:retry-deadline-ms (ss/get-session-data-in ctx0 session-id)))))
+        prepared        (prepared-request ctx session-id)
+        attempts*       (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (if (= 1 (swap! attempts* inc))
+                      (error-turn "Connection reset by peer")
+                      {:turn-id "turn-1"
+                       :model {:provider "openai" :id "gpt-test"}
+                       :ai-options {}
+                       :turn-ctx nil
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text "recovered"}]
+                                           :stop-reason :stop
+                                           :timestamp (java.time.Instant/now)}}))]
+      (let [result (turn-runtime/execute-prepared-request!
+                    {:provider-registry (atom {})} ctx session-id prepared nil)]
+        (is (= 600000 @deadline-in-sleep*))
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-stale-deadline-at-loop-entry-opens-fresh-window-test
+  ;; A persisted :retry-deadline-ms already in the past at loop entry is treated
+  ;; as stale and cleared, so the first retryable failure opens a fresh window
+  ;; instead of an instant :deadline give-up with zero retries.
+  (let [clock           (atom 5000)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 5000
+                                                            :auto-retry-base-delay-ms 2000}})
+        _               (swap! (:state* ctx0) assoc-in
+                               [:agent-session :sessions session-id :data]
+                               (assoc (ss/get-session-data-in ctx0 session-id)
+                                      :retry-deadline-ms 1000)) ;; past (now 5000)
+        ctx             (assoc ctx0
+                               :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                               :provider-retry-sleep-fn (fn [delay-ms]
+                                                          (swap! clock + (long delay-ms))))
+        prepared        (prepared-request ctx session-id)
+        attempts*       (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        ;; fresh window at now 5000 + 5000 = 10000; attempt 0 retries (2000),
+        ;; attempt 1 final-sleeps the remainder (3000) at the deadline
+        (is (= 2 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))
+        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))

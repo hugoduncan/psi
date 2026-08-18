@@ -175,6 +175,7 @@
    [:steering-messages [:vector :string]]
    [:follow-up-messages [:vector :string]]
    [:retry-attempt :int]
+   [:retry-deadline-ms {:optional true} [:maybe :int]]
    [:retry {:optional true}
     [:maybe
      [:map
@@ -243,9 +244,10 @@
    :auto-compaction-keep-recent-tokens 20000
    :branch-summary-reserve-tokens  16384
    :auto-retry-enabled             true
-   :auto-retry-max-retries         3
+   :auto-retry-max-retries         nil
    :auto-retry-base-delay-ms       2000
    :auto-retry-max-delay-ms        60000
+   :auto-retry-total-timeout-ms    600000
    :llm-stream-idle-timeout-ms     1200000
    :tool-batch-max-parallelism     4
    :default-active-tools           #{"read" "bash" "edit" "write"}})

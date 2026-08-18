@@ -1,54 +1,61 @@
 # Steps — 254 Bound provider auto-retry by total elapsed time instead of attempt count
 
+Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
+(`components/turn-runtime/src/psi/turn_runtime/retry.clj`) during implementation;
+`psi.turn-runtime.core` requires it as `retry` and drives the loop.
+
 ## Config & schema
 
-- [ ] Add `:auto-retry-total-timeout-ms 600000` to `default-config` (model.clj).
-- [ ] Change `:auto-retry-max-retries 3` → sentinel `nil` in `default-config`.
-- [ ] Add `[:retry-deadline-ms {:optional true} [:maybe :int]]` top-level to `agent-session-schema`.
+- [x] Add `:auto-retry-total-timeout-ms 600000` to `default-config` (model.clj).
+- [x] Change `:auto-retry-max-retries 3` → sentinel `nil` in `default-config`.
+- [x] Add `[:retry-deadline-ms {:optional true} [:maybe :int]]` top-level to `agent-session-schema`.
 
-## Turn-runtime retry loop (core.clj)
+## Turn-runtime retry loop (core.clj + retry.clj)
 
-- [ ] Add `now-ms` helper (injected `:now-fn`, fallback `Instant/now`).
-- [ ] Resolve `budget-active?`, `explicit-cap`, `count-cap` at top of `execute-prepared-request!`
+- [x] Add `now-ms` helper (injected `:now-fn`, fallback `Instant/now`).
+- [x] Resolve `budget-active?`, `explicit-cap`, `count-cap` at top of `execute-prepared-request!`
       (never `(long nil)`).
-- [ ] Add `retry-deadline-for` (stale past deadline at loop entry → clear canonical field, yield nil).
-- [ ] Replace `failure-reason-for` with structured `give-up-decision`
+- [x] Add `retry-deadline-for` (stale past deadline at loop entry → clear canonical field, yield nil).
+- [x] Replace `failure-reason-for` with structured `give-up-decision`
       (non-retryable / retry-disabled / count-cap / deadline / overshoot-with-`:final-sleep-ms`).
-- [ ] Thread `retry-deadline-ms` through the loop `recur` binding alongside `:retry-attempt`.
-- [ ] Reorder: compute `retry-metadata-for` before the give-up predicate so it sees `next-delay`.
-- [ ] Window-open deadline: `(or retry-deadline-ms (when (and retryable? retry-enabled? budget-active?) (+ now total-timeout-ms)))`.
-- [ ] Immediate-final branch: dispatch final `provider_request_finished` (+`:exhausted-reason`),
+- [x] Thread `retry-deadline-ms` through the loop `recur` binding alongside `:retry-attempt`.
+- [x] Reorder: compute `retry-metadata-for` before the give-up predicate so it sees `next-delay`.
+- [x] Window-open deadline: `(or retry-deadline-ms (when (and retryable? retry-enabled? budget-active?) (+ now total-timeout-ms)))`.
+- [x] Immediate-final branch: dispatch final `provider_request_finished` (+`:exhausted-reason`),
       `clear-active-retry!` `:clear-deadline? true`, `execution-result`.
-- [ ] Final-sleep branch (`:final-sleep-ms`): non-final error-branch event, non-final path once
+- [x] Final-sleep branch (`:final-sleep-ms`): non-final error-branch event, non-final path once
       with truncated metadata, sleep, then final `provider_request_finished`
       (`retry-exhausted :deadline`) + `:clear-deadline? true` + `execution-result`.
-- [ ] Retry branch: `provider_retry_scheduled` + `mark-active-retry!` (persist deadline),
+- [x] Retry branch: `provider_retry_scheduled` + `mark-active-retry!` (persist deadline),
       full sleep, inter-attempt `clear-active-retry!` `:clear-deadline? false`, `recur`.
-- [ ] `mark-active-retry!` gains `retry-deadline-ms` arg and writes it.
-- [ ] `clear-active-retry!` / `retry-clear-needed?` gain `:clear-deadline?` (preserve on
+- [x] `mark-active-retry!` gains `retry-deadline-ms` arg and writes it.
+- [x] `clear-active-retry!` / `retry-clear-needed?` gain `:clear-deadline?` (preserve on
       per-sleep, clear on success/final-give-up/cancel).
-- [ ] Cancel path: own unconditional `clear-active-retry!` `:clear-deadline? true` in the
+- [x] Cancel path: own unconditional `clear-active-retry!` `:clear-deadline? true` in the
       `if cancelled?` branch (both retry and final-sleep cancel).
-- [ ] `cancelled-retry-outcome` uses resolved `count-cap` for `:max-retries`.
-- [ ] Retry-outcome carries `:exhausted-reason` + `:max-retries` = `count-cap`.
+- [x] `cancelled-retry-outcome` uses resolved `count-cap` for `:max-retries`.
+- [x] Retry-outcome carries `:exhausted-reason` + `:max-retries` = `count-cap`.
 
 ## Tests
 
-- [ ] Verify existing retry tests (explicit caps) stay green.
-- [ ] New: budget-active default drives deadline termination; `:max-retries` nil.
-- [ ] New: truncated final sleep records/emits truncated delay, final event supersedes.
-- [ ] New: explicit small cap hard-caps (`:exhausted-reason :count-cap`).
-- [ ] New: budget-disabled count-only fallback 3.
-- [ ] New: `Retry-After` respected + deadline-bounded (oversized truncated).
-- [ ] New: cancellation interrupts backoff; no stale `:retry-deadline-ms` leak.
-- [ ] New: stale past deadline at loop entry opens fresh window.
-- [ ] New: inter-attempt clear preserves deadline; window close clears it.
-- [ ] session-state model test: `valid-session?` accepts `:retry-deadline-ms`.
+- [x] Verify existing retry tests (explicit caps) stay green.
+- [x] New: budget-active default drives deadline termination; `:max-retries` nil.
+- [x] New: truncated final sleep records/emits truncated delay, final event supersedes.
+- [x] New: explicit small cap hard-caps (`:exhausted-reason :count-cap`).
+- [x] New: budget-disabled count-only fallback 3.
+- [x] New: `Retry-After` respected + deadline-bounded (oversized truncated).
+- [x] New: cancellation interrupts backoff; no stale `:retry-deadline-ms` leak.
+- [x] New: stale past deadline at loop entry opens fresh window.
+- [x] New: inter-attempt clear preserves deadline; window close clears it.
+- [x] session-state model test: `valid-session?` accepts `:retry-deadline-ms`.
 
 ## Validation
 
-- [ ] `bb test --focus psi.turn-runtime.response-mode-retry-test` green.
-- [ ] `bb test --focus psi.turn-runtime.response-mode-test` green.
-- [ ] `bb test --focus psi.session-state.model-test` green.
-- [ ] Broader `bb test` retry/session-state/agent-session subset green.
-- [ ] `clj-kondo --lint` clean on changed files.
+- [x] `bb test --focus psi.turn-runtime.response-mode-retry-test` green (12 tests).
+- [x] `bb test --focus psi.turn-runtime.response-mode-test` green (18 tests).
+- [x] `bb test --focus psi.session-state.model-test` green.
+- [x] Broader `bb test` retry/session-state/agent-session subset green.
+- [x] `clj-kondo --lint` clean on changed files.
+- [x] Full `bb test` (seed 536015077): 2 failures both pre-existing on baseline
+      (streaming-error-event test-order dependence; delegate-review nullable-model
+      registry), not introduced by this change.

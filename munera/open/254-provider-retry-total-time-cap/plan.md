@@ -13,7 +13,13 @@ config layer and the turn-runtime retry loop, then update/extend tests.
 - Add top-level optional schema entry `[:retry-deadline-ms {:optional true} [:maybe :int]]`
   (sibling of `:retry-attempt`) in `agent-session-schema`.
 
-### Retry loop (components/turn-runtime/src/psi/turn_runtime/core.clj)
+### Retry loop (components/turn-runtime/src/psi/turn_runtime/core.clj + retry.clj)
+
+The retry machinery lives in a dedicated `psi.turn-runtime.retry` namespace
+(`components/turn-runtime/src/psi/turn_runtime/retry.clj`: `now-ms`, `retry-deadline-for`,
+`give-up-decision`, `mark-active-retry!`, `clear-active-retry!`/`retry-clear-needed?`,
+`sleep-for-retry!`, `cancelled-retry-outcome`, retry metadata/classification helpers),
+required as `retry` by core.clj, which owns the loop orchestration.
 
 Replace the count-only give-up with a single structured give-up predicate that folds
 count-cap + deadline + overshoot into one decision (no separate loop-body deadline check).
