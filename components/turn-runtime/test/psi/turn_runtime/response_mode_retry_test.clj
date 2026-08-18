@@ -377,15 +377,27 @@
 (deftest execute-prepared-request-stale-deadline-at-loop-entry-opens-fresh-window-test
   ;; A persisted :retry-deadline-ms already in the past at loop entry is treated
   ;; as stale and cleared, so the first retryable failure opens a fresh window
-  ;; instead of an instant :deadline give-up with zero retries.
+  ;; instead of an instant :deadline give-up with zero retries. The expired
+  ;; window's :retry-attempt/:retry are reset alongside the deadline (the same
+  ;; cleanup the terminal clears do), so a session rehydrated mid-window after
+  ;; the deadline (process death during a retry sleep leaves :retry-attempt > 0
+  ;; and a stale :retry map) starts its fresh window at attempt 0 with no stale
+  ;; retry metadata.
   (let [clock           (atom 5000)
         [ctx0 session-id] (create-session-context {:persist? false
                                                    :config {:auto-retry-total-timeout-ms 5000
                                                             :auto-retry-base-delay-ms 2000}})
         _               (swap! (:state* ctx0) assoc-in
                                [:agent-session :sessions session-id :data]
+                               ;; stale mid-window state: deadline past (now 5000),
+                               ;; attempt 3 with a stale :retry map left by a
+                               ;; process death during a retry sleep
                                (assoc (ss/get-session-data-in ctx0 session-id)
-                                      :retry-deadline-ms 1000)) ;; past (now 5000)
+                                      :retry-deadline-ms 1000
+                                      :retry-attempt 3
+                                      :retry {:delay-ms 16000
+                                              :delay-source :exponential-backoff
+                                              :resume-at 20000}))
         ctx             (assoc ctx0
                                :now-fn #(java.time.Instant/ofEpochMilli @clock)
                                :provider-retry-sleep-fn (fn [delay-ms]
@@ -396,15 +408,23 @@
                   (fn [& _]
                     (swap! attempts* inc)
                     (error-turn "Connection reset by peer"))]
-      (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
-            outcome (:execution-result/retry-outcome result)]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome   (:execution-result/retry-outcome result)
+            events    (provider-events ctx session-id)
+            scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
         ;; fresh window at now 5000 + 5000 = 10000; attempt 0 retries (2000),
-        ;; attempt 1 final-sleeps the remainder (3000) at the deadline
+        ;; attempt 1 final-sleeps the remainder (3000) at the deadline — NOT
+        ;; resuming at the stale attempt 3 (which would immediately overshoot
+        ;; with a 16000 next-delay and give up after a single attempt)
         (is (= 2 @attempts*))
+        (is (= [2000 3000] (mapv :delay-ms scheduled)))
+        (is (= [7000 10000] (mapv :resume-at scheduled)))
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :deadline (:exhausted-reason outcome)))
-        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
+        ;; no stale retry metadata / window deadline after the run
+        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-non-positive-retry-after-floors-to-backoff-test
   ;; A provider Retry-After of 0 (or negative integer) is floored to the

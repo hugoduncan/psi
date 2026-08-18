@@ -394,6 +394,32 @@
      :execution-result/runtime-unsupported-reason (:runtime/unsupported-reason attempt-result)
      :execution-result/retry-outcome       retry-outcome*}))
 
+(defn- failed-attempt-finished-event
+  "Shared provider_request_finished payload for a failed attempt, used by both
+   the immediate-final error-branch dispatch and the truncated-final-sleep
+   finalize dispatch of execute-prepared-request!: the two build identical base
+   fields (session, turn, attempt, provider, model, retry-attempt, status
+   failed, retryability, error fields); only :final? and the failure fields
+   (:failure-reason / :exhausted? / :exhausted-reason) differ."
+  [session-id turn-id attempt-data* attempt-result retry-attempt
+   {:keys [retryable? error-kind stop-reason error-message http-status]}
+   final? failure-fields]
+  (cond-> {:session-id session-id
+           :turn-id turn-id
+           :provider-request-id turn-id
+           :attempt-id (:attempt-id attempt-result)
+           :provider (:provider-id attempt-data*)
+           :model-id (:model-id attempt-data*)
+           :retry-attempt retry-attempt
+           :status :failed
+           :final? final?
+           :retryable? retryable?
+           :error-kind error-kind
+           :stop-reason stop-reason
+           :error-message error-message}
+    http-status (assoc :http-status http-status)
+    (seq failure-fields) (merge failure-fields)))
+
 (defn- schedule-and-sleep!
   "Shared retry scheduling + interruptible sleep used by both the full-delay
    retry branch and the truncated-final-sleep (overshoot) branch of
@@ -488,8 +514,11 @@
     (ss/apply-root-state-update-in!
      ctx
      (ss/session-update session-id #(dissoc % :provider-retry-abort-requested?)))
-    (loop [retry-attempt     (retry/retry-attempt-for ctx session-id)
-           retry-deadline-ms (retry/retry-deadline-for ctx session-id)]
+    ;; Read the deadline first: retry-deadline-for's stale branch resets
+    ;; :retry-attempt/:retry alongside the expired deadline, so the attempt
+    ;; read-back must observe the fresh-window state.
+    (loop [retry-deadline-ms (retry/retry-deadline-for ctx session-id)
+           retry-attempt     (retry/retry-attempt-for ctx session-id)]
       (let [attempt-data*  (assoc attempt-data :retry-attempt retry-attempt)
             attempt-result (execute-provider-attempt! ai-ctx ctx session-id prepared-request progress-queue attempt-data*)
             assistant-msg  (:assistant-message attempt-result)
@@ -512,7 +541,7 @@
                 :final? true}))
             (retry/clear-active-retry! ctx session-id progress-queue true)
             (execution-result ctx session-id prepared-request attempt-data* attempt-result nil))
-          (let [{:keys [retryable? error-kind error-message http-status stop-reason] :as error-fields}
+          (let [{:keys [retryable? error-message] :as error-fields}
                 (retry/provider-error-fields assistant-msg)
                 now              (retry/now-ms ctx)
                 retry-metadata   (retry/retry-metadata-for ctx assistant-msg retry-attempt)
@@ -545,23 +574,13 @@
             (retry/dispatch-provider-event!
              ctx
              "provider_request_finished"
-             (cond-> {:session-id session-id
-                      :turn-id turn-id
-                      :provider-request-id turn-id
-                      :attempt-id (:attempt-id attempt-result)
-                      :provider (:provider-id attempt-data*)
-                      :model-id (:model-id attempt-data*)
-                      :retry-attempt retry-attempt
-                      :status :failed
-                      :final? immediate-final?
-                      :retryable? retryable?
-                      :error-kind error-kind
-                      :stop-reason stop-reason
-                      :error-message error-message}
-               http-status (assoc :http-status http-status)
-               immediate-final? (assoc :failure-reason failure-reason)
-               (and immediate-final? exhausted?) (assoc :exhausted? true
-                                                        :exhausted-reason (:exhausted-reason decision))))
+             (failed-attempt-finished-event
+              session-id turn-id attempt-data* attempt-result retry-attempt
+              error-fields immediate-final?
+              (cond-> {}
+                immediate-final? (assoc :failure-reason failure-reason)
+                (and immediate-final? exhausted?) (assoc :exhausted? true
+                                                         :exhausted-reason (:exhausted-reason decision)))))
             (cond
               ;; Immediate final (no sleep): non-retryable / retry-disabled /
               ;; count-cap / deadline-reached.
@@ -590,23 +609,12 @@
                     (retry/dispatch-provider-event!
                      ctx
                      "provider_request_finished"
-                     (cond-> {:session-id session-id
-                              :turn-id turn-id
-                              :provider-request-id turn-id
-                              :attempt-id (:attempt-id attempt-result)
-                              :provider (:provider-id attempt-data*)
-                              :model-id (:model-id attempt-data*)
-                              :retry-attempt retry-attempt
-                              :status :failed
-                              :final? true
-                              :retryable? retryable?
-                              :error-kind error-kind
-                              :stop-reason stop-reason
-                              :error-message error-message
-                              :failure-reason :retry-exhausted
-                              :exhausted? true
-                              :exhausted-reason :deadline}
-                       http-status (assoc :http-status http-status)))
+                     (failed-attempt-finished-event
+                      session-id turn-id attempt-data* attempt-result retry-attempt
+                      error-fields true
+                      {:failure-reason :retry-exhausted
+                       :exhausted? true
+                       :exhausted-reason :deadline}))
                     (retry/clear-active-retry! ctx session-id progress-queue true)
                     (execution-result ctx session-id prepared-request attempt-data* attempt-result retry-outcome))))
 
@@ -620,4 +628,4 @@
                   (cancelled-retry-path! ctx session-id turn-id progress-queue prepared-request count-cap
                                          retry-enabled? attempt-data* attempt-result retry-attempt next-attempt
                                          error-fields)
-                  (recur next-attempt deadline-ms))))))))))
+                  (recur deadline-ms next-attempt))))))))))

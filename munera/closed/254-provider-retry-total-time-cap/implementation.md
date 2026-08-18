@@ -161,3 +161,44 @@
     `psi.turn-runtime.core-test` (16), `psi.agent-session.config-compaction-test`
     (8) all green; clj-kondo clean on core.clj + retry.clj.
 - implementation review 2026-08-18 (third turn): added 2 steps to be addressed.
+- implementation-review-followup 2026-08-18 (third turn, 2/2 steps done): addressed the 2
+  implementation-review steps added by the third turn.
+  - **Shared failed-attempt terminal-event builder (core.clj).** Added private
+    `failed-attempt-finished-event` (session-id, turn-id, attempt-data*,
+    attempt-result, retry-attempt, error-fields, final?, failure-fields) building
+    the base provider_request_finished failed payload; both the immediate-final
+    error-branch dispatch and the truncated-final-sleep finalize dispatch now
+    call it (the former passes `(cond-> {} ...)` failure fields for
+    `:failure-reason`/`:exhausted?`/`:exhausted-reason`, the latter the literal
+    `:retry-exhausted :deadline` triple). Outer error-fields destructuring in
+    `execute-prepared-request!` trimmed to `retryable?`/`error-message` (the
+    builder destructures the rest). ~18 duplicated lines removed from both sites;
+    event payloads byte-identical (same cond-> http-status handling, same
+    fields).
+  - **Stale-deadline fresh-window reset (retry.clj + core.clj).** `retry-deadline-for`
+    stale branch now assoc's `:retry-attempt 0` + `:retry nil` alongside the
+    deadline dissoc (the same cleanup the terminal clears do), so a session
+    rehydrated mid-window after the deadline (process death during a retry sleep
+    leaves `:retry-attempt` > 0 and a stale `:retry` map) starts its fresh window
+    at attempt 0 with no stale retry metadata. **Ordering fix this surfaced:** the
+    loop bindings previously read `retry-attempt-for` BEFORE `retry-deadline-for`,
+    so the local attempt binding captured the stale value despite the reset;
+    reordered to read `retry-deadline-for` first (its stale branch resets attempt
+    state) with the matching `(recur deadline-ms next-attempt)`. The extended
+    stale-deadline test seeds a past deadline + attempt 3 + stale `:retry` map and
+    asserts the fresh window behaves as attempt 0 (2 attempts, delays [2000 3000],
+    resume-at [7000 10000]) rather than resuming at stale attempt 3 (which would
+    immediately overshoot and give up after 1 attempt with [5000]).
+  - **Validation.** `psi.turn-runtime.response-mode-retry-test` (14, incl. the
+    extended stale-deadline test — without the reorder it fails with 1 attempt
+    [5000]), `psi.turn-runtime.response-mode-test` (18),
+    `psi.session-state.model-test` (12), `psi.agent-session.eql-provider-retry-test`
+    (3), `psi.turn-runtime.core-test` (16), `psi.agent-session.prompt-lifecycle-test`
+    (23), `psi.agent-session.statechart-actions-test` (8),
+    `psi.agent-session.config-compaction-test` (8), `psi.session-state.state-test`
+    (7) all green; clj-kondo clean on core.clj + retry.clj + retry test; full
+    `bb test` → 2695 passed / 1 failed, the failure the documented pre-existing
+    `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+    (unknown model `deepseek/deepseek-v4-flash`, model-registry, unrelated).
+    No change to give-up-decision branch order, deadline lifecycle, or
+    cancellation mechanics.

@@ -104,7 +104,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, third turn)
 
-- [ ] `execute-prepared-request!` (turn-runtime/core.clj): the failed-attempt
+- [x] `execute-prepared-request!` (turn-runtime/core.clj): the failed-attempt
       `provider_request_finished` dispatch (~:560) and the truncated-final-sleep
       finalize dispatch (~:610) build ~18-line identical payloads (session-id,
       turn-id, provider-request-id, attempt-id, provider, model-id,
@@ -115,7 +115,13 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       this finalize event duplication inline. Extract a shared failed-attempt
       terminal-event builder parameterized by `final?` + failure fields and use
       it from both branches.
-- [ ] `retry-deadline-for` (turn-runtime/retry.clj) stale branch dissocs only
+      → Done: private `failed-attempt-finished-event` (core.clj) builds the base
+      payload from `error-fields` + `final?` + failure-fields; both the
+      immediate-final error-branch dispatch and the truncated-final-sleep
+      finalize dispatch call it. Outer error-fields destructuring in
+      `execute-prepared-request!` trimmed to `retryable?`/`error-message` (the
+      builder destructures the rest) — clj-kondo clean.
+- [x] `retry-deadline-for` (turn-runtime/retry.clj) stale branch dissocs only
       `:retry-deadline-ms`. In the design's own "session persisted mid-window
       and rehydrated after the deadline has passed (process death / close)"
       scenario, a process death during a retry sleep leaves canonical
@@ -126,3 +132,13 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `:retry-attempt`/`:retry` alongside the stale-deadline dissoc (the same
       cleanup the three terminal clears do) so a stale window's fresh window
       starts at attempt 0 with no stale retry metadata.
+      → Done: `retry-deadline-for` stale branch now assoc's `:retry-attempt 0`
+      + `:retry nil` alongside the deadline dissoc. Loop bindings in
+      `execute-prepared-request!` reordered to read `retry-deadline-for` first
+      (its stale branch resets attempt state), so the `retry-attempt-for`
+      read-back observes the fresh-window state; matching `recur` order
+      (`deadline-ms` then `next-attempt`). Test extended: stale-deadline test
+      seeds `:retry-deadline-ms 1000` (past) + `:retry-attempt 3` + stale
+      `:retry` map and asserts the fresh window starts at attempt 0 (2 attempts,
+      delays [2000 3000], resume-at [7000 10000]) with no stale retry metadata
+      after the run.

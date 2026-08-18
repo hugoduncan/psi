@@ -29,14 +29,23 @@
    A persisted deadline already in the past (stale, e.g. a window left open by a
    turn-end path outside the terminal clears, or a session rehydrated after the
    deadline) is treated as expired: the canonical field is cleared and nil is
-   returned so the first retryable failure of the turn opens a fresh window."
+   returned so the first retryable failure of the turn opens a fresh window.
+   The expired window's :retry-attempt/:retry are reset alongside the deadline
+   (the same cleanup the terminal clears do), so a session rehydrated mid-window
+   after the deadline (process death during a retry sleep leaves :retry-attempt
+   > 0 and a stale :retry map) starts its fresh window at attempt 0 with no
+   stale retry metadata visible."
   [ctx session-id]
   (let [deadline (:retry-deadline-ms (ss/get-session-data-in ctx session-id))]
     (if (and (some? deadline) (< deadline (now-ms ctx)))
       (do
         (ss/apply-root-state-update-in!
          ctx
-         (ss/session-update session-id #(dissoc % :retry-deadline-ms)))
+         (ss/session-update session-id
+                            #(-> %
+                                 (assoc :retry-attempt 0
+                                        :retry nil)
+                                 (dissoc :retry-deadline-ms))))
         nil)
       deadline)))
 
