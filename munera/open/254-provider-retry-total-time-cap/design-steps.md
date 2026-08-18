@@ -241,3 +241,22 @@
   `:exhausted-reason` is reported when both are true (branch order implies `:count-cap` wins).
   Pin the precedence so `:exhausted-reason` reporting on the retry-outcome /
   `provider_request_finished` event is deterministic.
+
+## Inconsistency review 2026-08-18 (current session, third turn)
+
+- [ ] **Reconcile the default count-cap rationale with `Retry-After` overriding the backoff.**
+  Approach 4 raises `:auto-retry-max-retries` from 3 to 20 because "default backoff reaches ~14
+  attempts in 10 minutes" — a value "never reached within the default 10-minute window". That
+  rationale assumes the exponential schedule (2,4,8,16,32, then 60 s). But `retry-metadata`
+  (session-state/model.clj:571-572) computes `delay-ms (or retry-after-ms exponential-delay-ms)`:
+  a `Retry-After` **fully overrides** the exponential delay and is **not** bounded by
+  `:auto-retry-max-delay-ms`. Approach 5 confirms `Retry-After` is respected per attempt and
+  "provider-supplied, not config-shrinkable". A provider sending short `Retry-After` delays
+  (e.g. 1 s) lets the attempt count climb far faster than the exponential schedule, so
+  `max-retries=20` can be reached well inside the 10-minute window — giving up with
+  `:exhausted-reason :count-cap` at ~20 s instead of at the deadline — contradicting the
+  Goal/AC1 "retries for up to a total of 10 minutes" and Approach 4's "never reached within the
+  default window" claim. State whether the total-time budget is the effective default limiter for
+  ALL per-attempt delays (count-cap must not prematurely fire under fast `Retry-After`), or
+  whether the "10 minutes" goal is explicitly qualified for the `Retry-After` case — so the
+  default count-cap value and the Goal/AC1 "up to 10 minutes" agree regardless of provider delay.
