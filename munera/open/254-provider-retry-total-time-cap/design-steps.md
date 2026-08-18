@@ -63,3 +63,36 @@
   the retry window has elapsed 10 minutes total". State which holds: sleep only
   the remaining portion to reach the deadline exactly and give up at 10 min, or
   stop when the next full sleep overshoots (and reword AC1 accordingly).
+
+## Ambiguity re-review 2026-08-18 (post-follow-up)
+
+- [ ] **Define the deadline lifecycle: window-open detection and clearing.** The
+  design stores `:retry-deadline-ms` in canonical session state "when the retry
+  window opens (the first retryable failure)" and reads it back at loop entry,
+  but never specifies how the single give-up predicate distinguishes the
+  *window-opening* failure (compute + store the deadline) from *subsequent*
+  failures in the same window (reuse the stored deadline). Also specify where
+  the deadline is cleared: `clear-active-retry!` currently clears
+  `:retry-attempt`, `:retry`, and `:provider-retry-abort-requested?` (all
+  session-scoped canonical state) on success/give-up/cancel — if
+  `:retry-deadline-ms` is not cleared with them, a stale deadline persists in
+  session state and a later turn's first retry could inherit a truncated window
+  (the retry loop is per `execute-prepared-request!`, but the state it reads is
+  session-scoped). State whether the deadline is cleared by `clear-active-retry!`
+  and how a fresh window is anchored on a later turn.
+- [ ] **Specify whether the retry outcome/telemetry distinguishes count-cap vs
+  deadline exhaustion.** Both "deadline reached" and "count cap reached" map to
+  `:failure-reason :retry-exhausted` with `:exhausted? true` (Approach 2), so a
+  consumer of the retry-outcome / `provider_request_finished` event cannot tell
+  which boundary terminated the window. Clarify whether the single
+  `:retry-exhausted` reason is intended to suffice for both, or whether a
+  distinguishing field (e.g. `:exhausted-reason :count-cap | :deadline`) is
+  added to the outcome/event payload.
+- [ ] **State the disable semantics of the total-time budget (or confirm it is
+  always active).** The design adds `:auto-retry-total-timeout-ms` (default
+  600000) as the primary default limiter and keeps `:auto-retry-max-retries` as a
+  secondary hard cap, but does not specify whether a value of the new key can
+  disable the time budget (0? negative? nil?), nor whether the budget is simply
+  always active once the key exists. Confirm the config contract: is a
+  strict count-only mode (time budget off, count cap on, for large count values)
+  expressible, or is the total-time window unconditionally active by default?
