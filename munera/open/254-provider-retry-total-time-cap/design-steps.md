@@ -45,3 +45,21 @@
   the existing `:provider-retry-sleep-fn` injectable seam (used by current retry
   tests) so the total-time-with-`Retry-After` acceptance case stays deterministic
   without real sleeps.
+
+## Inconsistency review 2026-08-18
+
+- [ ] **Reconcile the 10-minute window anchor with the "retrying" framing.** Goal
+  and AC1 frame the budget as "10 minutes of retrying / retry window", but
+  Approach 2 anchors the deadline at "first-attempt start". That includes the
+  failing request's own execution time (so a slow-failing attempt shortens the
+  retry budget below 10 min) and is ambiguous between the *initial* attempt and
+  the *first retry* attempt. Define the anchor precisely (initial-attempt start
+  vs first-retry-decision time) and make Goal/AC1/Approach agree on whether the
+  window is 10 min of retrying or 10 min from the initial attempt start.
+- [ ] **Reconcile stop-before-deadline with AC1's "only after 10 minutes".**
+  Approach 2 stops with `:retry-exhausted` when the next scheduled sleep would
+  push past the deadline (so give-up can occur *before* 10 min elapses, e.g.
+  ~9:40 with the 60 s pin), while AC1 states the default "gives up ... only after
+  the retry window has elapsed 10 minutes total". State which holds: sleep only
+  the remaining portion to reach the deadline exactly and give up at 10 min, or
+  stop when the next full sleep overshoots (and reword AC1 accordingly).
