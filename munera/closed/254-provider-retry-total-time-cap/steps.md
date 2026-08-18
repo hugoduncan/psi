@@ -65,3 +65,21 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 - [x] Full `bb test` (seed 536015077): 2 failures both pre-existing on baseline
       (streaming-error-event test-order dependence; delegate-review nullable-model
       registry), not introduced by this change.
+
+## Review follow-up (implementation review)
+
+- [ ] session-state model test: steps.md claims `valid-session?` accepts
+      `:retry-deadline-ms`, but model_test.clj has no `:retry-deadline-ms`
+      reference — the optional schema field is only exercised absent. Add a test
+      asserting `valid-session?` with a populated top-level `:retry-deadline-ms`
+      (int value, and the nil value count-only mode writes).
+- [ ] CHANGELOG [Unreleased]: no entry for the user-visible retry behavior change —
+      new `:auto-retry-total-timeout-ms` config key (default 600000), default
+      give-up moved from ~3 attempts (~14 s) to a 10-minute total window,
+      `:auto-retry-max-retries` default is now sentinel `nil`, and
+      `:exhausted-reason` (`:count-cap | :deadline`) on retry-outcome +
+      `provider_request_finished`. Add per changelog protocol before the next commit.
+- [ ] `mark-active-retry!` (turn-runtime/retry.clj) assoc's `:retry-deadline-ms`
+      unconditionally: count-only mode (budget disabled → deadline nil) writes a
+      spurious `:retry-deadline-ms nil` into canonical session state for the window.
+      Assoc the deadline only when non-nil.
