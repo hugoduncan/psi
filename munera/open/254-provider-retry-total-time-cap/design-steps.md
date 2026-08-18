@@ -297,3 +297,24 @@
   raise's actual purpose: is the default 20 intended to bound count-only mode (accept the 3→20
   change), or is it meant only as an unused nominal fallback (and if so, why raise it at all)? The
   "nominal safety value, non-limiting" framing conflicts with the raise's real count-only effect.
+
+## Ambiguity review 2026-08-18 (second turn, current design state)
+
+- [ ] **Pin the loop-entry behavior for a persisted `:retry-deadline-ms` that is already in the past.**
+  The Clearing section clears the deadline only on the three retry-loop terminal paths — success,
+  final-give-up, cancel — and the Window-open detection keys the fresh-window decision solely on
+  the **presence** of the loop-bound deadline ("a later turn starts a fresh window only after the
+  previous window's canonical deadline was cleared on close"). But the deadline is canonical
+  session state (top-level field, threaded through the loop binding, re-seeded at loop entry), so a
+  window can be left open by a turn-end path **outside** those three clears: an external abort of an
+  in-flight request that isn't the retry-loop cancel path (the budget deliberately does not abort
+  in-flight requests), or a session persisted mid-window and rehydrated after the deadline has
+  passed (process death / close). In all those cases `:retry-deadline-ms` is present-but-expired at
+  the next loop entry. With presence-only detection the loop seeds a non-nil past deadline, so no
+  fresh window is computed and the first retryable failure immediately hits `now >= deadline` →
+  `:retry-exhausted :deadline` with **zero actual retries** — an instant give-up that contradicts
+  the "A stale deadline is thereby never leaked into a later turn's first retry" guarantee. State
+  whether a past deadline at loop entry is treated as stale (clear it and open a fresh 10-minute
+  window) or as authoritative (immediate `:deadline` give-up), and enumerate which turn-end /
+  rehydration paths must also clear the deadline so an expired value cannot strand a later turn's
+  first retryable failure.
