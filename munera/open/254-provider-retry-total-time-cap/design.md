@@ -2,8 +2,9 @@
 
 ## Goal
 
-Change the provider auto-retry policy so a retryable provider error (e.g.
-Anthropic 529 overloaded) keeps retrying with exponential backoff for **up to a
+Change the provider auto-retry policy so a retryable provider error (e.g. an
+Anthropic 529 response whose payload says "overloaded") keeps retrying with
+exponential backoff for **up to a
 total of 10 minutes** of wall-clock retrying — a retry window that opens when the
 first retry is scheduled and runs for 10 minutes — instead of the current
 behaviour of giving up after a fixed number of attempts (default 3 → ~14 s total:
@@ -12,9 +13,22 @@ behaviour of giving up after a fixed number of attempts (default 3 → ~14 s tot
 ## Context
 
 The turn runtime retries retryable provider errors (`:rate-limit`, `:timeout`,
-`:overloaded`, `:provider-unavailable`, `:transport`; 529 overloaded maps to
-`:overloaded`) inside `execute-prepared-request!`
+`:overloaded`, `:provider-unavailable`, `:transport`) inside
+`execute-prepared-request!`
 (`components/turn-runtime/src/psi/turn_runtime/core.clj`).
+
+**Error classification of 529.** A bare HTTP 529 with no "overloaded" message
+classifies as `:provider-unavailable`, not `:overloaded`: in `provider-error-kind`
+(`components/session-state/src/psi/session_state/model.clj`) the message-based
+`:overloaded` branch (`overloaded-error-patterns` = `#"(?i)overloaded"`) runs
+*before* the status-based provider-unavailable branch, which itself matches
+`(contains? #{500 502 503 529} http-status)`. So `:overloaded` is produced only
+when the error message contains "overloaded"; a bare 529 falls through to
+`:provider-unavailable`. Anthropic's real-world 529 overloaded responses do carry
+an "overloaded" message, so the Goal/Acceptance "529 overloaded" examples mean
+"a 529 whose payload says 'overloaded'" and classify as `:overloaded`. Both
+`:overloaded` and `:provider-unavailable` are in the retryable set, so retry
+behaviour is unchanged either way.
 
 Termination is **count-based** today:
 
@@ -71,21 +85,57 @@ safety cap (not the default limiter).
    give-up predicate that evaluates the count cap and the total-time deadline
    together, per failed attempt — no separate deadline check in the loop body.
    The loop ordering is: classify the failure → ensure the deadline is present
-   (window-opening failure: compute and persist it; otherwise read the persisted
-   value) → compute the would-be next delay (`retry-metadata-for`, which resolves
+   (window-opening failure: compute it — persisting it with the first retry's
+   `mark-active-retry!` when the retry path runs, per "Persistence at window
+   open" below; otherwise read the persisted value) → compute the would-be next
+   delay (`retry-metadata-for`, which resolves
    any `Retry-After`) → run the single give-up predicate against the failure
    classification, current retry count, the deadline, and the would-be next
-   delay. It decides:
-   - `:non-retryable` / `:retry-disabled` → stop (unchanged);
-   - count cap reached (`retry-attempt >= max-retries`) → `:retry-exhausted`
-     with `:exhausted-reason :count-cap`;
-   - deadline reached (`now >= deadline`) → `:retry-exhausted`
-     with `:exhausted-reason :deadline`;
-   - the next full delay would overshoot (`now + next-delay > deadline`) → sleep
-     the remaining portion (`deadline - now`) and then give up with
-     `:retry-exhausted` with `:exhausted-reason :deadline`, so the default
-     give-up occurs at the deadline;
+   delay. The predicate returns a **structured outcome** (not a bare
+   failure-reason), so the loop can tell "finalize now (no sleep)" apart from
+   "sleep the truncated remainder, record/emit it, then finalize". It decides:
+   - `:non-retryable` / `:retry-disabled` → stop (unchanged, immediate);
+   - count cap reached (`retry-attempt >= max-retries`) →
+     `{:failure-reason :retry-exhausted :exhausted-reason :count-cap}` —
+     finalize now, no sleep;
+   - deadline reached (`now >= deadline`) →
+     `{:failure-reason :retry-exhausted :exhausted-reason :deadline}` —
+     finalize now, no sleep;
+   - the next full delay would overshoot (`now + next-delay > deadline`) → a
+     distinct **final-sleep outcome**
+     `{:failure-reason :retry-exhausted :exhausted-reason :deadline
+       :final-sleep-ms (- deadline now)}` — the loop runs one retry-path
+     iteration with the truncated delay, then finalizes at the deadline;
    - otherwise → retry, sleeping the full `next-delay`.
+
+   **Scheduling the truncated final sleep.** The overshoot case is not the
+   uniform immediate-final signal: because the current loop only records/emits
+   a retry on the **non-final** path (`mark-active-retry!` +
+   `provider_retry_scheduled` run only before a sleep, while a `:retry-exhausted`
+   final goes straight to `clear-active-retry!` + `execution-result`, per
+   turn-runtime/core.clj:614-641), the overshoot final-sleep outcome routes the
+   loop through the retry path exactly once so the truncated delay is recorded
+   and emitted: compute `retry-metadata-for` with
+   `min(full-next-delay, deadline - now)`, write/emit that truncated
+   `:delay-ms`/`:resume-at` (`mark-active-retry!` + `provider_retry_scheduled`),
+   sleep the truncated delay via the interruptible seam, then finalize with
+   `:retry-exhausted :exhausted-reason :deadline` (clear + execution-result)
+   instead of recursing. The presence of `:final-sleep-ms` in the predicate
+   outcome is what distinguishes "finalize now (no sleep)" (absent) from "sleep
+   remainder, record truncated delay, then finalize" (present).
+
+   **Cancellation during the truncated final sleep.** The truncated final sleep
+   uses the same interruptible seam as any other retry sleep
+   (`interruptible-sleep-for-retry!` / `:provider-retry-sleep-fn`,
+   `sleep-for-retry!` → cancellable), so cancellation takes precedence over the
+   deadline give-up: if an active-turn abort or `:provider-retry-abort-requested?`
+   arrives during the truncated final sleep, the sleep is aborted and the
+   outcome becomes `:retry-cancelled` via the existing cancelled path
+   (`provider_request_cancelled` event + cancelled retry-outcome), exactly as
+   for any pending backoff. The `:retry-exhausted :deadline` give-up is emitted
+   only when the truncated sleep runs to completion uninterrupted (reaches the
+   deadline). This preserves the "cancelled immediately" constraint for the
+   whole window, including its final truncated sleep.
 
    **Distinguishing the termination boundary.** Both count-cap and deadline
    exhaustion keep the existing single `:failure-reason :retry-exhausted`
@@ -104,22 +154,35 @@ safety cap (not the default limiter).
 
    **Canonical deadline state.** Record the deadline in canonical session state,
    not a runtime-local binding: when the retry window opens (the first retryable
-   failure), store `:retry-deadline-ms` alongside the existing canonical `:retry`
-   metadata (with `:resume-at`) via the established
-   `apply-root-state-update-in!` / session-update path, and read it back the same
-   way `:retry-attempt` is read at loop entry. This survives loop re-entry and
-   follows the canonical-root vs runtime-handles state boundary
-   (`doc/architecture.md`); the `agent-session-schema` gains the deadline field.
+   failure that schedules a retry), store `:retry-deadline-ms` as a **top-level
+   session field** in the same `mark-active-retry!` session-update that marks the
+   first retry active (via the established `apply-root-state-update-in!` /
+   session-update path), and read it back the same way `:retry-attempt` is read
+   at loop entry. This survives loop re-entry and follows the canonical-root vs
+   runtime-handles state boundary (`doc/architecture.md`); the
+   `agent-session-schema` gains the deadline field.
 
    **Window-open detection.** The give-up predicate's deadline input is ensured
    once per window, before the predicate runs: if `:retry-deadline-ms` is absent
    from session state at a retryable, retry-enabled failure, that failure is the
    window-opening one — compute `deadline = now + :auto-retry-total-timeout-ms`
-   (when the budget is active; see Approach 1 disable semantics) and persist it
-   in the same session-update that marks the first retry active; otherwise reuse
+   (when the budget is active; see Approach 1 disable semantics); otherwise reuse
    the stored value. Because the window is keyed solely on deadline presence, a
    later turn starts a fresh window only after the previous window's deadline was
    cleared (below).
+
+   **Persistence at window open.** The deadline is computed **in memory** (using
+   the injected clock) for the give-up predicate on every window-opening failure,
+   but it is persisted to canonical session state only when the retry path
+   actually runs — i.e. in the same `mark-active-retry!` session-update that
+   schedules the first retry. A window-opening failure that immediately gives up
+   on the count cap (a final, no retry scheduled, so `mark-active-retry!` never
+   runs) computes the deadline in memory for the predicate's decision but writes
+   nothing to session state; `clear-active-retry!` then runs as usual with no
+   deadline to clear. This avoids a redundant canonical write that would be
+   immediately cleared, and keeps the persistence colocated with the only
+   consumer that needs it across attempts (the retry path's later predicate
+   reads).
 
    **Field placement.** `:retry-deadline-ms` is a **top-level** session field —
    a sibling of `:retry-attempt` — not a key inside the `:retry` map. The
@@ -206,8 +269,9 @@ safety cap (not the default limiter).
 
 ## Acceptance
 
-- Default config gives up on a retryable provider error (529 overloaded, 429,
-  timeout) only after the retry window has elapsed **10 minutes total** of wall
+- Default config gives up on a retryable provider error (e.g. a 529 whose
+  payload says "overloaded", 429, timeout)
+  only after the retry window has elapsed **10 minutes total** of wall
   clock — the final backoff is truncated to the remaining time so give-up occurs
   at the deadline — using backoff 2 s, 4 s, 8 s, 16 s, 32 s, then pinned at 60 s —
   not after 3 attempts (~14 s). The window is anchored at the first retry

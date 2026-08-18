@@ -125,7 +125,7 @@
 
 ## Ambiguity review 2026-08-18 (current session, second turn)
 
-- [ ] **Specify how the truncated final sleep is scheduled through the single
+- [x] **Specify how the truncated final sleep is scheduled through the single
   give-up predicate.** Approach 2's overshoot branch ("next full delay would
   overshoot → sleep the remaining portion (deadline − now) and then give up
   `:retry-exhausted` / `:exhausted-reason :deadline`") and the immediate "now ≥
@@ -144,7 +144,7 @@
   itself sleeps the remainder before returning — and how the loop distinguishes
   "finalize now (no sleep)" from "sleep remainder, record truncated delay, then
   finalize".
-- [ ] **State the outcome when cancellation interrupts the truncated final
+- [x] **State the outcome when cancellation interrupts the truncated final
   sleep.** Approach 2's overshoot branch gives up with
   `:retry-exhausted :deadline` after sleeping the remaining window, and that
   truncated sleep uses the interruptible seam (`interruptible-sleep-for-retry!`
@@ -156,7 +156,7 @@
   or stay `:retry-exhausted :deadline` (as the overshoot branch states)? The
   "cancelled immediately" constraint and the hardcoded `:deadline` give-up can
   conflict here; specify the precedence.
-- [ ] **Pin whether the window-opening deadline is persisted when the window
+- [x] **Pin whether the window-opening deadline is persisted when the window
   opens on an immediate count-cap give-up.** Approach 2's "ensure the deadline is
   present" step says the window-opening failure "compute[s] and persist[s]" the
   deadline, while also stating it persists "in the same session-update that marks
@@ -170,7 +170,7 @@
 
 ## Inconsistency review 2026-08-18 (current session, third turn)
 
-- [ ] **Correct the "529 overloaded maps to `:overloaded`" classification claim.**
+- [x] **Correct the "529 overloaded maps to `:overloaded`" classification claim.**
   Context states "529 overloaded maps to `:overloaded`", but
   `provider-error-kind` in
   `components/session-state/src/psi/session_state/model.clj` maps an HTTP 529
