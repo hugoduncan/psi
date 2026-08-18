@@ -167,3 +167,22 @@
   give-up at window-open writes nothing), or (b) persisted by the ensure-step
   regardless (a redundant canonical write immediately cleared by
   `clear-active-retry!`).
+
+## Inconsistency review 2026-08-18 (current session, third turn)
+
+- [ ] **Correct the "529 overloaded maps to `:overloaded`" classification claim.**
+  Context states "529 overloaded maps to `:overloaded`", but
+  `provider-error-kind` in
+  `components/session-state/src/psi/session_state/model.clj` maps an HTTP 529
+  status to `:provider-unavailable` (the provider-unavailable branch checks
+  `(contains? #{500 502 503 529} http-status)`), while `:overloaded` is produced
+  only when the error *message* matches `overloaded-error-patterns`
+  (`#"(?i)overloaded"`), which is checked before the status-based
+  provider-unavailable branch. So a bare 529 with no "overloaded" message yields
+  `:provider-unavailable`, not `:overloaded`. Both kinds are in the retryable
+  set, so retry behavior is unaffected, but the blanket "529 overloaded →
+  `:overloaded`" framing in Context (echoed in the Goal/Acceptance "529
+  overloaded" examples) is inaccurate and could mislead an implementer or a test
+  asserting `:error-kind :overloaded` for a 529 stub. Correct the mapping (e.g.
+  "529 → `:provider-unavailable`, with `:overloaded` only when the payload says
+  'overloaded'") or qualify it so design.md and the code agree.
