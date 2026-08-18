@@ -101,3 +101,28 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       namespace's `now-ms` defn): call `(now-ms ctx)` instead (rename the local
       binding so it does not shadow the fn) so the extracted namespace has a single
       clock-read path.
+
+## Review follow-up (implementation review, third turn)
+
+- [ ] `execute-prepared-request!` (turn-runtime/core.clj): the failed-attempt
+      `provider_request_finished` dispatch (~:560) and the truncated-final-sleep
+      finalize dispatch (~:610) build ~18-line identical payloads (session-id,
+      turn-id, provider-request-id, attempt-id, provider, model-id,
+      retry-attempt, :status :failed, retryable?, error-kind, stop-reason,
+      error-message, http-status `cond->`); only `:final?` and the failure
+      fields (`:failure-reason`/`:exhausted?`/`:exhausted-reason`) differ. The
+      re-review extracted `schedule-and-sleep!`/`cancelled-retry-path!` but left
+      this finalize event duplication inline. Extract a shared failed-attempt
+      terminal-event builder parameterized by `final?` + failure fields and use
+      it from both branches.
+- [ ] `retry-deadline-for` (turn-runtime/retry.clj) stale branch dissocs only
+      `:retry-deadline-ms`. In the design's own "session persisted mid-window
+      and rehydrated after the deadline has passed (process death / close)"
+      scenario, a process death during a retry sleep leaves canonical
+      `:retry-attempt` (> 0) and `:retry` (stale `:resume-at`) in session state;
+      the stale-deadline clear then opens a "fresh window" that resumes the
+      backoff at attempt N (e.g. 4 s instead of 2 s) and keeps the stale
+      `:retry` map visible until the first `mark-active-retry!`. Reset
+      `:retry-attempt`/`:retry` alongside the stale-deadline dissoc (the same
+      cleanup the three terminal clears do) so a stale window's fresh window
+      starts at attempt 0 with no stale retry metadata.

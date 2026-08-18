@@ -160,3 +160,4 @@
     `psi.agent-session.statechart-actions-test` (8),
     `psi.turn-runtime.core-test` (16), `psi.agent-session.config-compaction-test`
     (8) all green; clj-kondo clean on core.clj + retry.clj.
+- implementation review 2026-08-18 (third turn): added 2 steps to be addressed.
