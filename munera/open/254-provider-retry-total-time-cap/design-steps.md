@@ -282,3 +282,18 @@
   design never acknowledges. State whether count-only mode with defaults should yield 20 attempts
   (the raised default, consistent with the new nominal value) or preserve a smaller count-only
   default, so operators relying on count-only defaults are not surprised.
+
+## Inconsistency review 2026-08-18 (current session, third turn — post-follow-up design state)
+
+- [ ] **Reconcile the raise of the default `:auto-retry-max-retries` to 20 with the explicit-only
+  count-cap gating.** Approach 4 raises the default from 3 to 20 "as a nominal safety value"
+  justified by the budget-active window ("never reached within the default window"). But Approach 4
+  also gates the count-cap branch to fire **only when the operator explicitly configures**
+  `:auto-retry-max-retries` (or the budget is disabled). Under that gating the default value is
+  **never a limiter in the budget-active path** (the deadline alone bounds), so the raise's stated
+  purpose is vacuous there. The raise's only real effect lands in count-only mode (budget disabled),
+  where the raised default 20 becomes the sole give-up limiter — a silent behavior change from the
+  prior count-only default of 3 (also the subject of ambiguity step 2 this session). State the
+  raise's actual purpose: is the default 20 intended to bound count-only mode (accept the 3→20
+  change), or is it meant only as an unused nominal fallback (and if so, why raise it at all)? The
+  "nominal safety value, non-limiting" framing conflicts with the raise's real count-only effect.
