@@ -260,3 +260,25 @@
   ALL per-attempt delays (count-cap must not prematurely fire under fast `Retry-After`), or
   whether the "10 minutes" goal is explicitly qualified for the `Retry-After` case — so the
   default count-cap value and the Goal/AC1 "up to 10 minutes" agree regardless of provider delay.
+
+## Ambiguity review 2026-08-18 (current session, second turn — post-follow-up design state)
+
+- [ ] **Pin how the give-up predicate detects "explicitly configured" `:auto-retry-max-retries`.**
+  Approach 4 makes the count-cap branch fire "only when the operator has **explicitly configured**
+  `:auto-retry-max-retries`", but the config resolution path never preserves that distinction:
+  `default-config` always supplies the key (3 today, raised to 20), and turn-runtime reads it via a
+  plain `(get-in ctx [:config :auto-retry-max-retries] 3)` (core.clj:546) — so the predicate cannot
+  tell a default 20 from an operator-set 20. Specify the mechanism that carries "explicitly set"
+  through to the predicate (e.g. key presence in the effective config layer above default-config, a
+  `count-cap-set?` / explicitness signal plumbed into ctx `:config`, or a sentinel default that
+  reads as "unset"), so behavior-preserving explicit small caps still gate while the default cannot
+  prematurely fire under fast `Retry-After` (prior inconsistency step).
+- [ ] **Pin the count-only-mode default behavior when the total-time budget is disabled.**
+  Approach 1's disable semantics make `:auto-retry-max-retries` the sole limiter when
+  `:auto-retry-total-timeout-ms` is nil/absent/<= 0. With the default `:auto-retry-max-retries`
+  raised from 3 to 20 (Approach 4) as a "nominal safety value" for the budget-active case, an
+  operator who disables the budget without setting an explicit cap now gets **20 attempts** instead
+  of the prior count-only default of **3** — a silent behavior change to the count-only path that the
+  design never acknowledges. State whether count-only mode with defaults should yield 20 attempts
+  (the raised default, consistent with the new nominal value) or preserve a smaller count-only
+  default, so operators relying on count-only defaults are not surprised.
