@@ -95,9 +95,13 @@ safety cap (not the default limiter).
    failure-reason), so the loop can tell "finalize now (no sleep)" apart from
    "sleep the truncated remainder, record/emit it, then finalize". It decides:
    - `:non-retryable` / `:retry-disabled` → stop (unchanged, immediate);
-   - count cap reached (`retry-attempt >= max-retries`) →
+   - count cap reached (`retry-attempt >= max-retries`) —
      `{:failure-reason :retry-exhausted :exhausted-reason :count-cap}` —
-     finalize now, no sleep;
+     finalize now, no sleep. The count-cap branch is gated as in Approach 4: it
+     fires only when the operator has explicitly configured
+     `:auto-retry-max-retries`, or when the total-time budget is disabled; with
+     the budget active and no explicit override, the count-cap does not gate
+     (see Approach 4).
    - deadline reached (`now >= deadline`) →
      `{:failure-reason :retry-exhausted :exhausted-reason :deadline}` —
      finalize now, no sleep;
@@ -124,6 +128,33 @@ safety cap (not the default limiter).
    outcome is what distinguishes "finalize now (no sleep)" (absent) from "sleep
    remainder, record truncated delay, then finalize" (present).
 
+   **Event/state semantics of the truncated final.** Reusing the non-final path
+   for the truncated final is intended: the truncated delay is genuinely slept
+   (the remaining window), so `provider_retry_scheduled` / progress
+   `:retry-updated` reporting the truncated `:delay-ms`/`:resume-at` is accurate —
+   the retry is scheduled to resume at the deadline, at which point the window is
+   exhausted. The authoritative terminal signal is the subsequent
+   `provider_request_finished` (`:final? true`, `:failure-reason :retry-exhausted`,
+   `:exhausted-reason :deadline`), which consumers must treat as superseding the
+   interim "scheduled" signal; a consumer should not assert a retry resumes from a
+   `provider_retry_scheduled` whose session later emits a `:retry-exhausted`
+   final. The transient canonical bump (`:retry-attempt` → `next-attempt`,
+   `:retry :active? true`) is exactly the existing per-attempt lifecycle and is
+   cleared by the final-path `clear-active-retry!` immediately after the sleep,
+   before the turn's outcome is produced.
+
+   **Truncated final under test mode (`:provider-retry-sleep? false`).** The
+   truncated final sleep routes through the same sleep seam as any retry sleep
+   (`sleep-for-retry!`), so under `:provider-retry-sleep? false` it is a no-op
+   (no real wait, as in existing retry tests). The truncated delay is **still
+   recorded and emitted** (`mark-active-retry!` + `provider_retry_scheduled` with
+   the truncated `:delay-ms`/`:resume-at`) even when sleeping is disabled, so
+   deadline-window tests observe the truncation deterministically without real
+   sleeps. On finalize, `clear-active-retry!` **still runs unconditionally**: the
+   final-path clear is independent of the `:provider-retry-sleep?` skip that
+   applies only to the inter-attempt per-sleep clear (core.clj:642-643), so no
+   stale `:retry`/`:retry-attempt`/`:retry-deadline-ms` leaks in test mode.
+
    **Cancellation during the truncated final sleep.** The truncated final sleep
    uses the same interruptible seam as any other retry sleep
    (`interruptible-sleep-for-retry!` / `:provider-retry-sleep-fn`,
@@ -146,6 +177,15 @@ safety cap (not the default limiter).
    `:failure-reason :retry-exhausted` is present. Telemetry and UI can therefore
    tell whether the window was bounded by time or by an explicit count cap.
 
+   **Precedence when both boundaries hold.** The give-up predicate's ordered
+   branches evaluate the count cap before the deadline (mirroring the existing
+   `failure-reason-for` order: non-retryable → retry-disabled → count-cap →
+   deadline). When a single failed attempt reaches both the count cap
+   (`retry-attempt >= max-retries`) and the deadline (`now >= deadline`), the
+   count-cap branch wins and `:exhausted-reason :count-cap` is reported. This is
+   deterministic and is what a consumer observes on the retry-outcome /
+   `provider_request_finished` event.
+
    The per-attempt backoff still comes from `exponential-backoff-ms` (2 s, 4 s,
    8 s, 16 s, 32 s, then capped at `:auto-retry-max-delay-ms` 60 s) or from
    `Retry-After` when present; the deadline only bounds the total window and
@@ -162,14 +202,36 @@ safety cap (not the default limiter).
    runtime-handles state boundary (`doc/architecture.md`); the
    `agent-session-schema` gains the deadline field.
 
+   **Threading the deadline across inter-attempt cleanup.** `clear-active-retry!`
+   fires after *every* non-final retry sleep, not only at window close
+   (turn-runtime/core.clj inter-attempt call at line ~643, inside
+   `(when-not (= false (:provider-retry-sleep? ctx)) ...)`; final-path calls at
+   ~571 success and ~611 give-up). The retry loop already carries `:retry-attempt`
+   through its `recur` binding precisely because this mid-window clear resets
+   canonical `:retry-attempt` to 0 each iteration — the deadline must survive the
+   same inter-attempt cleanup, or the window-open detection would open a **fresh
+   10-minute window on every attempt**, defeating the single-window budget. The
+   deadline is therefore **threaded through the loop binding alongside
+   `:retry-attempt`**: seeded once at loop entry from the canonical
+   `:retry-deadline-ms` (`retry-deadline-for`, mirroring `retry-attempt-for`),
+   computed on the window-opening failure, and carried across attempts via
+   `recur`. The loop-bound value is the authoritative in-window deadline, so it
+   cannot be recomputed or lost by the per-sleep `clear-active-retry!`. The
+   canonical `:retry-deadline-ms` is still written once at window open (via the
+   `mark-active-retry!` session-update) so a read-back at loop entry / re-entry
+   sees it, but it is cleared **only on true window close** (see Clearing), not by
+   the inter-attempt cleanup.
+
    **Window-open detection.** The give-up predicate's deadline input is ensured
-   once per window, before the predicate runs: if `:retry-deadline-ms` is absent
-   from session state at a retryable, retry-enabled failure, that failure is the
-   window-opening one — compute `deadline = now + :auto-retry-total-timeout-ms`
-   (when the budget is active; see Approach 1 disable semantics); otherwise reuse
-   the stored value. Because the window is keyed solely on deadline presence, a
-   later turn starts a fresh window only after the previous window's deadline was
-   cleared (below).
+   once per window, before the predicate runs: the loop-bound deadline is `nil`
+   at the first retryable, retry-enabled failure (seeded from a canonical
+   `:retry-deadline-ms` that is absent until a window opens), so that failure is
+   the window-opening one — compute `deadline = now + :auto-retry-total-timeout-ms`
+   (when the budget is active; see Approach 1 disable semantics) and thread it
+   through the loop binding; otherwise reuse the threaded value. Because the
+   window is keyed solely on the presence of the loop-bound deadline, a later
+   turn starts a fresh window only after the previous window's canonical deadline
+   was cleared on close (below).
 
    **Persistence at window open.** The deadline is computed **in memory** (using
    the injected clock) for the give-up predicate on every window-opening failure,
@@ -196,9 +258,16 @@ safety cap (not the default limiter).
 
    **Clearing.** `clear-active-retry!` (and the `retry-clear-needed?` guard that
    decides whether to run it) currently clears `:retry-attempt`, `:retry`, and
-   `:provider-retry-abort-requested?` on success/give-up/cancel; add
-   `:retry-deadline-ms` to both so the window-scoped deadline is cleared with the
-   rest of the retry state and a stale deadline cannot leak into a later turn's
+   `:provider-retry-abort-requested?`. The window-scoped deadline must be cleared
+   **only on true window close** — the success clear (core.clj ~571), the
+   final-give-up clear (~611), and the cancellation path (a cancelled retry ends
+   the turn) — and must be **preserved by the inter-attempt (per-sleep) clear**
+   (core.clj ~643), otherwise the first sleep would wipe it and the next failure
+   would open a fresh window. To express this, `clear-active-retry!` /
+   `retry-clear-needed?` gain a window-scoped distinction (e.g. a
+   `:clear-deadline?` parameter, or a separate final-clear step): the per-sleep
+   call preserves `:retry-deadline-ms` while the success / final-give-up / cancel
+   calls clear it. A stale deadline is thereby never leaked into a later turn's
    first retry. Read-back at loop entry uses the same helper pattern as
    `retry-attempt-for` (e.g. a `retry-deadline-for`).
 
@@ -233,14 +302,27 @@ safety cap (not the default limiter).
    injected clock (falling back to `System/currentTimeMillis`), and the existing
    interruptible sleep stays the wall-clock wait between attempts.
 
-4. **Count remains a hard cap**: keep `:auto-retry-max-retries` as an explicit
-   upper bound on attempt count for callers who want a strict count limit, but it
-   must no longer be the *default* give-up point. **Pin the default**: raise
-   `:auto-retry-max-retries` from `3` to `20`, a value never reached within the
-   default 10-minute window (default backoff reaches ~14 attempts in 10 minutes),
-   so the total-time budget is the effective default limiter while operators can
-   still set a strict count cap. Behaviour-preserving for any explicit small
-   value.
+4. **Count remains an operator-set hard cap, not a default give-up source.** Keep
+   `:auto-retry-max-retries` as an explicit upper bound on attempt count for
+   callers who want a strict count limit, but it must no longer be the *default*
+   give-up point. **The total-time budget is the effective default limiter for ALL
+   per-attempt delays** — including provider-supplied `Retry-After` delays, which
+   fully override the exponential backoff and are not bounded by
+   `:auto-retry-max-delay-ms`. A fast `Retry-After` (e.g. 1 s) would otherwise let
+   the attempt count reach a fixed default cap (say 20) at ~20 s — well inside the
+   10-minute window — giving up with `:exhausted-reason :count-cap` instead of at
+   the deadline, contradicting Goal/AC1 ("up to 10 minutes") regardless of
+   provider delay. Consequently the count-cap branch fires only when the operator
+   has **explicitly configured** `:auto-retry-max-retries` (a strict,
+   behaviour-preserving hard cap for explicit small values) or when the total-time
+   budget is disabled (count-only mode); with the budget active and no explicit
+   override, the count-cap does not gate and the deadline alone bounds the window.
+   The declared default value of `:auto-retry-max-retries` is raised from `3` to
+   `20` as a nominal safety value, but it is **non-limiting while the total-time
+   budget is active** — the earlier "never reached within the default window"
+   rationale holds only for the exponential schedule and is superseded by the
+   explicit-cap semantics above. This makes Goal/AC1 ("retries for up to a total
+   of 10 minutes") hold regardless of the per-attempt delay source.
 
 5. **`Retry-After` interaction**: when a `Retry-After` header supplies a
    per-attempt delay, respect it as today. Because `retry-metadata-for` runs
@@ -289,8 +371,10 @@ safety cap (not the default limiter).
   or `<= 0` disables the time budget so a strict count-only mode is expressible.
 - The deadline field `:retry-deadline-ms` is a top-level session field (sibling
   of `:retry-attempt`) in `agent-session-schema`, cleared by
-  `clear-active-retry!` / `retry-clear-needed?` with the rest of the retry state
-  so a stale deadline never leaks across turns.
+  `clear-active-retry!` / `retry-clear-needed?` on true window close (success /
+  final give-up / cancel) while being preserved by the inter-attempt (per-sleep)
+  clear, so a stale deadline never leaks across turns and the window is not
+  reset mid-window.
 - Under truncation the canonical `:retry` metadata and the
   `provider_retry_scheduled` event record the delay actually slept
   (`min(full-next-delay, deadline - now)` with `:resume-at` recomputed), so the

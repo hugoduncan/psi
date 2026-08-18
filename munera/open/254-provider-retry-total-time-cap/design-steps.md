@@ -189,7 +189,7 @@
 
 ## Architecture review 2026-08-18 (current session, first turn)
 
-- [ ] **Reconcile the window-scoped deadline with the inter-attempt `clear-active-retry!`.**
+- [x] **Reconcile the window-scoped deadline with the inter-attempt `clear-active-retry!`.**
   `clear-active-retry!` runs after **every** non-final retry sleep, not only at window
   close (turn-runtime/core.clj non-final path: `(when-not (= false (:provider-retry-sleep? ctx))
   (clear-active-retry! ...))`, line ~643; final-path calls at ~571 and ~611). The design's
@@ -207,7 +207,7 @@
 
 ## Ambiguity review 2026-08-18 (current session, second turn)
 
-- [ ] **Specify the event/state semantics of routing the truncated final sleep through the
+- [x] **Specify the event/state semantics of routing the truncated final sleep through the
   non-final retry path.** Approach 2's final-sleep outcome routes the loop through the retry
   path "exactly once so the truncated delay is recorded and emitted": `mark-active-retry!` +
   `provider_retry_scheduled` run with the truncated `:delay-ms`/`:resume-at`, then the loop
@@ -223,7 +223,7 @@
   truncated final wait should be surfaced distinctly (e.g. the `:exhausted-reason :deadline` /
   final status taking precedence over the "scheduled" signal), so `provider_retry_scheduled` is
   not asserted for a retry that never resumes.
-- [ ] **Pin the truncated final sleep's behaviour under `:provider-retry-sleep? false` (test
+- [x] **Pin the truncated final sleep's behaviour under `:provider-retry-sleep? false` (test
   mode).** The current non-final path clears retry state after a sleep only when sleeping is not
   disabled: `(when-not (= false (:provider-retry-sleep? ctx)) (clear-active-retry! ...))`
   (turn-runtime/core.clj:642-643), and tests use this flag to skip real sleeps. Approach 2's
@@ -233,7 +233,7 @@
   `provider_retry_scheduled`) and whether `clear-active-retry!` still runs on finalize despite
   the existing test-mode skip — so deadline-window tests drive deterministically without real
   sleeps and without leaking stale retry state.
-- [ ] **State `:exhausted-reason` precedence when count-cap and deadline fire on the same
+- [x] **State `:exhausted-reason` precedence when count-cap and deadline fire on the same
   attempt.** The give-up predicate's ordered branches report `:count-cap` when
   `retry-attempt >= max-retries` and `:deadline` when `now >= deadline`. With an operator-set
   small `:auto-retry-max-retries` (count cap reached) and an elapsed window (deadline reached),
@@ -244,7 +244,7 @@
 
 ## Inconsistency review 2026-08-18 (current session, third turn)
 
-- [ ] **Reconcile the default count-cap rationale with `Retry-After` overriding the backoff.**
+- [x] **Reconcile the default count-cap rationale with `Retry-After` overriding the backoff.**
   Approach 4 raises `:auto-retry-max-retries` from 3 to 20 because "default backoff reaches ~14
   attempts in 10 minutes" — a value "never reached within the default 10-minute window". That
   rationale assumes the exponential schedule (2,4,8,16,32, then 60 s). But `retry-metadata`
