@@ -93,12 +93,11 @@
   (let [base-ms              (get-in ctx [:config :auto-retry-base-delay-ms] 2000)
         max-ms               (get-in ctx [:config :auto-retry-max-delay-ms] 60000)
         exponential-delay-ms (session-model/exponential-backoff-ms retry-attempt base-ms max-ms)
-        now-fn               (or (:now-fn ctx) #(java.time.Instant/now))
-        now-ms               (.toEpochMilli ^java.time.Instant (now-fn))]
+        now                  (now-ms ctx)]
     (session-model/retry-metadata (:provider-error/headers assistant-message)
                                   retry-attempt
                                   exponential-delay-ms
-                                  now-ms)))
+                                  now)))
 
 (defn emit-retry-updated-progress!
   [progress-queue session-id]

@@ -86,7 +86,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation re-review)
 
-- [ ] `execute-prepared-request!` (turn-runtime/core.clj): the truncated-final-sleep
+- [x] `execute-prepared-request!` (turn-runtime/core.clj): the truncated-final-sleep
       branch (~:505-575) duplicates the retry branch's (~:590-660) scheduling and
       cancel blocks — `provider_retry_scheduled` dispatch, `mark-active-retry!`,
       `sleep-for-retry!`, and the cancelled-path block (`cancelled-retry-outcome` +
@@ -96,7 +96,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       parameterized by the meta map (truncated vs full), whether the per-sleep
       preserve clear runs, and the post-sleep continuation (finalize `:deadline` vs
       `recur`).
-- [ ] `retry-metadata-for` (turn-runtime/retry.clj) re-implements the `now-ms`
+- [x] `retry-metadata-for` (turn-runtime/retry.clj) re-implements the `now-ms`
       helper inline (`now-fn`/`.toEpochMilli` local, a few lines below the same
       namespace's `now-ms` defn): call `(now-ms ctx)` instead (rename the local
       binding so it does not shadow the fn) so the extracted namespace has a single

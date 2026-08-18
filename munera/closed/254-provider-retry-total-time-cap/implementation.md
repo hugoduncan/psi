@@ -136,3 +136,27 @@
     `psi.turn-runtime.response-mode-test` (18) all green; clj-kondo clean on retry.clj + model_test.clj.
     No change to the give-up predicate, deadline lifecycle, or cancellation mechanics.
 - implementation re-review 2026-08-18: added 2 steps to be addressed.
+- implementation-review-followup 2026-08-18 (2/2 steps done): addressed the 2
+  implementation re-review steps.
+  - **Shared retry scheduling/cancel helpers (core.clj).** Extracted two private
+    defns before `execute-prepared-request!`: `schedule-and-sleep!` (dispatch
+    `provider_retry_scheduled` + `mark-active-retry!` + optional per-sleep
+    preserve-clear + `sleep-for-retry!`, returns cancelled?) and
+    `cancelled-retry-path!` (cancelled-retry-outcome + unconditional
+    `clear-active-retry!` `:clear-deadline? true` + `provider_request_cancelled`
+    + execution-result). Both the truncated-final-sleep branch and the full-delay
+    retry branch now call them; the final-sleep branch passes `preserve-clear?`
+    false (no inter-attempt clear) and keeps its inline authoritative
+    `provider_request_finished` (`:deadline`) finalize, the retry branch passes
+    true and `recur`s. ~40 duplicated lines removed; behavior identical (same
+    event payloads, clear ordering, sleep seam, cancel precedence).
+  - **Single clock-read path (retry.clj).** `retry-metadata-for` now calls the
+    namespace's `(now-ms ctx)` (local renamed `now-ms` → `now`) instead of
+    re-implementing `now-fn`/`.toEpochMilli` inline.
+  - **Validation.** `psi.turn-runtime.response-mode-retry-test` (14),
+    `psi.turn-runtime.response-mode-test` (18), `psi.session-state.model-test`
+    (12), `psi.agent-session.eql-provider-retry-test` (3),
+    `psi.agent-session.prompt-lifecycle-test` (23),
+    `psi.agent-session.statechart-actions-test` (8),
+    `psi.turn-runtime.core-test` (16), `psi.agent-session.config-compaction-test`
+    (8) all green; clj-kondo clean on core.clj + retry.clj.
