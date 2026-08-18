@@ -233,6 +233,25 @@ safety cap (not the default limiter).
    turn starts a fresh window only after the previous window's canonical deadline
    was cleared on close (below).
 
+   **Stale persisted deadline at loop entry.** The loop-entry seed
+   (`retry-deadline-for`, mirroring `retry-attempt-for`) treats a persisted
+   `:retry-deadline-ms` that is already **in the past** (`deadline < now`, using
+   the same injected `:now-fn` the deadline computation uses) as stale: it clears
+   the canonical field and yields `nil`, so the first retryable, retry-enabled
+   failure of that turn opens a **fresh** window instead of inheriting the expired
+   one. This covers the turn-end / rehydration paths that lie **outside** the
+   three terminal clears (success / final-give-up / cancel) and could otherwise
+   leave a present-but-expired deadline in canonical session state: an external
+   abort of an in-flight request (which the budget deliberately does not cut off,
+   so the retry-loop cancel path never runs) and a session persisted mid-window
+   and rehydrated after the deadline has passed (process death / close). No
+   additional explicit clears are added at those turn-end points — the loop-entry
+   stale check runs before the window-opening detection, so an expired value can
+   never strand a later turn's first retryable failure with zero actual retries
+   (an immediate `:retry-exhausted :deadline`). A deadline that is still in the
+   future at loop entry remains authoritative: the in-window deadline is reused,
+   so a mid-window re-entry continues the same budget rather than restarting it.
+
    **Persistence at window open.** The deadline is computed **in memory** (using
    the injected clock) for the give-up predicate on every window-opening failure,
    but it is persisted to canonical session state only when the retry path
@@ -309,10 +328,15 @@ safety cap (not the default limiter).
    per-attempt delays** — including provider-supplied `Retry-After` delays, which
    fully override the exponential backoff and are not bounded by
    `:auto-retry-max-delay-ms`. A fast `Retry-After` (e.g. 1 s) would otherwise let
-   the attempt count reach a fixed default cap at ~20 s — well inside the
+   the attempt count reach a fixed default count cap in seconds — well inside the
    10-minute window — giving up with `:exhausted-reason :count-cap` instead of at
    the deadline, contradicting Goal/AC1 ("up to 10 minutes") regardless of
-   provider delay. Consequently the count-cap branch fires only when the operator
+   provider delay. Under the sentinel-`nil` default there is **no fixed default
+   count cap** in the budget-active path (the counterfactual fixed caps would be
+   the old default 3, reached at ~3 s under a 1 s `Retry-After`, or the dropped
+   raise-to-20, reached at ~20 s), so the count-cap can never prematurely fire;
+   the explicit-only gating below is what keeps Goal/AC1's "up to 10 minutes" true
+   for any per-attempt delay source. Consequently the count-cap branch fires only when the operator
    has **explicitly configured** `:auto-retry-max-retries` (a strict,
    behaviour-preserving hard cap for explicit small values) or when the total-time
    budget is disabled (count-only mode); with the budget active and no explicit

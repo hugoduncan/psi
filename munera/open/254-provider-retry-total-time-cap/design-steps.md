@@ -300,7 +300,7 @@
 
 ## Ambiguity review 2026-08-18 (second turn, current design state)
 
-- [ ] **Pin the loop-entry behavior for a persisted `:retry-deadline-ms` that is already in the past.**
+- [x] **Pin the loop-entry behavior for a persisted `:retry-deadline-ms` that is already in the past.**
   The Clearing section clears the deadline only on the three retry-loop terminal paths — success,
   final-give-up, cancel — and the Window-open detection keys the fresh-window decision solely on
   the **presence** of the loop-bound deadline ("a later turn starts a fresh window only after the
@@ -321,7 +321,7 @@
 
 ## Inconsistency review 2026-08-18 (third turn, current design state)
 
-- [ ] **Reconcile Approach 4's "fixed default cap at ~20 s" rationale with the sentinel-`nil` default.**
+- [x] **Reconcile Approach 4's "fixed default cap at ~20 s" rationale with the sentinel-`nil` default.**
   Approach 4 motivates the explicit-only count-cap gating with: "A fast `Retry-After` (e.g. 1 s)
   would otherwise let the attempt count reach a **fixed default cap at ~20 s** ... giving up with
   `:exhausted-reason :count-cap` instead of at the deadline". That illustration is a vestige of the
