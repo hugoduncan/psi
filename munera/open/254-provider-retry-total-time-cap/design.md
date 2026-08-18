@@ -124,6 +124,9 @@ safety cap (not the default limiter).
 - Origin: user-reported friction — Anthropic overloaded 529 responses retried at
   2 s/4 s/8 s give up too early for a transiently overloaded provider.
 - Design-only: plan.md / steps.md to be written before execution.
-- Consider whether the 10-minute default is uniform across providers or should be
-  overridable per provider/model; defer to plan. The default of 10 minutes is the
-  user's requested behaviour.
+- **Decision (user):** the default 10-minute total-time budget is
+  provider/model **independent** — a single uniform default
+  (`:auto-retry-total-timeout-ms` = 600000) applies to every provider and model
+  unless an operator explicitly overrides the session/config key. No per-provider
+  or per-model retry-window table is introduced; the design should not add
+  provider/model-specific retry-timeout configuration.
