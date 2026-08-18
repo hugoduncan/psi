@@ -4,7 +4,6 @@
 
 Not yet started:
 
-- `munera/open/254-provider-retry-total-time-cap/` — bound provider auto-retry by total elapsed time (default 10 min) instead of attempt count, so Anthropic 529 overloaded keeps retrying past ~14 s. Design-only.
 - `munera/open/249-workflow-resume-validation-error/` — clarify or improve workflow resume behavior when a run is `:running` rather than blocked. Design-only; auto-generated and pending human review.
 - `munera/open/202-document-at-bounds-in-scheduler-doc/` — (from master) document the resolved-millisecond-delay absolute `:at` bounds in `doc/scheduler.md`. NNN collides with closed `202-reusable-review-follow-up-step` (left as-is per convention).
 - `munera/open/206-emacs-buffer-local-widget-mutation-timers/` — move Emacs widget-projection mutation watchdog timers from a module-global hash into buffer-local `psi-emacs-state` and cancel them in `psi-emacs--teardown-buffer`, fixing orphaned/non-deterministic/cross-buffer timers when a psi buffer is killed mid-mutation. Design-only.
