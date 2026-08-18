@@ -394,22 +394,24 @@ safety cap (not the default limiter).
    3)`); with the budget active the count-only fallback is never consulted.
 
    **Reported `:max-retries` under the sentinel default.** The `:max-retries`
-   field surfaced on the retry-outcome map, the `provider_request_finished`
-   event, the cancelled retry-outcome, and the `provider_request_cancelled`
-   event reports the **effective count limiter** the window is actually bound by
-   (or `nil` when the count cap does not gate), resolved by the same non-coercing
-   predicate resolution the count-cap branch uses (never `(long nil)` — the
-   sentinel `nil` is never coerced to a long). Concretely: an explicitly
-   configured non-`nil` `:auto-retry-max-retries` reports that value (the actual
-   hard cap); budget-disabled count-only mode with no explicit cap reports the
-   count-only fallback `3` (the actual sole limiter, preserving what a count-only
-   consumer sees today); budget-active default (effective cap `nil`) reports
-   `nil`, because the deadline alone bounds the window and there is no count
-   limiter to report. This is deterministic per mode and flows from the single
-   predicate resolution, so all four surfaces agree; the only consumer-visible
-   change is the acknowledged budget-active-default `3` → `nil` (an accurate
-   reflection that the default path no longer has a count limiter, not a silent
-   telemetry change).
+   field surfaced on the retry-outcome map (`:execution-result/retry-outcome`)
+   and the cancelled retry-outcome map reports the **effective count limiter**
+   the window is actually bound by (or `nil` when the count cap does not gate),
+   resolved by the same non-coercing predicate resolution the count-cap branch
+   uses (never `(long nil)` — the sentinel `nil` is never coerced to a long).
+   Concretely: an explicitly configured non-`nil` `:auto-retry-max-retries`
+   reports that value (the actual hard cap); budget-disabled count-only mode
+   with no explicit cap reports the count-only fallback `3` (the actual sole
+   limiter, preserving what a count-only consumer sees today); budget-active
+   default (effective cap `nil`) reports `nil`, because the deadline alone
+   bounds the window and there is no count limiter to report. This is
+   deterministic per mode and flows from the single predicate resolution, so
+   both outcome surfaces agree. (Note: `:max-retries` is carried only on these
+   two outcome maps — the `provider_request_finished` /
+   `provider_request_cancelled` events do not carry it today and gain nothing
+   for this change.) The only consumer-visible change is the acknowledged
+   budget-active-default `3` → `nil` (an accurate reflection that the default
+   path no longer has a count limiter, not a silent telemetry change).
 
 5. **`Retry-After` interaction**: when a `Retry-After` header supplies a
    per-attempt delay, respect it as today. Because `retry-metadata-for` runs
