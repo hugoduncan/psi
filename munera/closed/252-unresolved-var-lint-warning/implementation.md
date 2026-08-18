@@ -862,3 +862,31 @@ Additional non-task paths (beyond the slice list above): `.gitignore` line 3 (`*
   `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean,
   `bb commit-check:file-lengths` exit 0
 - implementation review 2026-08-16: added 2 steps to be addressed
+
+## Closure — scope reduction (2026-08-18)
+
+Per decision, the regression-test guard suite was **removed**:
+`components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+`lint_config_test_support.clj`, and `lint_config_integration_test.clj` were
+deleted, and tests.edn's `:capture-output?` was restored to `true` (the slice-15
+`false` flip existed solely for the removed suite's SKIP-line visibility).
+
+The guard suite had grown to ~1,980 lines across 47+ review slices guarding a
+2-line lint-config fix — recursive over-engineering that never converged. The
+review loop reviewed the guards' guards (ERROR-vs-FAIL taxonomy, jar-export
+file-set enumeration, exec-format start-failure sub-classing) rather than the
+fix, violating `small` / `simple(x) > complex(x)`.
+
+**Retained (the actual fix):**
+- `.clj-kondo/imports/http-kit/http-kit/config.edn` — `:lint-as {org.httpkit.client/defreq clojure.core/def}` resolving the two unresolved-var warnings.
+- `.gitignore` negation tracking the http-kit import dir.
+- `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj` (pre-existing server hook).
+
+**Verification at closure:** `bb lint` → `errors: 0, warnings: 0` (both dev-http
+warnings resolved, no new warnings); unit suite 2684 passed with only the
+pre-existing environmental `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+failure (unknown model deepseek/deepseek-v4-flash, unrelated); integration suite
+30 passed / 151 assertions, 0 failed.
+
+**Stopped:** no further implementation-review passes on this task — the review
+loop demonstrably does not converge.

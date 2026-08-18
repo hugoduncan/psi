@@ -2771,3 +2771,20 @@ Treat this file as the active surface; tick items as they complete, noting shas/
       assertions unchanged, integration 34/189 no SKIP (both proofs ran),
       `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
       `bb commit-check:file-lengths` exit 0
+
+## Slice 48 — Closure (2026-08-18)
+
+- [x] Remove the regression-test guard suite (scope decision): deleted
+      `lint_config_test.clj`, `lint_config_test_support.clj`,
+      `lint_config_integration_test.clj` — the ~1,980-line suite guarding a
+      2-line fix had grown to 47+ review slices of recursive over-engineering
+      that never converged.
+- [x] Restore tests.edn `:capture-output? true` (the slice-15 `false` flip was
+      guard-suite-only; original value was `true`).
+- [x] Retain the actual fix: import config.edn `:lint-as`, `.gitignore`
+      negation, with_channel.clj hook.
+- [x] Verify: `bb lint` errors 0 / warnings 0 (both dev-http warnings resolved);
+      unit suite passes (only the pre-existing environmental
+      `workflow_delegate_review_step_live_test` model failure remains, unrelated);
+      integration suite 30 passed / 151 assertions, 0 failed.
+- [x] Close task.
