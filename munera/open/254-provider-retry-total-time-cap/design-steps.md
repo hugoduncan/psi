@@ -204,3 +204,40 @@
   `:retry-deadline-ms` only on true final close / turn end), or split a window-scoped clear out of
   the per-sleep cleanup. The design must state how the deadline is not recomputed at each attempt
   given `clear-active-retry!` fires mid-window.
+
+## Ambiguity review 2026-08-18 (current session, second turn)
+
+- [ ] **Specify the event/state semantics of routing the truncated final sleep through the
+  non-final retry path.** Approach 2's final-sleep outcome routes the loop through the retry
+  path "exactly once so the truncated delay is recorded and emitted": `mark-active-retry!` +
+  `provider_retry_scheduled` run with the truncated `:delay-ms`/`:resume-at`, then the loop
+  finalizes `:retry-exhausted :deadline` (clear + execution-result) instead of recursing. Today
+  `mark-active-retry!` + `provider_retry_scheduled` run only on the non-final path where a real
+  retry will be attempted (turn-runtime/core.clj:633-641). Reusing them for a final means a
+  consumer of `provider_retry_scheduled` / progress `:retry-updated` (UI, telemetry) sees
+  "retry scheduled / active retry, resuming at :resume-at" when in fact the window is exhausted
+  and the turn is about to fail with `:retry-exhausted`. It also transiently sets canonical
+  `:retry-attempt` to `next-attempt` (one more than actually attempted) and `:retry :active? true`
+  during the final sleep, before clear resets them. State whether reusing the non-final
+  emit/mark for the truncated final is intended (and what a consumer should read), or whether the
+  truncated final wait should be surfaced distinctly (e.g. the `:exhausted-reason :deadline` /
+  final status taking precedence over the "scheduled" signal), so `provider_retry_scheduled` is
+  not asserted for a retry that never resumes.
+- [ ] **Pin the truncated final sleep's behaviour under `:provider-retry-sleep? false` (test
+  mode).** The current non-final path clears retry state after a sleep only when sleeping is not
+  disabled: `(when-not (= false (:provider-retry-sleep? ctx)) (clear-active-retry! ...))`
+  (turn-runtime/core.clj:642-643), and tests use this flag to skip real sleeps. Approach 2's
+  final-sleep outcome "sleeps the truncated remainder ... then finalize[s] with
+  `:retry-exhausted :deadline` (clear + execution-result)". With the sleep seam disabled, specify
+  whether the truncated delay is still recorded/emitted (`mark-active-retry!` +
+  `provider_retry_scheduled`) and whether `clear-active-retry!` still runs on finalize despite
+  the existing test-mode skip — so deadline-window tests drive deterministically without real
+  sleeps and without leaking stale retry state.
+- [ ] **State `:exhausted-reason` precedence when count-cap and deadline fire on the same
+  attempt.** The give-up predicate's ordered branches report `:count-cap` when
+  `retry-attempt >= max-retries` and `:deadline` when `now >= deadline`. With an operator-set
+  small `:auto-retry-max-retries` (count cap reached) and an elapsed window (deadline reached),
+  both conditions can hold at one failed attempt. The design does not state which
+  `:exhausted-reason` is reported when both are true (branch order implies `:count-cap` wins).
+  Pin the precedence so `:exhausted-reason` reporting on the retry-outcome /
+  `provider_request_finished` event is deterministic.
