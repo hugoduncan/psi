@@ -290,6 +290,25 @@ safety cap (not the default limiter).
    first retry. Read-back at loop entry uses the same helper pattern as
    `retry-attempt-for` (e.g. a `retry-deadline-for`).
 
+   **Cancellation path owns an unconditional clear.** The code's cancel branch
+   (`turn-runtime/core.clj` `(if cancelled? ...)` after the per-sleep clear)
+   today has **no independent `clear-active-retry!`** — it relies on the
+   inter-attempt per-sleep clear that runs just before it, which the design
+   re-purposes to **preserve** the deadline (`:clear-deadline? false`) and which
+   is **skipped entirely** under `:provider-retry-sleep? false` (the
+   `(when-not (= false (:provider-retry-sleep? ctx)) ...)` guard). Because a
+   cancelled retry ends the turn, the cancel branch must therefore gain its
+   **own unconditional `clear-active-retry!` call with `:clear-deadline? true`**,
+   placed inside the `if cancelled?` branch (after the per-sleep call, not a
+   modification of it), so the deadline — and, under test mode, `:retry` /
+   `:retry-attempt` as well — is cleared on cancel regardless of
+   `:provider-retry-sleep?` and the per-sleep preserve. This mirrors the
+   truncated-final finalize clear, which is likewise unconditional and
+   independent of the sleep-skip. With this call in place, the cancellation path
+   clears `:retry-deadline-ms` on true window close exactly like the success and
+   final-give-up clears, so the "stale deadline never leaked" guarantee holds for
+   the cancel path in both normal and test modes.
+
    **Recorded/emitted delay under truncation.** The canonical `:retry` metadata
    `:delay-ms`/`:resume-at` written by `mark-active-retry!`, and the
    `provider_retry_scheduled` event `:delay-ms`/`:resume-at`, reflect the delay
@@ -373,6 +392,24 @@ safety cap (not the default limiter).
    give-up they do today. The fallback is applied only in the budget-disabled,
    cap-unset case (e.g. the predicate resolves `(or explicit-cap count-only-default
    3)`); with the budget active the count-only fallback is never consulted.
+
+   **Reported `:max-retries` under the sentinel default.** The `:max-retries`
+   field surfaced on the retry-outcome map, the `provider_request_finished`
+   event, the cancelled retry-outcome, and the `provider_request_cancelled`
+   event reports the **effective count limiter** the window is actually bound by
+   (or `nil` when the count cap does not gate), resolved by the same non-coercing
+   predicate resolution the count-cap branch uses (never `(long nil)` — the
+   sentinel `nil` is never coerced to a long). Concretely: an explicitly
+   configured non-`nil` `:auto-retry-max-retries` reports that value (the actual
+   hard cap); budget-disabled count-only mode with no explicit cap reports the
+   count-only fallback `3` (the actual sole limiter, preserving what a count-only
+   consumer sees today); budget-active default (effective cap `nil`) reports
+   `nil`, because the deadline alone bounds the window and there is no count
+   limiter to report. This is deterministic per mode and flows from the single
+   predicate resolution, so all four surfaces agree; the only consumer-visible
+   change is the acknowledged budget-active-default `3` → `nil` (an accurate
+   reflection that the default path no longer has a count limiter, not a silent
+   telemetry change).
 
 5. **`Retry-After` interaction**: when a `Retry-After` header supplies a
    per-attempt delay, respect it as today. Because `retry-metadata-for` runs
