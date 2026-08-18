@@ -418,7 +418,11 @@ safety cap (not the default limiter).
    before the give-up predicate, the predicate sees the actual `Retry-After`
    delay; an oversized `Retry-After` whose delay would push past the deadline is
    truncated to the remaining window and the retry ends with `:retry-exhausted`
-   at the deadline. A `Retry-After` delay is provider-supplied and not
+   at the deadline. A **non-positive integer `Retry-After`** (0 or negative) has
+   no positive floor and is floored to the exponential backoff (the same `pos?`
+   guard the RFC-date branch already applies for ≤ 0), so the budget-active
+   default never retries back-to-back with an immediate 0-delay until the
+   deadline. A `Retry-After` delay is provider-supplied and not
    config-shrinkable, so the total-time-with-`Retry-After` acceptance case drives
    the wait through the existing `:provider-retry-sleep-fn` injectable seam
    (already used by current retry tests in `response_mode_test.clj`), combined

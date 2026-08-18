@@ -44,14 +44,20 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 - [x] New: explicit small cap hard-caps (`:exhausted-reason :count-cap`).
 - [x] New: budget-disabled count-only fallback 3.
 - [x] New: `Retry-After` respected + deadline-bounded (oversized truncated).
+- [x] New: non-positive integer `Retry-After` (0/negative) floors to exponential
+      backoff under the budget-active default (no back-to-back 0-delay retries) —
+      model-level (`retry-after-delay-ms`/`retry-metadata`) + turn-runtime.
 - [x] New: cancellation interrupts backoff; no stale `:retry-deadline-ms` leak.
+- [x] New: cancellation during the truncated final sleep (overshoot path) →
+      `:retry-cancelled`, truncated `provider_retry_scheduled` then
+      `provider_request_cancelled`, no stale `:retry-deadline-ms` (plan test 6).
 - [x] New: stale past deadline at loop entry opens fresh window.
 - [x] New: inter-attempt clear preserves deadline; window close clears it.
 - [x] session-state model test: `valid-session?` accepts `:retry-deadline-ms`.
 
 ## Validation
 
-- [x] `bb test --focus psi.turn-runtime.response-mode-retry-test` green (12 tests).
+- [x] `bb test --focus psi.turn-runtime.response-mode-retry-test` green (14 tests).
 - [x] `bb test --focus psi.turn-runtime.response-mode-test` green (18 tests).
 - [x] `bb test --focus psi.session-state.model-test` green.
 - [x] Broader `bb test` retry/session-state/agent-session subset green.

@@ -102,9 +102,15 @@ count-cap + deadline + overshoot into one decision (no separate loop-body deadli
   4. Budget disabled (`nil`/`<= 0` total-timeout) + no explicit cap → count-only fallback 3
      (`:max-retries` 3, `:exhausted-reason :count-cap`).
   5. `Retry-After` respected per attempt and still deadline-bounded (oversized
-     `Retry-After` truncated to deadline).
+     `Retry-After` truncated to deadline). A non-positive integer `Retry-After`
+     (0/negative) has no positive floor and floors to the exponential backoff
+     (like the RFC-date branch), so the budget-active default never retries
+     back-to-back with an immediate 0-delay until the deadline.
   6. Cancellation interrupts a pending backoff (incl. truncated final sleep) →
      `:retry-cancelled`, and no stale `:retry-deadline-ms` leaks after cancel.
+     Covered for both the normal first backoff and the truncated final sleep
+     (overshoot path: truncated `provider_retry_scheduled` then
+     `provider_request_cancelled`).
   7. Stale past deadline at loop entry opens a fresh window (no instant `:deadline` give-up).
   8. `:retry-deadline-ms` preserved by inter-attempt clear, cleared on window close.
 - `components/session-state/test/psi/session_state/model_test.clj`: `valid-session?`

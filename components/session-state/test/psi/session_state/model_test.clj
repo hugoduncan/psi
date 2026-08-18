@@ -280,3 +280,20 @@
           e (session/make-entry :thinking-level {:thinking-level :off})
           s' (session/append-entry s e)]
       (is (= [e] (:session-entries s'))))))
+
+(deftest retry-after-non-positive-integer-floors-to-exponential-test
+  ;; A non-positive integer Retry-After (0 or negative) has no positive floor and
+  ;; must not yield an immediate 0/negative delay under the budget-active default
+  ;; (where the count-cap is nil and the loop would otherwise retry back-to-back
+  ;; until the deadline): it floors to the exponential backoff, exactly like the
+  ;; RFC-date branch already does for <= 0.
+  (testing "retry-after-delay-ms returns nil for non-positive integers"
+    (is (nil? (session/retry-after-delay-ms "0" 0)))
+    (is (nil? (session/retry-after-delay-ms "-5" 0)))
+    (is (= 5000 (session/retry-after-delay-ms "5" 0))))
+
+  (testing "retry-metadata falls back to exponential backoff for Retry-After 0"
+    (let [meta (session/retry-metadata {:retry-after "0"} 0 2000 0)]
+      (is (= 2000 (:delay-ms meta)))
+      (is (= :exponential-backoff (:delay-source meta)))
+      (is (= 2000 (:resume-at meta))))))

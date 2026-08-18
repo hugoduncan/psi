@@ -540,7 +540,12 @@
       nil
 
       (integer-string? raw)
-      (* 1000 (Long/parseLong raw))
+      (let [delay-ms (* 1000 (Long/parseLong raw))]
+        ;; Non-positive integers (0 / negative) have no meaningful wait: floor to
+        ;; the exponential backoff like the RFC-date branch does for <= 0, so
+        ;; retry-metadata's `(or retry-after-ms exponential-delay-ms)` falls back.
+        (when (pos? delay-ms)
+          delay-ms))
 
       :else
       (try

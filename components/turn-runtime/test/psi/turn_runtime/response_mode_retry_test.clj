@@ -405,3 +405,89 @@
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :deadline (:exhausted-reason outcome)))
         (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-non-positive-retry-after-floors-to-backoff-test
+  ;; A provider Retry-After of 0 (or negative integer) is floored to the
+  ;; exponential backoff under the budget-active default: the count-cap is nil so
+  ;; there is no immediate give-up, and the loop must not retry back-to-back with
+  ;; an immediate 0-delay until the deadline.
+  (let [clock          (atom 0)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 600000
+                                                            :auto-retry-base-delay-ms 2000
+                                                            :auto-retry-max-delay-ms 60000}})
+        ctx            (assoc ctx0
+                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                              :provider-retry-sleep-fn (fn [delay-ms]
+                                                         (swap! clock + (long delay-ms))))
+        prepared       (prepared-request ctx session-id)
+        attempts*      (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (assoc (error-turn "rate limit exceeded")
+                           :assistant-message {:role "assistant"
+                                               :content [{:type :error :text "rate limit exceeded"}]
+                                               :stop-reason :error
+                                               :error-message "rate limit exceeded"
+                                               :http-status 429
+                                               :provider-error/headers {"Retry-After" "0"}
+                                               :timestamp (java.time.Instant/now)}))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome   (:execution-result/retry-outcome result)
+            events    (provider-events ctx session-id)
+            scheduled (first (filter #(= "provider_retry_scheduled" (:type %)) events))]
+        ;; Retry-After 0 floors to the exponential backoff, not an immediate 0-delay retry
+        (is (= :exponential-backoff (:delay-source scheduled)))
+        (is (= 2000 (:delay-ms scheduled)))
+        (is (= 2000 (:resume-at scheduled)))
+        ;; still budget-active default: give-up happens at the deadline, not a count cap
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))
+        (is (nil? (:max-retries outcome)))))))
+
+(deftest execute-prepared-request-cancel-during-truncated-final-sleep-test
+  ;; Cancellation arriving during the truncated final sleep (overshoot path)
+  ;; returns :retry-cancelled, emits the truncated provider_retry_scheduled then
+  ;; provider_request_cancelled, and clears the window deadline (plan test 6).
+  (let [clock          (atom 0)
+        sleep-calls*   (atom 0)
+        cancelled?     (atom false)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 5000
+                                                            :auto-retry-base-delay-ms 2000
+                                                            :auto-retry-max-delay-ms 60000}})
+        ctx            (assoc ctx0
+                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                              :provider-retry-cancelled? (fn [_session-id] @cancelled?)
+                              :provider-retry-sleep-fn
+                              (fn [delay-ms]
+                                (swap! sleep-calls* inc)
+                                (swap! clock + (long delay-ms))
+                                ;; flip cancellation during the truncated final sleep (2nd)
+                                (when (= 2 @sleep-calls*)
+                                  (reset! cancelled? true))))
+        prepared       (prepared-request ctx session-id)
+        attempts*      (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome   (:execution-result/retry-outcome result)
+            events    (provider-events ctx session-id)
+            scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
+        (is (= 2 @attempts*))
+        (is (= :retry-cancelled (:failure-reason outcome)))
+        (is (true? (:cancelled? outcome)))
+        ;; full first backoff (2000), then the truncated final sleep (5000 - 2000)
+        (is (= [2000 3000] (mapv :delay-ms scheduled)))
+        ;; the truncated scheduled signal is superseded by the cancel event
+        (is (= "provider_request_cancelled" (:type (last events))))
+        (is (true? (:final? (last events))))
+        (is (= :retry-cancelled (:failure-reason (last events))))
+        ;; no stale retry state / window deadline after cancel
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
+        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
