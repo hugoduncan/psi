@@ -318,3 +318,19 @@
   window) or as authoritative (immediate `:deadline` give-up), and enumerate which turn-end /
   rehydration paths must also clear the deadline so an expired value cannot strand a later turn's
   first retryable failure.
+
+## Inconsistency review 2026-08-18 (third turn, current design state)
+
+- [ ] **Reconcile Approach 4's "fixed default cap at ~20 s" rationale with the sentinel-`nil` default.**
+  Approach 4 motivates the explicit-only count-cap gating with: "A fast `Retry-After` (e.g. 1 s)
+  would otherwise let the attempt count reach a **fixed default cap at ~20 s** ... giving up with
+  `:exhausted-reason :count-cap` instead of at the deadline". That illustration is a vestige of the
+  dropped raise-to-20: under the current design the default `:auto-retry-max-retries` is the sentinel
+  `nil` (no cap), so there **is no fixed default count cap** to reach in the budget-active path — and
+  if a hypothetical fixed default existed it would be the old 3 (reached at ~3 s under 1 s `Retry-After`),
+  not 20 (~20 s). The "~20 s / fixed default cap" premise only corresponds to the raised-20 default the
+  design explicitly dropped, and a reader of Approach 4 could reasonably conclude a nominal ~20 default
+  cap still exists somewhere. Reword the rationale to refer to the counterfactual correctly (e.g. "would
+  otherwise reach the old fixed default cap in seconds" or state plainly that there is no default count
+  cap under the sentinel, so the count-cap can never prematurely fire), so the illustration matches the
+  sentinel-`nil` default-config it is part of.
