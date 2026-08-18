@@ -66,7 +66,7 @@
 
 ## Ambiguity re-review 2026-08-18 (post-follow-up)
 
-- [ ] **Define the deadline lifecycle: window-open detection and clearing.** The
+- [x] **Define the deadline lifecycle: window-open detection and clearing.** The
   design stores `:retry-deadline-ms` in canonical session state "when the retry
   window opens (the first retryable failure)" and reads it back at loop entry,
   but never specifies how the single give-up predicate distinguishes the
@@ -80,7 +80,7 @@
   (the retry loop is per `execute-prepared-request!`, but the state it reads is
   session-scoped). State whether the deadline is cleared by `clear-active-retry!`
   and how a fresh window is anchored on a later turn.
-- [ ] **Specify whether the retry outcome/telemetry distinguishes count-cap vs
+- [x] **Specify whether the retry outcome/telemetry distinguishes count-cap vs
   deadline exhaustion.** Both "deadline reached" and "count cap reached" map to
   `:failure-reason :retry-exhausted` with `:exhausted? true` (Approach 2), so a
   consumer of the retry-outcome / `provider_request_finished` event cannot tell
@@ -88,7 +88,7 @@
   `:retry-exhausted` reason is intended to suffice for both, or whether a
   distinguishing field (e.g. `:exhausted-reason :count-cap | :deadline`) is
   added to the outcome/event payload.
-- [ ] **State the disable semantics of the total-time budget (or confirm it is
+- [x] **State the disable semantics of the total-time budget (or confirm it is
   always active).** The design adds `:auto-retry-total-timeout-ms` (default
   600000) as the primary default limiter and keeps `:auto-retry-max-retries` as a
   secondary hard cap, but does not specify whether a value of the new key can
@@ -99,7 +99,7 @@
 
 ## Inconsistency re-review 2026-08-18 (post-follow-up)
 
-- [ ] **Reconcile the truncated final sleep with the recorded/emitted delay.** The
+- [x] **Reconcile the truncated final sleep with the recorded/emitted delay.** The
   design truncates the final sleep to the remaining window ("sleep the remaining
   portion (deadline - now)") for both the exponential and oversized-`Retry-After`
   paths (Approach 2/5), but never says whether the truncated sleep amount is
@@ -113,7 +113,7 @@
   telemetry) would see a resume time that does not match when the retry actually
   resumes. Specify whether the recorded/emitted delay is the full computed delay
   or the truncated remaining-window delay, and how `:resume-at` is adjusted.
-- [ ] **Pin the schema placement of the deadline field.** Approach 2 says store
+- [x] **Pin the schema placement of the deadline field.** Approach 2 says store
   `:retry-deadline-ms` "alongside the existing canonical `:retry` metadata (with
   `:resume-at`)" and "the `agent-session-schema` gains the deadline field", but
   does not state whether `:retry-deadline-ms` is a **top-level** session field

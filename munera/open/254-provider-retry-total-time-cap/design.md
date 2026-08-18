@@ -56,23 +56,45 @@ safety cap (not the default limiter).
 
 1. **New config key** `:auto-retry-total-timeout-ms`, default `600000`
    (10 minutes), alongside the existing `:auto-retry-*` keys in default-config.
+   **Disable semantics.** The total-time budget is active whenever the key
+   resolves to a positive value: a deadline is computed for each retry window and
+   bounds the loop. A value of `nil`/absent or `<= 0` disables the time budget
+   entirely — no deadline is computed, the give-up predicate evaluates only the
+   count cap, and the existing `:auto-retry-max-retries` becomes the sole
+   limiter. This keeps a strict count-only mode expressible (e.g. time budget
+   off with a large count cap) and leaves `:auto-retry-enabled` as the
+   master on/off for retries as a whole.
 
 2. **Deadline-based termination via a single give-up predicate.** Extend the
    existing count-cap decision (`failure-reason-for` in
    `components/turn-runtime/src/psi/turn_runtime/core.clj`) into one coherent
    give-up predicate that evaluates the count cap and the total-time deadline
    together, per failed attempt — no separate deadline check in the loop body.
-   The loop ordering is: classify the failure → compute the would-be next delay
-   (`retry-metadata-for`, which resolves any `Retry-After`) → run the single
-   give-up predicate against the failure classification, current retry count, the
-   deadline, and the would-be next delay. It decides:
+   The loop ordering is: classify the failure → ensure the deadline is present
+   (window-opening failure: compute and persist it; otherwise read the persisted
+   value) → compute the would-be next delay (`retry-metadata-for`, which resolves
+   any `Retry-After`) → run the single give-up predicate against the failure
+   classification, current retry count, the deadline, and the would-be next
+   delay. It decides:
    - `:non-retryable` / `:retry-disabled` → stop (unchanged);
-   - count cap reached (`retry-attempt >= max-retries`) → `:retry-exhausted`;
-   - deadline reached (`now >= deadline`) → `:retry-exhausted`;
+   - count cap reached (`retry-attempt >= max-retries`) → `:retry-exhausted`
+     with `:exhausted-reason :count-cap`;
+   - deadline reached (`now >= deadline`) → `:retry-exhausted`
+     with `:exhausted-reason :deadline`;
    - the next full delay would overshoot (`now + next-delay > deadline`) → sleep
      the remaining portion (`deadline - now`) and then give up with
-     `:retry-exhausted`, so the default give-up occurs at the deadline;
+     `:retry-exhausted` with `:exhausted-reason :deadline`, so the default
+     give-up occurs at the deadline;
    - otherwise → retry, sleeping the full `next-delay`.
+
+   **Distinguishing the termination boundary.** Both count-cap and deadline
+   exhaustion keep the existing single `:failure-reason :retry-exhausted`
+   surface (so existing consumers of `:retry-exhausted` / `:exhausted?` are
+   unchanged), but the give-up predicate also exposes which boundary fired via a
+   new `:exhausted-reason` field — `:count-cap` or `:deadline` — carried on the
+   retry-outcome map and the `provider_request_finished` event payload whenever
+   `:failure-reason :retry-exhausted` is present. Telemetry and UI can therefore
+   tell whether the window was bounded by time or by an explicit count cap.
 
    The per-attempt backoff still comes from `exponential-backoff-ms` (2 s, 4 s,
    8 s, 16 s, 32 s, then capped at `:auto-retry-max-delay-ms` 60 s) or from
@@ -88,6 +110,46 @@ safety cap (not the default limiter).
    way `:retry-attempt` is read at loop entry. This survives loop re-entry and
    follows the canonical-root vs runtime-handles state boundary
    (`doc/architecture.md`); the `agent-session-schema` gains the deadline field.
+
+   **Window-open detection.** The give-up predicate's deadline input is ensured
+   once per window, before the predicate runs: if `:retry-deadline-ms` is absent
+   from session state at a retryable, retry-enabled failure, that failure is the
+   window-opening one — compute `deadline = now + :auto-retry-total-timeout-ms`
+   (when the budget is active; see Approach 1 disable semantics) and persist it
+   in the same session-update that marks the first retry active; otherwise reuse
+   the stored value. Because the window is keyed solely on deadline presence, a
+   later turn starts a fresh window only after the previous window's deadline was
+   cleared (below).
+
+   **Field placement.** `:retry-deadline-ms` is a **top-level** session field —
+   a sibling of `:retry-attempt` — not a key inside the `:retry` map. The
+   `:retry` map is replaced each attempt by `mark-active-retry!` (fresh
+   per-attempt `:delay-ms`/`:resume-at`), whereas the deadline is a
+   window-scoped value that must persist across every attempt in the window and
+   be cleared once on window close, so it belongs at session top level next to
+   `:retry-attempt`. In `agent-session-schema` it is
+   `[:retry-deadline-ms {:optional true} [:maybe :int]]` (absent until a window
+   opens).
+
+   **Clearing.** `clear-active-retry!` (and the `retry-clear-needed?` guard that
+   decides whether to run it) currently clears `:retry-attempt`, `:retry`, and
+   `:provider-retry-abort-requested?` on success/give-up/cancel; add
+   `:retry-deadline-ms` to both so the window-scoped deadline is cleared with the
+   rest of the retry state and a stale deadline cannot leak into a later turn's
+   first retry. Read-back at loop entry uses the same helper pattern as
+   `retry-attempt-for` (e.g. a `retry-deadline-for`).
+
+   **Recorded/emitted delay under truncation.** The canonical `:retry` metadata
+   `:delay-ms`/`:resume-at` written by `mark-active-retry!`, and the
+   `provider_retry_scheduled` event `:delay-ms`/`:resume-at`, reflect the delay
+   that will actually be slept: `min(full-next-delay, deadline - now)`, with
+   `:resume-at` recomputed as `now + that-slept-delay`. For intermediate (non
+   final) attempts the deadline does not bind, so this is the full computed delay
+   exactly as today; only the truncated final sleep records a shorter delay, so a
+   consumer (progress `:retry-updated`, UI, telemetry) always sees a resume time
+   that matches when the retry actually resumes. `:delay-source` keeps reporting
+   the source of the underlying computed delay (`:exponential-backoff` or
+   `:retry-after`), independent of truncation.
 
    **Anchor.** The 10-minute budget is the *retry window*: it opens when the
    first retry is scheduled (the first retryable-failure decision) and runs for
@@ -159,7 +221,20 @@ safety cap (not the default limiter).
 - A retry window is cancelled immediately (no waiting out the remaining backoff)
   when the active turn is aborted or `:provider-retry-abort-requested?` is set.
 - An explicitly configured small `:auto-retry-max-retries` still acts as a hard
-  cap on attempt count.
+  cap on attempt count; setting `:auto-retry-total-timeout-ms` to `nil`/absent
+  or `<= 0` disables the time budget so a strict count-only mode is expressible.
+- The deadline field `:retry-deadline-ms` is a top-level session field (sibling
+  of `:retry-attempt`) in `agent-session-schema`, cleared by
+  `clear-active-retry!` / `retry-clear-needed?` with the rest of the retry state
+  so a stale deadline never leaks across turns.
+- Under truncation the canonical `:retry` metadata and the
+  `provider_retry_scheduled` event record the delay actually slept
+  (`min(full-next-delay, deadline - now)` with `:resume-at` recomputed), so the
+  reported resume time matches the actual resume; `:delay-source` is unchanged.
+- Count-cap and deadline exhaustion both yield `:failure-reason :retry-exhausted`
+  with `:exhausted? true`, and additionally carry `:exhausted-reason` —
+  `:count-cap` or `:deadline` — in the retry-outcome and
+  `provider_request_finished` event so consumers can tell which boundary fired.
 - Tests: existing retry tests updated where they assert count-based give-up;
   new tests (using the injected `:now-fn` clock and small config values, and the
   `:provider-retry-sleep-fn` seam for the `Retry-After` path) prove the
