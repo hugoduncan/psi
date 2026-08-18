@@ -83,3 +83,21 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       unconditionally: count-only mode (budget disabled → deadline nil) writes a
       spurious `:retry-deadline-ms nil` into canonical session state for the window.
       Assoc the deadline only when non-nil.
+
+## Review follow-up (implementation re-review)
+
+- [ ] `execute-prepared-request!` (turn-runtime/core.clj): the truncated-final-sleep
+      branch (~:505-575) duplicates the retry branch's (~:590-660) scheduling and
+      cancel blocks — `provider_retry_scheduled` dispatch, `mark-active-retry!`,
+      `sleep-for-retry!`, and the cancelled-path block (`cancelled-retry-outcome` +
+      `provider_request_cancelled` dispatch + `clear-active-retry! true` +
+      `execution-result`) are copied across both branches (~40 lines). Extract shared
+      helpers (schedule-and-sleep returning cancelled?, and the cancel-path emission)
+      parameterized by the meta map (truncated vs full), whether the per-sleep
+      preserve clear runs, and the post-sleep continuation (finalize `:deadline` vs
+      `recur`).
+- [ ] `retry-metadata-for` (turn-runtime/retry.clj) re-implements the `now-ms`
+      helper inline (`now-fn`/`.toEpochMilli` local, a few lines below the same
+      namespace's `now-ms` defn): call `(now-ms ctx)` instead (rename the local
+      binding so it does not shadow the fn) so the extracted namespace has a single
+      clock-read path.

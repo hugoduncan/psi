@@ -135,3 +135,4 @@
   - **Validation.** `bb test --focus psi.session-state.model-test` (12), `psi.turn-runtime.response-mode-retry-test` (14),
     `psi.turn-runtime.response-mode-test` (18) all green; clj-kondo clean on retry.clj + model_test.clj.
     No change to the give-up predicate, deadline lifecycle, or cancellation mechanics.
+- implementation re-review 2026-08-18: added 2 steps to be addressed.
