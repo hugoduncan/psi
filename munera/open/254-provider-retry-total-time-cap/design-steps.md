@@ -96,3 +96,29 @@
   always active once the key exists. Confirm the config contract: is a
   strict count-only mode (time budget off, count cap on, for large count values)
   expressible, or is the total-time window unconditionally active by default?
+
+## Inconsistency re-review 2026-08-18 (post-follow-up)
+
+- [ ] **Reconcile the truncated final sleep with the recorded/emitted delay.** The
+  design truncates the final sleep to the remaining window ("sleep the remaining
+  portion (deadline - now)") for both the exponential and oversized-`Retry-After`
+  paths (Approach 2/5), but never says whether the truncated sleep amount is
+  reflected in the canonical `:retry` metadata (`:delay-ms`/`:resume-at`) stored
+  by `mark-active-retry!` or in the `provider_retry_scheduled` event payload
+  (`:delay-ms`/`:resume-at`, core.clj:623-636). Today both are written from the
+  full `retry-metadata` (full exponential or `Retry-After` delay) while
+  `sleep-for-retry!` sleeps that full `:delay-ms` (core.clj:641). Under
+  truncation the actual sleep would be shorter than the recorded/emitted
+  `:delay-ms`/`:resume-at`, so a consumer (progress `:retry-updated`, UI,
+  telemetry) would see a resume time that does not match when the retry actually
+  resumes. Specify whether the recorded/emitted delay is the full computed delay
+  or the truncated remaining-window delay, and how `:resume-at` is adjusted.
+- [ ] **Pin the schema placement of the deadline field.** Approach 2 says store
+  `:retry-deadline-ms` "alongside the existing canonical `:retry` metadata (with
+  `:resume-at`)" and "the `agent-session-schema` gains the deadline field", but
+  does not state whether `:retry-deadline-ms` is a **top-level** session field
+  (sibling of `:retry`) or a key **inside** the `:retry` map next to `:resume-at`.
+  The placement determines the `agent-session-schema` shape, the
+  `clear-active-retry!` / `retry-clear-needed?` clearing logic (which must include
+  it, per ambiguity step 1), and the loop read-back — pin it explicitly so the
+  schema edit, the clearing path, and the predicate's read agree.
