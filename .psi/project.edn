@@ -76,31 +76,59 @@
   ;; in user_models_test.clj) means .psi/models.edn and the
   ;; doc/custom-providers.md example must move together if the fallback is
   ;; chosen.
+  #_{:designing
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"
+      :thinking-level :high}
+     :fixing-design
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}
+     :planning
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"
+      :thinking-level :high}
+     :fixing-plan
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}
+     :implementing
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}
+     :reviewing-implementation
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"
+      :thinking-level :high}
+     :fixing-implementation
+     {:model-provider "deepseek"
+      :model-id "deepseek-v4-flash"
+      :thinking-level :low}}
   {:designing
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"
+   {:model-provider "llama-swap"
+    :model-id "qwen3.8-27b"
     :thinking-level :high}
    :fixing-design
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"
+   {:model-provider "llama-swap"
+    :model-id "qwen3.8-27b"
     :thinking-level :low}
    :planning
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"
+   {:model-provider "llama-swap"
+    :model-id "qwen3.8-27b"
     :thinking-level :high}
    :fixing-plan
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"
+   {:model-provider "llama-swap"
+    :model-id "qwen3.8-27b"
     :thinking-level :low}
    :implementing
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"
+   {:model-provider "llama-swap"
+    :model-id "qwen3.8-27b"
     :thinking-level :low}
    :reviewing-implementation
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"
+   {:model-provider "llama-swap"
+    :model-id "qwen3.8-27b"
     :thinking-level :high}
    :fixing-implementation
-   {:model-provider "deepseek"
-    :model-id "deepseek-v4-flash"
+   {:model-provider "llama-swap"
+    :model-id "qwen3.8-27b"
     :thinking-level :low}}}}
