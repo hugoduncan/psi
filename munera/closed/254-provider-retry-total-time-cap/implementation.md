@@ -204,3 +204,35 @@
     cancellation mechanics.
 
 - implementation review 2026-08-18 (fourth turn): added 1 step to be addressed.
+- implementation-review-followup 2026-08-19 (fourth turn, 1/1 step done): addressed the
+  4th-turn implementation-review step (test-seam hot-loop hazard).
+  - **Behavioral fail-fast guard (retry.clj + core.clj).** Added
+    `retry/assert-test-seam-no-hot-loop!`: at the retry-scheduling point (the
+    `:else` branch of `execute-prepared-request!`), when `:provider-retry-sleep? false`
+    + budget-active + nil count-cap and the clock advanced < 1000 ms between two
+    consecutive scheduled retries, the loop cannot reach its deadline — throw
+    `Test-seam misconfiguration` (ex-info with the config + observed advance)
+    instead of hot-looping a persistent retryable failure until the real
+    10-min wall-clock deadline. Static "no injected :now-fn" detection is
+    impossible: every session ctx supplies the default wall-clock
+    `:now-fn java.time.Instant/now` via callback-fns as a fresh fn instance
+    (verified: `(= java.time.Instant/now java.time.Instant/now)` is false on
+    JVM Clojure), so the guard is behavioral and also catches constant injected
+    clocks. Fires on the 2nd scheduled retry (needs two clock reads) — still
+    fail-fast. Loop threads `last-retry-now` through `recur` (new 3rd binding).
+  - **Empirical discovery: `:provider-retry-sleep? false` via `create-session-context`
+    opts is INERT** — `create-context*` (agent-session/context.clj) does not
+    propagate the key to the ctx (verified: `(:provider-retry-sleep? ctx)` is
+    nil), so those tests real-sleep. The seam keys must be assoc'd onto the ctx
+    directly; the two new tests do so.
+  - **Tests.** `execute-prepared-request-hot-loop-test-seam-guard-test`: sleep?
+    false on ctx + wall clock + persistent failure → guard throws
+    `Test-seam misconfiguration` at 2 attempts (no hang).
+    `execute-prepared-request-advancing-clock-test-seam-not-guarded-test`:
+    sleep? false + injected advancing atom clock + persistent failure → window
+    still runs to `:deadline` (guard bypassed). retry-test 14 → 16.
+  - **Validation.** response-mode-retry-test 16, response-mode-test 18,
+    model-test 12, eql-provider-retry-test 3, core-test 16,
+    prompt-lifecycle retry vars 2 — all green; clj-kondo clean on retry.clj +
+    core.clj + retry test. No change to give-up-decision branch order, deadline
+    lifecycle, cancellation, or config semantics.

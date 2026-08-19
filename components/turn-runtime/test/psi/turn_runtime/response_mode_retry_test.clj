@@ -511,3 +511,57 @@
         ;; no stale retry state / window deadline after cancel
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
         (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-hot-loop-test-seam-guard-test
+  ;; A persistent retryable failure under the sleep-disabled, budget-active,
+  ;; cap-free test seam with a non-advancing clock (the default wall-clock
+  ;; :now-fn) must fail fast as a test-config error instead of hot-looping to
+  ;; the real wall-clock deadline (10 minutes with the default timeout) — the
+  ;; pre-change default 3-attempt cap bounded the same misconfiguration. The
+  ;; seam keys are assoc'd onto the ctx directly (create-session-context opts
+  ;; do not propagate :provider-retry-sleep? / :now-fn to the ctx).
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        ctx              (assoc ctx0 :provider-retry-sleep? false)
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Test-seam misconfiguration"
+           (turn-runtime/execute-prepared-request!
+            {:provider-registry (atom {})} ctx session-id prepared nil)))
+      ;; the guard needs two consecutive clock reads to detect the
+      ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
+      ;; not a 10-minute spin
+      (is (= 2 @attempts*)))))
+
+(deftest execute-prepared-request-advancing-clock-test-seam-not-guarded-test
+  ;; The seam guard only fires on a non-advancing clock: an injected clock that
+  ;; advances between attempts still drives the budget window to the deadline
+  ;; (documented seam contract: an ADVANCING :now-fn is required whenever the
+  ;; budget is active).
+  (let [clock          (atom 0)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 5000
+                                                            :auto-retry-base-delay-ms 2000}})
+        ctx            (assoc ctx0
+                              :provider-retry-sleep? false
+                              :now-fn #(java.time.Instant/ofEpochMilli @clock))
+        prepared       (prepared-request ctx session-id)
+        attempts*      (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    ;; advance the injected clock past the next backoff each attempt
+                    (swap! clock + 2000)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= 2 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))
+        (is (nil? (:max-retries outcome)))))))

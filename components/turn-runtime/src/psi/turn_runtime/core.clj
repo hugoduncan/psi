@@ -518,7 +518,8 @@
     ;; :retry-attempt/:retry alongside the expired deadline, so the attempt
     ;; read-back must observe the fresh-window state.
     (loop [retry-deadline-ms (retry/retry-deadline-for ctx session-id)
-           retry-attempt     (retry/retry-attempt-for ctx session-id)]
+           retry-attempt     (retry/retry-attempt-for ctx session-id)
+           last-retry-now    nil]
       (let [attempt-data*  (assoc attempt-data :retry-attempt retry-attempt)
             attempt-result (execute-provider-attempt! ai-ctx ctx session-id prepared-request progress-queue attempt-data*)
             assistant-msg  (:assistant-message attempt-result)
@@ -620,12 +621,16 @@
 
               ;; Retry with the full next delay.
               :else
-              (let [next-attempt (inc retry-attempt)
-                    cancelled?   (schedule-and-sleep! ctx session-id turn-id progress-queue attempt-data*
+              (let [next-attempt (inc retry-attempt)]
+                ;; Fail fast on a non-advancing-clock hot loop under the
+                ;; sleep-disabled, budget-active, cap-free test seam (review
+                ;; follow-up, 4th turn): the loop cannot reach its deadline.
+                (retry/assert-test-seam-no-hot-loop! ctx budget-active? count-cap last-retry-now now)
+                (let [cancelled? (schedule-and-sleep! ctx session-id turn-id progress-queue attempt-data*
                                                       retry-attempt next-attempt retry-metadata
                                                       error-fields deadline-ms (:delay-ms retry-metadata) true)]
-                (if cancelled?
-                  (cancelled-retry-path! ctx session-id turn-id progress-queue prepared-request count-cap
-                                         retry-enabled? attempt-data* attempt-result retry-attempt next-attempt
-                                         error-fields)
-                  (recur deadline-ms next-attempt))))))))))
+                  (if cancelled?
+                    (cancelled-retry-path! ctx session-id turn-id progress-queue prepared-request count-cap
+                                           retry-enabled? attempt-data* attempt-result retry-attempt next-attempt
+                                           error-fields)
+                    (recur deadline-ms next-attempt now)))))))))))

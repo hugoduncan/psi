@@ -145,7 +145,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, fourth turn)
 
-- [ ] Test-seam hot-loop hazard under the budget-active default: with
+- [x] Test-seam hot-loop hazard under the budget-active default: with
       `:provider-retry-sleep? false` (no real sleeps), no injected `:now-fn`
       (falls back to `Instant/now` wall clock), and no explicit
       `:auto-retry-max-retries` (sentinel-nil default), a persistent retryable
@@ -161,3 +161,27 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `:provider-retry-sleep? false` + budget-active + nil count-cap + no
       injected `:now-fn` as a test-config error (fail fast), or document that
       the seam requires an advancing `:now-fn` whenever the budget is active.
+      → Done: behavioral fail-fast guard. `retry/assert-test-seam-no-hot-loop!`
+      (retry.clj) fires at the retry-scheduling point (the `:else` branch of
+      `execute-prepared-request!`) when `:provider-retry-sleep? false` +
+      budget-active + nil count-cap and the clock advanced < 1000 ms between
+      two consecutive scheduled retries — the loop cannot reach its deadline,
+      so a persistent failure would spin until the real 10-min wall-clock
+      deadline. Static "no injected `:now-fn`" detection is impossible (every
+      session ctx supplies the default wall-clock `:now-fn java.time.Instant/now`
+      via callback-fns, as a fresh fn instance per ctx), so the guard is
+      behavioral: it also catches a constant injected clock. Fires on the 2nd
+      scheduled retry (needs two consecutive clock reads) — still fail-fast.
+      The loop threads `last-retry-now` through `recur` (new 3rd binding).
+      Two new tests: the guard throws `Test-seam misconfiguration` (2
+      attempts, no hang); an injected advancing atom-backed clock still drives
+      the window to `:deadline` (guard bypassed). Note: `:provider-retry-sleep? false`
+      passed via `create-session-context` opts is NOT propagated to the ctx
+      (`create-context*` ignores it — verified empirically), so the seam keys
+      must be assoc'd onto the ctx directly, as the new tests do. All current
+      tests unaffected: explicit caps, budget-disabled, injected advancing
+      `:now-fn`, or success-terminating stubs that schedule at most one retry
+      (the guard needs a 2nd retry-scheduling to compare clock reads).
+      Validation: retry-test 16, response-mode-test 18, model-test 12,
+      eql-provider-retry-test 3, core-test 16, prompt-lifecycle retry vars 2
+      — all green; clj-kondo clean.
