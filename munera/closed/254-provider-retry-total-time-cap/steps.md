@@ -456,7 +456,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, tenth turn)
 
-- [ ] `retry-after-delay-ms` (session-state/model.clj) integer branch parses
+- [x] `retry-after-delay-ms` (session-state/model.clj) integer branch parses
       `Retry-After` with `(Long/parseLong raw)` WITHOUT the try/catch the
       RFC-date `:else` branch has: a numeric string outside Long range (e.g.
       `Retry-After: 99999999999999999999`) throws an uncaught
@@ -475,10 +475,27 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       nil/exponential) and a turn-runtime test (budget-active default,
       cap-free, persistent retryable failure + oversized `Retry-After` →
       floors to backoff, window runs to `:deadline`, no throw).
-- [ ] `retry-deadline-for` (turn-runtime/retry.clj) has two textually identical
+      → Done: integer branch now parses via the existing `parse-long-safe`
+      helper (`(some-> raw parse-long-safe (* 1000))`), so an out-of-Long-range
+      integer yields nil → `(when (and delay-ms (pos? delay-ms)) ...)` floors
+      to the exponential backoff; comment updated. New
+      `retry-after-oversized-integer-floors-to-exponential-test` (model_test.clj:
+      `retry-after-delay-ms` 20-digit → nil; `retry-metadata` → exponential
+      2000, `:delay-source :exponential-backoff`) and
+      `execute-prepared-request-oversized-retry-after-floors-to-backoff-test`
+      (retry_test.clj: budget-active default — timeout/cap keys omitted so
+      default-config 600000/nil apply — persistent retryable failure with a
+      20-digit `Retry-After` → no throw, first scheduled delay exponential
+      2000, window runs to `:deadline`, `:max-retries nil`).
+- [x] `retry-deadline-for` (turn-runtime/retry.clj) has two textually identical
       cond-branch bodies (budget-disabled leftover deadline and stale-past
       deadline): both assoc `:retry-attempt 0` + `:retry nil`, dissoc
       `:retry-deadline-ms`, and yield nil. Merge into one branch
       (`(and (some? deadline) (or (not budget-active?) (< deadline (now-ms ctx))))`)
       with the two intents documented in the existing docstring; behavior
       unchanged.
+      → Done: merged into a single branch with the combined predicate
+      `(and (some? deadline) (or (not budget-active?) (< deadline (now-ms ctx))))`;
+      docstring gains a sentence noting both intents share one branch (same
+      cleanup, differing only in the predicate). Behavior unchanged; all
+      deadline tests green.

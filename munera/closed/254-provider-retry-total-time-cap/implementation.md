@@ -320,3 +320,36 @@
 - addressed 8th-turn review steps 2026-08-19: propagated `:retry-min-clock-advance-ms` through `create-context*` opts (new opts-propagation test asserts guard uses the override, ex-data 12345 vs derived 2000); `retry-deadline-for` budget-disabled branch now resets stale `:retry-attempt 0`/`:retry nil` alongside the deadline dissoc, leftover-future-deadline test seeded with attempt-3 + stale retry map asserts fresh window (4 attempts, residue cleared). Retry suite 19 → 20, response-mode 18, model 12 — green; clj-kondo clean; `bb commit-check:file-lengths` passes (eql_introspection_test.clj split landed in prior commit).
 - implementation review 2026-08-19 (tenth turn): verified commit-check:file-lengths failure (eql_introspection_test.clj 829 lines at 2666fe401) resolved at HEAD via the ninth-turn split (586 + new provider_introspection_test.clj 265, verbatim move, no forwarding vars); all commit checks, clj-kondo, and focused suites green. No new actionable issues found.
 - implementation review 2026-08-19 (eleventh turn): added 2 steps to be addressed.
+- implementation-review-followup 2026-08-19 (eleventh turn, 2/2 steps done): addressed the 2
+  eleventh-turn implementation-review steps.
+  - **Oversized integer `Retry-After` no longer throws (model.clj).**
+    `retry-after-delay-ms` integer branch parsed with bare `(Long/parseLong raw)` —
+    a numeric `Retry-After` outside Long range (20-digit value) threw an uncaught
+    `NumberFormatException` instead of falling back to exponential backoff; since
+    `retry-metadata-for` now runs on every failed attempt (before the give-up
+    predicate), one malformed oversized header crashed the whole turn. Fix: the
+    integer branch now parses via the existing `parse-long-safe` helper
+    (`(some-> raw parse-long-safe (* 1000))`), yielding nil for out-of-range
+    values; `(when (and delay-ms (pos? delay-ms)) ...)` floors to exponential
+    backoff (nil-guard added — `(pos? nil)` NPEs). New
+    `retry-after-oversized-integer-floors-to-exponential-test` (model_test.clj:
+    `retry-after-delay-ms` 20-digit → nil; `retry-metadata` → exponential 2000)
+    and `execute-prepared-request-oversized-retry-after-floors-to-backoff-test`
+    (response_mode_retry_test.clj: budget-active default — timeout/cap keys
+    omitted → default-config 600000/nil — 20-digit `Retry-After`, persistent
+    failure → no throw, first scheduled delay exponential 2000, window to
+    `:deadline`, `:max-retries nil`).
+  - **`retry-deadline-for` branch merge (retry.clj).** The budget-disabled
+    leftover-deadline and stale-past-deadline cond branches had textually
+    identical bodies (assoc `:retry-attempt 0` + `:retry nil`, dissoc
+    `:retry-deadline-ms`, yield nil); merged into one branch with predicate
+    `(and (some? deadline) (or (not budget-active?) (< deadline (now-ms ctx))))`
+    and a docstring sentence documenting both intents in the shared branch.
+    Behavior unchanged.
+  - **Validation.** model-test 12 → 13 (94 assertions),
+    response-mode-retry-test 20 → 21 (120), response-mode-test 18 (135),
+    eql-provider-retry-test 3, core-test 16 — all green; clj-kondo clean on all
+    four changed files; `bb commit-check:file-lengths` /
+    `commit-check:dispatch-architecture` (0 failures) / `changelog:check` /
+    `fmt:check` pass. No change to give-up-decision branch order, deadline
+    lifecycle, cancellation, or config semantics.

@@ -310,3 +310,17 @@
       (is (= 2000 (:delay-ms meta)))
       (is (= :exponential-backoff (:delay-source meta)))
       (is (= 2000 (:resume-at meta))))))
+
+(deftest retry-after-oversized-integer-floors-to-exponential-test
+  ;; A numeric Retry-After outside Long range (e.g. a 20-digit value) is
+  ;; unparsable by Long/parseLong and must not throw: it yields nil and
+  ;; retry-metadata floors to the exponential backoff, exactly like the RFC-date
+  ;; branch does for unparsable values.
+  (testing "retry-after-delay-ms returns nil for an oversized integer"
+    (is (nil? (session/retry-after-delay-ms "99999999999999999999" 0))))
+
+  (testing "retry-metadata falls back to exponential backoff for an oversized Retry-After"
+    (let [meta (session/retry-metadata {:retry-after "99999999999999999999"} 0 2000 0)]
+      (is (= 2000 (:delay-ms meta)))
+      (is (= :exponential-backoff (:delay-source meta)))
+      (is (= 2000 (:resume-at meta))))))

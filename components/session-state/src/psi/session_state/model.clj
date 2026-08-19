@@ -540,11 +540,13 @@
       nil
 
       (integer-string? raw)
-      (let [delay-ms (* 1000 (Long/parseLong raw))]
-        ;; Non-positive integers (0 / negative) have no meaningful wait: floor to
-        ;; the exponential backoff like the RFC-date branch does for <= 0, so
+      (let [delay-ms (some-> raw parse-long-safe (* 1000))]
+        ;; Non-positive integers (0 / negative) have no meaningful wait, and
+        ;; integers outside Long range (e.g. an oversized Retry-After) are
+        ;; unparsable — both yield nil, flooring to the exponential backoff
+        ;; like the RFC-date branch does for <= 0 / unparsable values, so
         ;; retry-metadata's `(or retry-after-ms exponential-delay-ms)` falls back.
-        (when (pos? delay-ms)
+        (when (and delay-ms (pos? delay-ms))
           delay-ms))
 
       :else

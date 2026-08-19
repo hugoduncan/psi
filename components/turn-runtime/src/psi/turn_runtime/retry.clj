@@ -44,22 +44,16 @@
    (the same cleanup the terminal clears do), so a session rehydrated mid-window
    after the deadline (process death during a retry sleep leaves :retry-attempt
    > 0 and a stale :retry map) starts its fresh window at attempt 0 with no
-   stale retry metadata visible."
+   stale retry metadata visible.
+   Both cases — budget-disabled leftover and stale-past — share a single branch:
+   each requires a present canonical deadline, clears it, resets the same
+   :retry-attempt/:retry residue, and yields nil; only the predicate differs
+   (budget disabled, vs deadline already in the past)."
   [ctx session-id budget-active?]
   (let [deadline (:retry-deadline-ms (ss/get-session-data-in ctx session-id))]
     (cond
-      (and (some? deadline) (not budget-active?))
-      (do
-        (ss/apply-root-state-update-in!
-         ctx
-         (ss/session-update session-id
-                            #(-> %
-                                 (assoc :retry-attempt 0
-                                        :retry nil)
-                                 (dissoc :retry-deadline-ms))))
-        nil)
-
-      (and (some? deadline) (< deadline (now-ms ctx)))
+      (and (some? deadline)
+           (or (not budget-active?) (< deadline (now-ms ctx))))
       (do
         (ss/apply-root-state-update-in!
          ctx
