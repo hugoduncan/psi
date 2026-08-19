@@ -554,3 +554,43 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       3 → 4; the three pre-existing marker tests (success / count-cap /
       cancel) unchanged. clj-kondo clean; `bb commit-check:file-lengths`
       passes; CHANGELOG [Unreleased] Fixed entry added.
+
+## Review follow-up (implementation review, fourteenth turn)
+
+- [ ] `:exhausted-reason` (`:count-cap | :deadline`) is dropped by the EQL
+      `provider-retries` introspection surface. `provider-retry-summary->eql`
+      (agent-session/resolvers/provider_retries.clj) projects the terminal
+      event's `:failure-reason` into `:psi.provider-request/final-status` and
+      its `:error-kind`, but not the sibling `:exhausted-reason` — and
+      `provider-retries` is the ONLY consumer of the retained provider events
+      (no raw-event EQL resolver; RPC does not subscribe to provider retry
+      events; `grep exhausted-reason components/*/src` matches only
+      turn-runtime core.clj/retry.clj). The design's stated purpose of the
+      field — "Telemetry and UI can therefore tell whether the window was
+      bounded by time or by an explicit count cap" — is therefore unreachable
+      through any EQL/UI read path today: an observer querying
+      `:psi.agent-session/provider-retries` sees `final-status :retry-exhausted`
+      but cannot tell which boundary fired, exactly the debuggability gap the
+      7th-turn `:retry-deadline-ms`-on-all-surfaces step closed for the window
+      deadline. Fix: add `:psi.provider-request/exhausted-reason
+      (:exhausted-reason final)` to `provider-retry-summary->eql` and the three
+      resolver output key lists (by-request-id / by-turn-id / provider-retries),
+      and assert it — `provider-retry-truncated-final-schedule-marker-test`
+      (eql_provider_retry_test.clj:262) already seeds
+      `:exhausted-reason :deadline` on the final event and would fail without
+      the projection; add a `:count-cap` case alongside.
+- [ ] CHANGELOG [Unreleased] is missing a Fixed entry for the oversized-integer
+      `Retry-After` crash fix (11th-turn follow-up). A provider-sent numeric
+      `Retry-After` outside Long range (e.g. 20 digits) previously threw an
+      uncaught `NumberFormatException` from `retry-after-delay-ms`
+      (session-state/model.clj) — and because `retry-metadata-for` now runs on
+      EVERY failed attempt before `give-up-decision`, one malformed oversized
+      header crashed the whole turn instead of flooring to the exponential
+      backoff; the fix parses via `parse-long-safe` and yields nil →
+      exponential fallback. bug_fix is user-visible per the changelog protocol
+      (the 13th-turn EQL-marker fix got a Fixed entry for the same reason), and
+      the 12th-turn docs review verified only the behaviour-change entry (line
+      49), not this crash fix. Add a `### Fixed` entry (e.g. "A provider
+      `Retry-After` outside Long range now floors to the exponential backoff
+      instead of crashing the turn with an uncaught `NumberFormatException`")
+      before the next commit.

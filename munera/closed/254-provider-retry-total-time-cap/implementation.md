@@ -389,3 +389,4 @@
     provider-introspection-test 3 — all green; clj-kondo clean on both changed files;
     `bb commit-check:file-lengths` passes; CHANGELOG [Unreleased] Fixed entry added
     (bug_fix is user-visible per changelog protocol).
+- implementation review 2026-08-19 (fourteenth turn): added 2 steps to be addressed.
