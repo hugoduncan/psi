@@ -287,3 +287,4 @@
     (unknown model deepseek/deepseek-v4-flash). A `scheduled-deliver` flake at
     an earlier random seed (534056833) reproduced as pass at the same-seed
     baseline comparison → pre-existing order/timing flake, not introduced here.
+- implementation review 2026-08-19 (seventh turn): added 3 steps to be addressed.

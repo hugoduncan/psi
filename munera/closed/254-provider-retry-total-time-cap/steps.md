@@ -304,3 +304,48 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       the gate, the 2000 ms first backoff overshoots the 1000 ms window →
       `:deadline` give-up after 1 attempt) and asserts 4 attempts, `:count-cap`,
       `:max-retries 3`, and the leftover deadline cleared. retry suite 17 → 18.
+
+## Review follow-up (implementation review, seventh turn)
+
+- [ ] `create-context*` (agent-session/context.clj) silently drops the retry
+      test-seam keys passed via `create-session-context` opts: the
+      destructured opts list does not include `:provider-retry-sleep?`,
+      `:provider-retry-sleep-fn`, `:now-fn`, or `:provider-retry-cancelled?`,
+      so a test passing them the natural way (opts) real-sleeps / misses the
+      cancellation seam with no warning. The 4th/5th/6th-turn follow-ups
+      worked around this (assoc the keys directly onto the ctx "established
+      empirically"), but the root cause is unfixed — every future retry test
+      author hits the same silent trap. Propagate the seam keys through
+      `create-context*` (they are inert outside the retry seam, so
+      production behavior is unchanged) or fail fast when they are passed via
+      opts and ignored; then the direct-assoc workarounds in the retry /
+      response-mode / prompt-lifecycle tests can revert to the natural opts
+      API.
+- [ ] `assert-test-seam-no-hot-loop!` (retry.clj) uses the hardcoded
+      `min-retry-clock-advance-ms` 1000 ms threshold: an injected clock that
+      advances by less than 1000 ms between scheduled retries trips the guard
+      even though the loop terminates at the injected deadline — a FALSE
+      positive. Sub-second base delays are already legitimate in this suite
+      (`execute-prepared-request-retry-after-header-drives-delay-test` uses
+      `:auto-retry-base-delay-ms 10`; it only avoids the guard because it
+      carries an explicit cap), so a budget-active, cap-free test with a
+      small base delay (e.g. 10/100/500 ms) and the standard advancing-clock
+      pattern (`(fn [delay-ms] (swap! clock + (long delay-ms)))`) throws
+      `Test-seam misconfiguration` at the 2nd retry despite a correctly
+      advancing clock. The discriminator only needs to separate a constant
+      clock (advance exactly 0) / wall-clock jitter from delay-driven
+      advances: derive the threshold from the configured delays (e.g.
+      `(min :auto-retry-base-delay-ms :auto-retry-max-delay-ms)` or a small
+      jitter bound), make it configurable, or document a minimum-delay
+      constraint.
+- [ ] The new top-level `:retry-deadline-ms` session field is absent from
+      every surface that already exposes its siblings `:retry-attempt` /
+      `:retry`: the EQL session resolver `agent-session-retry-compact`
+      (agent-session/resolvers/session.clj ~270), the session introspection
+      map (agent-session/introspection.clj ~45), and the RPC
+      `session/updated` projection (rpc/events.clj ~54, ~141). A session
+      retrying inside a 10-minute window is undebuggable via EQL/RPC: the
+      window deadline is invisible (only the per-attempt `:resume-at` shows),
+      so an observer cannot tell when the window closes. Add
+      `:retry-deadline-ms` to the three surfaces, or explicitly document it
+      as intentionally internal.
