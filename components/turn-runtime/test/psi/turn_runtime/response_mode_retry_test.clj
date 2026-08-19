@@ -196,8 +196,7 @@
 
 (deftest execute-prepared-request-total-time-window-governs-termination-test
   ;; The total-time window (sentinel-nil count cap, budget active) bounds the
-  ;; retry loop: termination happens at the injected-clock deadline, not at a
-  ;; default count cap, and the final sleep is truncated to the remaining window.
+  ;; loop: termination at the injected-clock deadline, final sleep truncated.
   (let [clock          (atom 0)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 5000
@@ -236,10 +235,8 @@
 
 (deftest execute-prepared-request-explicit-count-cap-still-bounds-test
   ;; An explicitly configured small :auto-retry-max-retries remains a hard cap
-  ;; even with the total-time budget active (:exhausted-reason :count-cap, no
-  ;; truncated final sleep). The :provider-retry-sleep? seam flag flows through
-  ;; create-session-context opts (propagated to the ctx by create-context*), so
-  ;; the test pays no real backoff time.
+  ;; even with the budget active (:exhausted-reason :count-cap, no truncated
+  ;; final sleep); the :provider-retry-sleep? seam avoids real backoff time.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-max-retries 1}
                                                   :provider-retry-sleep? false})
@@ -262,10 +259,8 @@
 
 (deftest execute-prepared-request-count-only-fallback-three-test
   ;; Budget disabled (total-timeout <= 0) with no explicit cap uses the preserved
-  ;; count-only fallback of 3 as the sole give-up limiter. The
-  ;; :provider-retry-sleep? seam flag flows through create-session-context opts
-  ;; (propagated to the ctx by create-context*), so the test pays no real
-  ;; backoff time.
+  ;; count-only fallback of 3 as the sole give-up limiter; the
+  ;; :provider-retry-sleep? seam avoids real backoff time.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 0}
                                                   :provider-retry-sleep? false})
@@ -285,18 +280,11 @@
 
 (deftest execute-prepared-request-budget-disabled-ignores-leftover-future-deadline-test
   ;; Count-only mode (budget disabled) must not be deadline-bounded by a leftover
-  ;; FUTURE canonical :retry-deadline-ms from a prior budget-active window (e.g.
-  ;; a session persisted mid-window with the deadline still future and rehydrated
-  ;; with :auto-retry-total-timeout-ms nil/absent/<= 0 — a config change /
-  ;; process restart). Without the loop-entry budget-active? gate, the persisted
-  ;; future deadline binds `deadline-ms` in count-only mode and the overshoot
-  ;; branch gives up `:exhausted-reason :deadline` after 1 attempt; with the
-  ;; gate, the deadline is cleared at entry and the give-up predicate evaluates
-  ;; only the count-only fallback 3. The stale :retry-attempt/:retry residue of
-  ;; the prior window is reset alongside the deadline (8th-turn follow-up):
-  ;; without the reset, a seeded attempt 3 >= the fallback 3 gives up at the
-  ;; FIRST failure with 0 retries, or the backoff resumes mid-sequence with a
-  ;; stale :retry map visible.
+  ;; FUTURE canonical :retry-deadline-ms from a prior budget-active window
+  ;; (rehydrated with the budget disabled). Without the loop-entry budget-active?
+  ;; gate, the persisted future deadline binds count-only mode (overshoot gives
+  ;; up :deadline after 1 attempt); with the gate it is cleared at entry. The
+  ;; stale :retry-attempt/:retry residue resets alongside (8th-turn follow-up).
   (let [clock          (atom 0)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 0
@@ -305,12 +293,9 @@
                                                   :now-fn #(java.time.Instant/ofEpochMilli @clock)})
         _              (swap! (:state* ctx) assoc-in
                               [:agent-session :sessions session-id :data]
-                              ;; future-but-close persisted deadline + stale
-                              ;; :retry-attempt/:retry from the prior window:
-                              ;; without the fix, the first 2000 ms backoff
-                              ;; overshoots the 1000 ms remaining window →
-                              ;; :deadline give-up, and the attempt 3 residue
-                              ;; gives up at the first failure (>= fallback 3)
+                              ;; future-but-close deadline (1000) + stale attempt
+                              ;; 3 / :retry residue: without the fix, the 2000 ms
+                              ;; backoff overshoots → :deadline, attempt 3 >= 3
                               (assoc (ss/get-session-data-in ctx session-id)
                                      :retry-deadline-ms 1000
                                      :retry-attempt 3
@@ -378,8 +363,8 @@
         (is (true? (:final? (last events))))))))
 
 (deftest execute-prepared-request-cancel-clears-deadline-test
-  ;; Cancellation during a pending backoff returns :retry-cancelled and clears the
-  ;; window deadline via its own unconditional clear (not the per-sleep preserve).
+  ;; Cancellation during a pending backoff returns :retry-cancelled and clears
+  ;; the deadline via its own unconditional clear (not the per-sleep preserve).
   (let [cancelled?      (atom false)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 600000}
@@ -402,11 +387,10 @@
         (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-deadline-preserved-inter-attempt-test
-  ;; The window deadline survives the inter-attempt (per-sleep) clear: it is
-  ;; present in canonical state during a retry sleep, and a later success window
-  ;; close clears it. The :provider-retry-sleep-fn must close over the ctx to
-  ;; read session state, so it is assoc'd after context creation (opts are
-  ;; evaluated before the ctx exists); :now-fn flows through opts.
+  ;; The window deadline survives the inter-attempt (per-sleep) clear: present
+  ;; during a retry sleep, cleared by a later success window close. The
+  ;; :provider-retry-sleep-fn must close over the ctx (opts are evaluated before
+  ;; the ctx exists), so it is assoc'd after creation; :now-fn flows via opts.
   (let [deadline-in-sleep* (atom nil)
         [ctx0 session-id] (create-session-context {:persist? false
                                                    :config {:auto-retry-total-timeout-ms 600000}
@@ -437,14 +421,11 @@
         (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-stale-deadline-at-loop-entry-opens-fresh-window-test
-  ;; A persisted :retry-deadline-ms already in the past at loop entry is treated
-  ;; as stale and cleared, so the first retryable failure opens a fresh window
-  ;; instead of an instant :deadline give-up with zero retries. The expired
-  ;; window's :retry-attempt/:retry are reset alongside the deadline (the same
-  ;; cleanup the terminal clears do), so a session rehydrated mid-window after
-  ;; the deadline (process death during a retry sleep leaves :retry-attempt > 0
-  ;; and a stale :retry map) starts its fresh window at attempt 0 with no stale
-  ;; retry metadata.
+  ;; A persisted :retry-deadline-ms already past at loop entry is stale:
+  ;; cleared, so the first retryable failure opens a fresh window instead of an
+  ;; instant :deadline give-up. The expired window's :retry-attempt/:retry reset
+  ;; alongside (process death during a retry sleep leaves attempt > 0 and a
+  ;; stale :retry map), so the fresh window starts at attempt 0.
   (let [clock           (atom 5000)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 5000
@@ -488,10 +469,9 @@
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-non-positive-retry-after-floors-to-backoff-test
-  ;; A provider Retry-After of 0 (or negative integer) is floored to the
-  ;; exponential backoff under the budget-active default: the count-cap is nil so
-  ;; there is no immediate give-up, and the loop must not retry back-to-back with
-  ;; an immediate 0-delay until the deadline.
+  ;; A provider Retry-After of 0 (or negative integer) floors to the
+  ;; exponential backoff under the budget-active default (count-cap nil, no
+  ;; immediate give-up) — never an immediate 0-delay back-to-back retry.
   (let [clock          (atom 0)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 600000
@@ -529,10 +509,8 @@
 
 (deftest execute-prepared-request-oversized-retry-after-floors-to-backoff-test
   ;; A numeric Retry-After outside Long range (e.g. a 20-digit value) is
-  ;; unparsable and must not crash the turn: under the budget-active default
-  ;; (cap-free) it floors to the exponential backoff and the window still runs
-  ;; to :deadline — one malformed oversized header cannot kill the retry loop
-  ;; with an uncaught NumberFormatException.
+  ;; unparsable and must not crash the turn: it floors to the exponential
+  ;; backoff and the window still runs to :deadline — no NumberFormatException.
   (let [clock          (atom 0)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-base-delay-ms 2000
@@ -570,12 +548,10 @@
 
 (deftest execute-prepared-request-near-long-retry-after-floors-to-backoff-test
   ;; A PARSEABLE near-Long/MAX integer Retry-After (16 digits, seconds >=
-  ;; 9223372036854775) previously crashed the whole turn with an uncaught
-  ;; ArithmeticException: the integer branch's `* 1000` overflowed for seconds
-  ;; >= 9223372036854776, and even the largest fitting product overflowed
-  ;; retry-metadata's `:resume-at`. Under the budget-active default (cap-free)
-  ;; it now floors to the exponential backoff and the window still runs to
-  ;; :deadline — one malformed near-Long header cannot kill the retry loop.
+  ;; 9223372036854775) previously crashed the turn with an uncaught
+  ;; ArithmeticException: the `* 1000` overflowed, and the largest fitting
+  ;; product overflowed `:resume-at`. It now floors to the exponential backoff
+  ;; and the window still runs to :deadline — no crash.
   (doseq [retry-after ["9223372036854775" "9223372036854776"]]
     (let [clock          (atom 0)
           [ctx session-id] (create-session-context {:persist? false
@@ -611,6 +587,42 @@
           (is (= :retry-exhausted (:failure-reason outcome)))
           (is (= :deadline (:exhausted-reason outcome)))
           (is (nil? (:max-retries outcome))))))))
+
+(deftest execute-prepared-request-zero-base-delay-floored-to-positive-sleep-test
+  ;; Zero :auto-retry-base-delay-ms / :auto-retry-max-delay-ms previously
+  ;; yielded :delay-ms 0, which sleep-for-retry! skips — under the
+  ;; budget-active default (cap-free) a persistent retryable failure hot-looped
+  ;; back-to-back with zero delay until the real wall-clock deadline (16th-turn
+  ;; follow-up). retry-metadata now floors the delay to 1 ms, so the first
+  ;; scheduled :delay-ms is positive and the loop always sleeps between
+  ;; attempts; the injected 3 ms budget bounds the loop to 4 attempts.
+  (doseq [config [{:auto-retry-total-timeout-ms 3 :auto-retry-base-delay-ms 0 :auto-retry-max-delay-ms 60000}
+                  {:auto-retry-total-timeout-ms 3 :auto-retry-base-delay-ms 2000 :auto-retry-max-delay-ms 0}]]
+    (let [clock          (atom 0)
+          sleeps*        (atom [])
+          [ctx session-id] (create-session-context {:persist? false :config config
+                                                    :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                                                    :provider-retry-sleep-fn (fn [delay-ms]
+                                                                               (swap! sleeps* conj (long delay-ms))
+                                                                               (swap! clock + (long delay-ms)))})
+          prepared       (prepared-request ctx session-id)
+          attempts*      (atom 0)]
+      (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                    (fn [& _] (swap! attempts* inc) (error-turn "Connection reset by peer"))]
+        (let [result    (turn-runtime/execute-prepared-request!
+                         {:provider-registry (atom {})} ctx session-id prepared nil)
+              outcome   (:execution-result/retry-outcome result)
+              events    (provider-events ctx session-id)
+              scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
+          (is (every? pos? (mapv :delay-ms scheduled)))
+          (is (= [1 1 1] (mapv :delay-ms scheduled)))
+          (is (= [1 1 1] @sleeps*))
+          (is (= 4 @attempts*))
+          (is (= :retry-exhausted (:failure-reason outcome)))
+          (is (= :deadline (:exhausted-reason outcome)))
+          (is (nil? (:max-retries outcome)))
+          (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
+          (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id)))))))))
 
 (deftest execute-prepared-request-cancel-during-truncated-final-sleep-test
   ;; Cancellation arriving during the truncated final sleep (overshoot path)
@@ -658,12 +670,9 @@
 
 (deftest execute-prepared-request-hot-loop-test-seam-guard-test
   ;; A persistent retryable failure under the sleep-disabled, budget-active,
-  ;; cap-free test seam with a non-advancing clock (the default wall-clock
-  ;; :now-fn) must fail fast as a test-config error instead of hot-looping to
-  ;; the real wall-clock deadline (10 minutes with the default timeout) — the
-  ;; pre-change default 3-attempt cap bounded the same misconfiguration. The
-  ;; seam keys flow through create-session-context opts (propagated to the ctx
-  ;; by create-context*).
+  ;; cap-free test seam with a non-advancing clock (default wall-clock :now-fn)
+  ;; fails fast as a test-config error instead of hot-looping to the real
+  ;; 10-minute wall-clock deadline (pre-change 3-attempt cap bounded it).
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
@@ -684,11 +693,9 @@
 
 (deftest execute-prepared-request-sleep-fn-seam-guard-test
   ;; The seam guard also covers an injected no-op :provider-retry-sleep-fn
-  ;; WITHOUT the :provider-retry-sleep? false flag: budget active, nil count
-  ;; cap, non-advancing clock (default wall-clock :now-fn), persistent
-  ;; failure — the sleep-fn makes the waits no-ops, so the loop would hot-loop
-  ;; to the real wall-clock deadline unless the guard fires (the sleep? flag
-  ;; alone being nil would skip the guard).
+  ;; WITHOUT the :provider-retry-sleep? false flag: budget active, nil cap,
+  ;; non-advancing clock, persistent failure — the waits are no-ops so the
+  ;; loop would hot-loop unless the guard fires (the sleep? flag alone skips).
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :provider-retry-sleep-fn (fn [_delay-ms])})
         prepared         (prepared-request ctx session-id)
@@ -735,13 +742,10 @@
         (is (nil? (:max-retries outcome)))))))
 
 (deftest execute-prepared-request-small-base-delay-advancing-clock-not-guarded-test
-  ;; The seam guard's clock-advance threshold is derived from the configured
-  ;; backoff delays ((min base max), floored at 1), so a budget-active, cap-free
-  ;; test with a sub-second base delay and a correctly advancing injected clock
-  ;; does NOT trip a false-positive Test-seam misconfiguration at the 2nd retry
-  ;; (review follow-up, 7th turn — the old hardcoded 1000 ms threshold fired for
-  ;; any advance < 1000 ms, e.g. the standard delay-driven pattern under
-  ;; :auto-retry-base-delay-ms 10).
+  ;; The guard's clock-advance threshold is derived from the backoff delays
+  ;; ((min base max), floored at 1), so a sub-second base delay with a correctly
+  ;; advancing clock does NOT trip a false-positive at the 2nd retry (7th-turn
+  ;; follow-up — the old hardcoded 1000 ms fired for any advance < 1000 ms).
   (let [clock          (atom 0)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 100
@@ -767,16 +771,12 @@
         (is (= :deadline (:exhausted-reason outcome)))))))
 
 (deftest execute-prepared-request-retry-min-clock-advance-opts-propagation-test
-  ;; The :retry-min-clock-advance-ms hot-loop guard threshold override flows
-  ;; through create-session-context opts (propagated to the ctx by
-  ;; create-context*, 8th-turn follow-up) — a cap-free budget-active
-  ;; sleep-disabled test whose smallest delay is below the configured base can
-  ;; raise the guard threshold via the natural opts API instead of assoc'ing
-  ;; the key directly onto the ctx after creation (the silent-drop trap the
-  ;; 7th-turn seam-key propagation closed for the other four keys). The guard's
-  ;; ex-data reports the effective threshold; with the opts key propagated it
-  ;; is the override, not the (min base max) default (2000 with default
-  ;; config) — so the assertion fails if create-context* still drops it.
+  ;; The :retry-min-clock-advance-ms guard-threshold override flows through
+  ;; create-session-context opts (8th-turn follow-up), replacing the
+  ;; direct-assoc-after-creation workaround (the silent-drop trap the 7th-turn
+  ;; seam-key propagation closed for the other four keys). The guard's ex-data
+  ;; reports the effective threshold — the override, not the 2000 default — so
+  ;; the assertion fails if create-context* still drops it.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :provider-retry-sleep? false
                                                   :retry-min-clock-advance-ms 12345})

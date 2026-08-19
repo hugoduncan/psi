@@ -673,7 +673,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, sixteenth turn)
 
-- [ ] Zero `:auto-retry-base-delay-ms` (or `:auto-retry-max-delay-ms`) with the
+- [x] Zero `:auto-retry-base-delay-ms` (or `:auto-retry-max-delay-ms`) with the
       budget active hot-loops in PRODUCTION. `exponential-backoff-ms` yields 0
       for a 0 base (or max), `sleep-for-retry!` skips non-positive delays, and
       `assert-test-seam-no-hot-loop!` fires only under the sleep-disabled test
@@ -693,7 +693,24 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       misconfiguration). Add a turn-runtime test: budget active, cap-free,
       base 0 → first scheduled `:delay-ms` positive and the loop sleeps, never
       zero-delay back-to-back.
-- [ ] `mementum/knowledge/provider-retry-total-time-window.md` is stale: it was
+      → Done: `retry-metadata` now floors the per-attempt delay to a positive
+      minimum — `(max 1 (long (or retry-after-ms exponential-delay-ms)))` — so
+      a 0 base/max exponential yields 1 ms (not 0), `sleep-for-retry!` always
+      sleeps between attempts, and the budget-active default can never retry
+      back-to-back with an immediate 0-delay until the deadline (design
+      Approach 5 guarantee restored). New model test
+      `retry-metadata-floors-zero-exponential-to-positive-delay-test` (zero
+      exponential → `:delay-ms 1`, positive `Retry-After` still wins) and
+      turn-runtime
+      `execute-prepared-request-zero-base-delay-floored-to-positive-sleep-test`
+      (doseq over base-0 and max-0 configs, budget active 3 ms, cap-free:
+      every scheduled `:delay-ms` is the positive floor 1, the loop sleeps
+      [1 1 1], give-up `:deadline` at 4 attempts — no hot loop). CHANGELOG
+      [Unreleased] Fixed entry added. Validation: model-test 15,
+      retry-test 23, response-mode-test 18, eql-provider-retry-test 5,
+      provider-introspection-test 3, session-test 9, retry-headers-test 3,
+      rpc-prompt/rpc-events green — all green; clj-kondo clean.
+- [x] `mementum/knowledge/provider-retry-total-time-window.md` is stale: it was
       written at the first closure (2026-08-18), BEFORE the 4th–15th-turn
       follow-ups, and omits post-closure facts a future AI session needs — the
       `assert-test-seam-no-hot-loop!` behavioral guard + derived/overridable
@@ -704,3 +721,14 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       provider-retries projection, and the oversized/near-Long `Retry-After`
       floor fixes. Refresh the page (status stays done) per mementum's
       stale-knowledge protocol before closing.
+      → Done: page refreshed in place (status stays `done`) with the 4th–15th
+      and 16th-turn follow-up facts: the `assert-test-seam-no-hot-loop!`
+      behavioral guard + derived/overridable `:retry-min-clock-advance-ms`
+      threshold, the `create-context*` seam-key propagation (all five retry
+      seam keys now flow through `create-session-context` opts), the
+      `:retry-deadline-ms` EQL/RPC/introspection surfaces (`session/updated`
+      payload + `:psi.agent-session/retry-deadline-ms` resolver), the
+      `:exhausted-reason` EQL provider-retries projection (incl. the
+      last-schedule `final?` keying rule), the oversized/near-Long `Retry-After`
+      floor fixes, and the 16th-turn positive-delay floor (zero base/max config
+      never hot-loops).
