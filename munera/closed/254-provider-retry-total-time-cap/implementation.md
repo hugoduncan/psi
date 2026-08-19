@@ -353,3 +353,10 @@
     `commit-check:dispatch-architecture` (0 failures) / `changelog:check` /
     `fmt:check` pass. No change to give-up-decision branch order, deadline
     lifecycle, cancellation, or config semantics.
+- implementation review 2026-08-19 (twelfth turn): no new actionable issues. Re-verified the
+  commit-check:file-lengths failure at 2666fe401 (eql_introspection_test.clj 829 lines)
+  remains resolved at HEAD (4c575a4c9) — check passes; the ninth-turn split is a clean
+  logical move (586 + 265 lines, private helper copies, no forwarding vars). Docs review
+  per review-task-docs: CHANGELOG [Unreleased] accurately covers the retry behaviour
+  change (config keys, :exhausted-reason, :retry-deadline-ms surfaces — verified against
+  code); no stale or missing references in README/doc/ramora.
