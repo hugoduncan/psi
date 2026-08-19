@@ -58,17 +58,17 @@
   1000)
 
 (defn assert-test-seam-no-hot-loop!
-  "Fail fast when the test-seam retry loop cannot reach its deadline: with
-   :provider-retry-sleep? false (no real sleeps / :provider-retry-sleep-fn), an
-   active total-time budget, no explicit count cap (sentinel-nil default
-   :auto-retry-max-retries), and a clock that did not advance between
-   consecutive scheduled retries, a persistent retryable failure would spin
-   until the REAL wall-clock deadline (10 minutes with the default
-   :auto-retry-total-timeout-ms 600000). Pre-change the same test-seam
-   misconfiguration terminated after the default 3 attempts; the budget-active
-   default now has no count limiter, so the seam requires an ADVANCING :now-fn
-   (e.g. an atom-backed clock advanced by :provider-retry-sleep-fn) whenever the
-   budget is active.
+  "Fail fast when the test-seam retry loop cannot reach its deadline: with real
+   retry sleeps disabled — either :provider-retry-sleep? false or an injected
+   :provider-retry-sleep-fn (no-op or otherwise) — an active total-time budget,
+   no explicit count cap (sentinel-nil default :auto-retry-max-retries), and a
+   clock that did not advance between consecutive scheduled retries, a
+   persistent retryable failure would spin until the REAL wall-clock deadline
+   (10 minutes with the default :auto-retry-total-timeout-ms 600000). Pre-change
+   the same test-seam misconfiguration terminated after the default 3 attempts;
+   the budget-active default now has no count limiter, so the seam requires an
+   ADVANCING :now-fn (e.g. an atom-backed clock advanced by
+   :provider-retry-sleep-fn) whenever the budget is active.
 
    All session contexts supply a default wall-clock :now-fn
    (java.time.Instant/now) and create fresh fn instances, so 'no injected
@@ -77,13 +77,15 @@
    non-advancing. last-retry-now is the previous scheduled retry's now-ms (nil
    on the first retry), now the current failed attempt's."
   [ctx budget-active? count-cap last-retry-now now]
-  (when (and (= false (:provider-retry-sleep? ctx))
+  (when (and (or (= false (:provider-retry-sleep? ctx))
+                 (some? (:provider-retry-sleep-fn ctx)))
              budget-active?
              (nil? count-cap)
              (some? last-retry-now)
              (< (- now last-retry-now) min-retry-clock-advance-ms))
-    (throw (ex-info "Test-seam misconfiguration: :provider-retry-sleep? false with an active :auto-retry-total-timeout-ms budget, no explicit :auto-retry-max-retries, and a non-advancing clock would hot-loop a persistent retryable failure until the real wall-clock deadline. Inject an ADVANCING :now-fn (e.g. an atom-backed clock advanced by :provider-retry-sleep-fn) or set an explicit :auto-retry-max-retries."
+    (throw (ex-info "Test-seam misconfiguration: real retry sleeps disabled (:provider-retry-sleep? false or :provider-retry-sleep-fn) with an active :auto-retry-total-timeout-ms budget, no explicit :auto-retry-max-retries, and a non-advancing clock would hot-loop a persistent retryable failure until the real wall-clock deadline. Inject an ADVANCING :now-fn (e.g. an atom-backed clock advanced by :provider-retry-sleep-fn) or set an explicit :auto-retry-max-retries."
                     {:provider-retry-sleep? (:provider-retry-sleep? ctx)
+                     :provider-retry-sleep-fn (some? (:provider-retry-sleep-fn ctx))
                      :auto-retry-total-timeout-ms (get-in ctx [:config :auto-retry-total-timeout-ms])
                      :auto-retry-max-retries (get-in ctx [:config :auto-retry-max-retries])
                      :clock-advance-ms (- now last-retry-now)}))))

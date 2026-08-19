@@ -236,10 +236,12 @@
 (deftest execute-prepared-request-explicit-count-cap-still-bounds-test
   ;; An explicitly configured small :auto-retry-max-retries remains a hard cap
   ;; even with the total-time budget active (:exhausted-reason :count-cap, no
-  ;; truncated final sleep).
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 1}})
+  ;; truncated final sleep). The :provider-retry-sleep? seam flag is assoc'd
+  ;; onto the ctx directly (create-session-context opts do not propagate it to
+  ;; the ctx — established empirically), so the test pays no real backoff time.
+  (let [[ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-max-retries 1}})
+        ctx              (assoc ctx0 :provider-retry-sleep? false)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -259,10 +261,13 @@
 
 (deftest execute-prepared-request-count-only-fallback-three-test
   ;; Budget disabled (total-timeout <= 0) with no explicit cap uses the preserved
-  ;; count-only fallback of 3 as the sole give-up limiter.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-total-timeout-ms 0}})
+  ;; count-only fallback of 3 as the sole give-up limiter. The
+  ;; :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
+  ;; (create-session-context opts do not propagate it to the ctx — established
+  ;; empirically), so the test pays no real backoff time.
+  (let [[ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 0}})
+        ctx              (assoc ctx0 :provider-retry-sleep? false)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -522,6 +527,31 @@
   ;; do not propagate :provider-retry-sleep? / :now-fn to the ctx).
   (let [[ctx0 session-id] (create-session-context {:persist? false})
         ctx              (assoc ctx0 :provider-retry-sleep? false)
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Test-seam misconfiguration"
+           (turn-runtime/execute-prepared-request!
+            {:provider-registry (atom {})} ctx session-id prepared nil)))
+      ;; the guard needs two consecutive clock reads to detect the
+      ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
+      ;; not a 10-minute spin
+      (is (= 2 @attempts*)))))
+
+(deftest execute-prepared-request-sleep-fn-seam-guard-test
+  ;; The seam guard also covers an injected no-op :provider-retry-sleep-fn
+  ;; WITHOUT the :provider-retry-sleep? false flag: budget active, nil count
+  ;; cap, non-advancing clock (default wall-clock :now-fn), persistent
+  ;; failure — the sleep-fn makes the waits no-ops, so the loop would hot-loop
+  ;; to the real wall-clock deadline unless the guard fires (the sleep? flag
+  ;; alone being nil would skip the guard).
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        ctx              (assoc ctx0 :provider-retry-sleep-fn (fn [_delay-ms]))
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!

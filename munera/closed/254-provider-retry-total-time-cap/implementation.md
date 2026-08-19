@@ -237,3 +237,24 @@
     core.clj + retry test. No change to give-up-decision branch order, deadline
     lifecycle, cancellation, or config semantics.
 - implementation review 2026-08-19 (fifth turn): added 2 steps to be addressed.
+- implementation review 2026-08-18 (fifth turn): addressed 2 review steps.
+  - **Real-sleep tests.** `execute-prepared-request-explicit-count-cap-still-bounds-test`
+    and `execute-prepared-request-count-only-fallback-three-test` passed
+    `:provider-retry-sleep? false` via `create-session-context` opts (inert —
+    not propagated to the ctx), so they real-slept ~2 s and ~14 s per suite run.
+    Both now create ctx0 without the flag and `(assoc ctx0 :provider-retry-sleep? false)`
+    directly onto the ctx, matching the hot-loop tests. Retry suite: ~25.0 s → 13.2 s.
+  - **Guard coverage for the sleep-fn seam.** `assert-test-seam-no-hot-loop!`
+    condition broadened from `(= false (:provider-retry-sleep? ctx))` to
+    `(or (= false (:provider-retry-sleep? ctx)) (some? (:provider-retry-sleep-fn ctx)))`;
+    docstring + ex-info message updated to name both seams, ex-data gains
+    `:provider-retry-sleep-fn` presence. New
+    `execute-prepared-request-sleep-fn-seam-guard-test`: no-op sleep-fn without
+    the flag, budget active, nil count-cap, wall-clock `:now-fn`, persistent
+    failure → guard throws at the 2nd scheduled retry (2 attempts, no hang).
+    Verified safe for all current sleep-fn tests (advancing clocks >= 2000 ms;
+    non-advancing sleep-fn tests schedule at most one retry or carry an explicit
+    count cap).
+  - **Validation.** response-mode-retry-test 17, response-mode-test 18,
+    model-test 12, eql-provider-retry-test 3, core-test 16 — all green;
+    clj-kondo clean on retry.clj + retry test.

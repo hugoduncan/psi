@@ -188,7 +188,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, fifth turn)
 
-- [ ] New retry tests real-sleep because the `:provider-retry-sleep?` seam flag
+- [x] New retry tests real-sleep because the `:provider-retry-sleep?` seam flag
       passed via `create-session-context` opts is INERT (`create-context*` in
       agent-session/context.clj does not propagate it to the ctx — established
       empirically in the 4th-turn follow-up):
@@ -199,7 +199,11 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       Assoc `:provider-retry-sleep? false` directly onto the ctx (the pattern
       the two hot-loop tests already use) or inject a no-op
       `:provider-retry-sleep-fn`, so the new tests stop paying real backoff time.
-- [ ] `assert-test-seam-no-hot-loop!` (retry.clj) fires only when
+      → Done: both tests now create ctx0 via `create-session-context` (without
+      the inert opts flag) and `(assoc ctx0 :provider-retry-sleep? false)`
+      directly onto the ctx, matching the hot-loop tests. Retry suite drops from
+      ~25.0 s to 13.2 s.
+- [x] `assert-test-seam-no-hot-loop!` (retry.clj) fires only when
       `(= false (:provider-retry-sleep? ctx))`, but its docstring claims to
       guard "with :provider-retry-sleep? false (no real sleeps /
       :provider-retry-sleep-fn)". A test that injects a no-op
@@ -213,3 +217,15 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       tests: advancing-clock tests advance >= 2000 ms; the non-advancing
       sleep-fn tests schedule at most one retry (the guard needs two
       consecutive clock reads).
+      → Done: guard condition broadened to
+      `(or (= false (:provider-retry-sleep? ctx)) (some? (:provider-retry-sleep-fn ctx)))`
+      with docstring + ex-info message updated to name both seams and
+      `:provider-retry-sleep-fn` presence added to the ex-data. New test
+      `execute-prepared-request-sleep-fn-seam-guard-test` injects a no-op
+      sleep-fn without the flag (budget active, nil count-cap, default
+      wall-clock `:now-fn`, persistent failure) and asserts the guard throws
+      at the 2nd scheduled retry. All current sleep-fn tests unaffected
+      (verified): advancing-clock tests advance >= 2000 ms; non-advancing
+      sleep-fn tests (`deadline-preserved-inter-attempt`, `cancel-*`,
+      `clears-active-retry-state`) schedule at most one retry or carry an
+      explicit count cap.
