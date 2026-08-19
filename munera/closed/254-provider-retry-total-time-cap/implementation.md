@@ -258,3 +258,4 @@
   - **Validation.** response-mode-retry-test 17, response-mode-test 18,
     model-test 12, eql-provider-retry-test 3, core-test 16 — all green;
     clj-kondo clean on retry.clj + retry test.
+- implementation review 2026-08-19 (sixth turn): added 2 steps to be addressed.

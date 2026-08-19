@@ -229,3 +229,56 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       sleep-fn tests (`deadline-preserved-inter-attempt`, `cancel-*`,
       `clears-active-retry-state`) schedule at most one retry or carry an
       explicit count cap.
+
+## Review follow-up (implementation review, sixth turn)
+
+- [ ] Complete the 5th-turn inert-flag real-sleep fix across the remaining
+      retry tests. The seam discovery — `:provider-retry-sleep? false` passed
+      via `create-session-context` opts is NOT propagated to the ctx
+      (`create-context*` destructures known keys only) — was applied only to
+      the two NEW tests. Seven OTHER retry tests still pass the flag via opts
+      and real-sleep on every suite run (measured with test-var timing):
+      - `response_mode_test.clj`:
+        `execute-prepared-request-retry-exhaustion-preserves-last-cause-test`
+        (~6 s: 2 s + 4 s),
+        `execute-prepared-request-retry-after-header-drives-delay-test`
+        (~5 s `Retry-After`),
+        `execute-prepared-request-streaming-error-event-provider-headers-drive-retry-test`
+        (~4 s `Retry-After`),
+        `execute-prepared-request-streaming-exception-preserves-retry-headers-test`
+        (~2 s `Retry-After`);
+      - `response_mode_retry_test.clj`:
+        `execute-prepared-request-streaming-retry-discards-failed-partial-output-test`
+        (~2 s);
+      - `prompt_lifecycle_test.clj`:
+        `prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test`
+        (~2 s),
+        `prompt-provider-retry-after-tool-result-does-not-rerun-tool-test`
+        (~2 s).
+      Fix: drop the inert opts flag and `(assoc ctx0 :provider-retry-sleep? false)`
+      directly onto the ctx (or inject a no-op `:provider-retry-sleep-fn`), matching
+      the 5th-turn pattern. Do NOT touch
+      `execute-prepared-request-production-backoff-observes-active-turn-abort-test`
+      (response_mode_test.clj) — it intentionally real-sleeps through the
+      interruptible poll seam to test active-turn abort and carries no flag.
+      (~23 s of needless real sleep per full-suite run.)
+- [ ] Budget-disabled (count-only) mode can still be deadline-bounded by a
+      leftover FUTURE canonical `:retry-deadline-ms` from a prior budget-active
+      window. `retry-deadline-for` (retry.clj:27) returns a future deadline
+      regardless of `budget-active?`, and the loop's
+      `deadline-ms (or retry-deadline-ms (when (and retryable? retry-enabled?
+      budget-active?) (+ now budget-timeout-ms)))` (core.clj:550) binds it in
+      count-only mode → `:exhausted-reason :deadline` (while `:max-retries`
+      reports the count-only fallback 3) instead of count-cap-only give-up,
+      contradicting design Approach 1 disable semantics ("no deadline is
+      computed, the give-up predicate evaluates only the count cap"). Reachable
+      when a session persisted mid-window (deadline still future) is rehydrated
+      with `:auto-retry-total-timeout-ms` nil/absent/`<= 0` (config change /
+      process restart); the existing stale-past entry check handles only
+      expired deadlines. Fix: gate the loop-entry seed on `budget-active?` —
+      e.g. `retry-deadline-for` takes `budget-active?` and clears the canonical
+      deadline + yields nil when disabled, or the `deadline-ms` resolution drops
+      the seed when `budget-active?` is false — and add a test: session seeded
+      with a future persisted `:retry-deadline-ms`, budget disabled, no
+      explicit cap → gives up only on the count-only fallback 3, never
+      `:exhausted-reason :deadline`.
