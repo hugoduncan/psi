@@ -315,3 +315,4 @@
     statechart-actions-test 8, footer-test 8, rpc-prompt-stream/command + rpc-session-
     navigation — all green; clj-kondo clean on all changed files. No change to
     give-up-decision branch order, deadline lifecycle, cancellation, or config semantics.
+- implementation review 2026-08-19 (eighth turn): added 2 steps to be addressed.

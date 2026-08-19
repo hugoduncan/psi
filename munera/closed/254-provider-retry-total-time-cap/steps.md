@@ -332,6 +332,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       comment (opts are evaluated before the ctx exists). The 4 pre-existing
       tests that already passed the flag via opts (previously inert) now
       actually disable sleeps. clj-kondo clean.
+
 - [x] `assert-test-seam-no-hot-loop!` (retry.clj) uses the hardcoded
       `min-retry-clock-advance-ms` 1000 ms threshold: an injected clock that
       advances by less than 1000 ms between scheduled retries trips the guard
@@ -382,3 +383,35 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `session-updated-payload-includes-retry-contract-test` seeds/asserts
       the field (rpc_events_test.clj, key-set + value), fixture
       `session-scoped-event-data` updated for the new required key.
+
+## Review follow-up (implementation review, eighth turn)
+
+- [ ] `create-context*` (agent-session/context.clj) still silently drops
+      `:retry-min-clock-advance-ms` passed via `create-session-context` opts:
+      the 7th-turn seam-key propagation covers `:provider-retry-sleep?` /
+      `:provider-retry-sleep-fn` / `:provider-retry-cancelled?` / `:now-fn`
+      but not the hot-loop guard threshold override that
+      `retry-min-clock-advance-ms` (turn-runtime/retry.clj) documents as
+      "Overridable per-test via :retry-min-clock-advance-ms on the ctx" — the
+      same silent-drop trap for a future cap-free budget-active test whose
+      smallest delay is a provider `Retry-After` below the configured base
+      (the exact case the docstring names). No current test passes it, so
+      nothing misbehaves today. Propagate the key through `create-context*`
+      alongside the other four seam keys, and add a test that passes it via
+      opts and asserts the guard threshold uses it.
+- [ ] `retry-deadline-for` (turn-runtime/retry.clj) budget-disabled branch
+      dissoc's only `:retry-deadline-ms`, leaving the stale `:retry-attempt` /
+      `:retry` residue from a prior budget-active window — unlike the stale-past
+      branch, which resets `:retry-attempt 0` + `:retry nil` alongside the
+      deadline dissoc (3rd-turn fix). A session persisted mid-window (deadline
+      still future) and rehydrated with `:auto-retry-total-timeout-ms`
+      nil/absent/`<= 0` gives up at the FIRST failure with 0 retries when the
+      stale attempt >= the count-only fallback 3 (verified empirically: seeded
+      future deadline 5000 + attempt 3 + stale `:retry` map under timeout 0 →
+      1 attempt, `:exhausted-reason :count-cap`, `:max-retries 3`, vs 4
+      attempts for a clean count-only session), or resumes the backoff
+      mid-sequence with a stale `:retry` map visible when the stale attempt
+      < 3. The 6th-turn leftover-future-deadline test seeded only the
+      deadline, so the residue was never exercised. Reset
+      `:retry-attempt`/`:retry` in the budget-disabled branch (mirror the
+      stale-past branch) and extend the test to seed attempt + retry map.
