@@ -199,3 +199,89 @@
                  :psi.provider-retry/rate-limit nil
                  :psi.provider-retry/final? true}]
                (:psi.provider-request/retry-attempts by-request)))))))
+
+(deftest provider-retry-truncated-final-schedule-marker-test
+  (testing "the truncated final schedule of a deadline give-up carries final? true"
+    ;; Hand-built sequence mirroring the empirically-verified truncated-final
+    ;; flow (budget 5000 / base 2000, injected clock + sleep-fn): the
+    ;; authoritative terminal provider_request_finished reports the pre-sleep
+    ;; FAILED attempt (retry-attempt 1, the actual executed attempt) while the
+    ;; truncated schedule it supersedes carries retry-attempt 2 (delay 3000,
+    ;; resume-at == deadline 5000) — the LAST schedule must be marked final,
+    ;; not the one whose attempt matches the terminal event's.
+    (let [[ctx session-id] (create-session-context)]
+      (test-support/update-state! ctx :provider-events
+                                  into
+                                  [{:type "provider_request_started"
+                                    :provider-request-id "request-truncated"
+                                    :turn-id "turn-truncated"
+                                    :retry-attempt 0}
+                                   {:type "provider_request_finished"
+                                    :provider-request-id "request-truncated"
+                                    :turn-id "turn-truncated"
+                                    :retry-attempt 0
+                                    :status :failed
+                                    :final? false
+                                    :error-kind :transport
+                                    :error-message "connection reset"}
+                                   {:type "provider_retry_scheduled"
+                                    :provider-request-id "request-truncated"
+                                    :turn-id "turn-truncated"
+                                    :failed-attempt 0
+                                    :retry-attempt 1
+                                    :error-kind :transport
+                                    :error-message "connection reset"
+                                    :delay-ms 2000
+                                    :delay-source :exponential-backoff
+                                    :resume-at 2000}
+                                   {:type "provider_request_finished"
+                                    :provider-request-id "request-truncated"
+                                    :turn-id "turn-truncated"
+                                    :retry-attempt 1
+                                    :status :failed
+                                    :final? false
+                                    :error-kind :transport
+                                    :error-message "connection reset"}
+                                   {:type "provider_retry_scheduled"
+                                    :provider-request-id "request-truncated"
+                                    :turn-id "turn-truncated"
+                                    :failed-attempt 1
+                                    :retry-attempt 2
+                                    :error-kind :transport
+                                    :error-message "connection reset"
+                                    :delay-ms 3000
+                                    :delay-source :exponential-backoff
+                                    :resume-at 5000}
+                                   {:type "provider_request_finished"
+                                    :provider-request-id "request-truncated"
+                                    :turn-id "turn-truncated"
+                                    :retry-attempt 1
+                                    :status :failed
+                                    :final? true
+                                    :failure-reason :retry-exhausted
+                                    :exhausted-reason :deadline
+                                    :error-kind :transport}])
+      (let [by-request (session/query-in ctx session-id
+                                         (retry-query)
+                                         {:psi.provider-request/id "request-truncated"})]
+        (is (= :retry-exhausted (:psi.provider-request/final-status by-request)))
+        (is (= 2 (:psi.provider-request/retry-count by-request)))
+        (is (= [{:psi.provider-retry/attempt 1
+                 :psi.provider-retry/failed-attempt 0
+                 :psi.provider-retry/error-kind :transport
+                 :psi.provider-retry/error-message "connection reset"
+                 :psi.provider-retry/delay-ms 2000
+                 :psi.provider-retry/delay-source :exponential-backoff
+                 :psi.provider-retry/resume-at 2000
+                 :psi.provider-retry/rate-limit nil
+                 :psi.provider-retry/final? false}
+                {:psi.provider-retry/attempt 2
+                 :psi.provider-retry/failed-attempt 1
+                 :psi.provider-retry/error-kind :transport
+                 :psi.provider-retry/error-message "connection reset"
+                 :psi.provider-retry/delay-ms 3000
+                 :psi.provider-retry/delay-source :exponential-backoff
+                 :psi.provider-retry/resume-at 5000
+                 :psi.provider-retry/rate-limit nil
+                 :psi.provider-retry/final? true}]
+               (:psi.provider-request/retry-attempts by-request)))))))

@@ -502,7 +502,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, thirteenth turn)
 
-- [ ] Truncated-final attempt-number mismatch breaks the EQL `provider-retries`
+- [x] Truncated-final attempt-number mismatch breaks the EQL `provider-retries`
       final marker. The truncated final sleep's `provider_retry_scheduled`
       reports `:retry-attempt N+1` (`next-attempt`, via `schedule-and-sleep!`),
       but the authoritative terminal `provider_request_finished` it supersedes
@@ -533,3 +533,24 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       queried through `:psi.agent-session/provider-retries`, or a hand-built
       finished(1,false) → scheduled(2) → finished(1,true) sequence) asserting
       the truncated schedule carries `final? true`.
+      → Done: chose the resolver-side fix — `provider-retry-summary->eql`
+      (agent-session/resolvers/provider_retries.clj) now marks a schedule
+      final by `(= (:retry-attempt %) (some-> (last schedules) :retry-attempt))`
+      (the LAST schedule of the provider request) instead of matching the
+      terminal event's `:retry-attempt`. The terminal `provider_request_finished`
+      keeps reporting the pre-sleep failed attempt N (the actually-executed
+      attempt, consistent with its `:attempt-id`); the marker is a projection
+      concern and "last schedule" is correct for every terminal path (success /
+      count-cap / deadline / cancel — the cancel event reports the scheduled
+      attempt N+1). New
+      `provider-retry-truncated-final-schedule-marker-test`
+      (eql_provider_retry_test.clj) hand-builds the verified truncated-final
+      sequence — finished(0,false) → scheduled(1, 2000/2000) →
+      finished(1,false) → scheduled(2, 3000/5000) → finished(1,true,
+      `:retry-exhausted :deadline`) — and asserts the truncated schedule
+      (attempt 2) carries `final? true` while the full backoff (attempt 1)
+      carries `final? false`. Verified the test fails against the pre-fix
+      resolver (14 pass / 1 fail) and passes with it. eql-provider-retry-test
+      3 → 4; the three pre-existing marker tests (success / count-cap /
+      cancel) unchanged. clj-kondo clean; `bb commit-check:file-lengths`
+      passes; CHANGELOG [Unreleased] Fixed entry added.

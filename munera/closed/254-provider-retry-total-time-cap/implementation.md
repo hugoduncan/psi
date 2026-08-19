@@ -361,3 +361,31 @@
   change (config keys, :exhausted-reason, :retry-deadline-ms surfaces — verified against
   code); no stale or missing references in README/doc/ramora.
 - implementation review 2026-08-19 (thirteenth turn): added 1 step to be addressed.
+- implementation-review-followup 2026-08-19 (thirteenth turn, 1/1 step done): addressed the
+  13th-turn implementation-review step (truncated-final attempt-number mismatch breaks the
+  EQL provider-retries final marker).
+  - **Resolver-side final-marker fix (provider_retries.clj).** `provider-retry-summary->eql`
+    now marks a schedule final when it is the LAST schedule of the provider request
+    (`= (:retry-attempt %) (some-> (last schedules) :retry-attempt)`) instead of matching the
+    terminal event's `:retry-attempt`. The truncated-final `provider_request_finished`
+    reports the pre-sleep failed attempt N (the actually-executed attempt, consistent with
+    its `:attempt-id`) while the superseded truncated schedule carries N+1 (resume-at ==
+    deadline), so the old rule marked the second-to-last schedule `final? true` and the
+    truncated final `final? false`. "Last schedule" is correct for every terminal path
+    (success / count-cap / deadline / cancel — the cancel event reports the scheduled
+    attempt N+1). Chose this over aligning the terminal event's `:retry-attempt` to
+    next-attempt to keep the runtime event semantics consistent (a `provider_request_finished`
+    always refers to a real executed attempt).
+  - **Regression test.** `provider-retry-truncated-final-schedule-marker-test`
+    (eql_provider_retry_test.clj) hand-builds the verified truncated-final sequence
+    finished(0,false) → scheduled(1, 2000/2000) → finished(1,false) →
+    scheduled(2, 3000/5000) → finished(1,true, `:retry-exhausted :deadline`) and asserts the
+    truncated schedule (attempt 2) carries `final? true`, the full backoff (attempt 1)
+    `final? false`. Verified failing against the pre-fix resolver (14 pass / 1 fail) and
+    passing with it; the three pre-existing marker tests (success / count-cap / cancel) are
+    unchanged by the new rule.
+  - **Validation.** eql-provider-retry-test 3 → 4 (15 assertions),
+    response-mode-retry-test 21, response-mode-test 18, eql-introspection-test 5,
+    provider-introspection-test 3 — all green; clj-kondo clean on both changed files;
+    `bb commit-check:file-lengths` passes; CHANGELOG [Unreleased] Fixed entry added
+    (bug_fix is user-visible per changelog protocol).

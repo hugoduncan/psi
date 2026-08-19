@@ -31,7 +31,17 @@
         schedules     (filter #(= "provider_retry_scheduled" (:type %)) events*)
         finals        (filter :final? events*)
         final         (last finals)
-        final-attempt (:retry-attempt final)]
+        ;; A schedule is the final retry of the provider request when it is the
+        ;; LAST schedule (max retry-attempt), not when its attempt number
+        ;; matches the terminal event's. The terminal event does not always
+        ;; report the superseded schedule's attempt: the truncated-final
+        ;; deadline give-up reports the pre-sleep FAILED attempt N (the actual
+        ;; executed attempt, matching its :attempt-id) while the superseded
+        ;; truncated schedule — the retry that runs out the window to the
+        ;; deadline — carries N+1. Keying on the last schedule keeps the marker
+        ;; correct for every terminal path (success, count-cap, deadline,
+        ;; cancel: the cancel event reports the scheduled attempt N+1).
+        final-attempt (some-> (last schedules) :retry-attempt)]
     {:psi.provider-request/id             provider-request-id
      :psi.provider-request/turn-id        (:turn-id (first events*))
      :psi.provider-request/retry-count    (count schedules)
