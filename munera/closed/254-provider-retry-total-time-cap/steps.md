@@ -453,3 +453,32 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       longer claims provider captures. Both files lint clean (clj-kondo) and
       the focused suite (8 tests, 162 assertions across both namespaces) is
       green; `bb commit-check:file-lengths` passes.
+
+## Review follow-up (implementation review, tenth turn)
+
+- [ ] `retry-after-delay-ms` (session-state/model.clj) integer branch parses
+      `Retry-After` with `(Long/parseLong raw)` WITHOUT the try/catch the
+      RFC-date `:else` branch has: a numeric string outside Long range (e.g.
+      `Retry-After: 99999999999999999999`) throws an uncaught
+      `NumberFormatException` instead of falling back to the exponential
+      backoff (verified empirically: `retry-after-delay-ms` and
+      `retry-metadata` both throw). The single-predicate reorder
+      (`retry-metadata-for` runs unconditionally BEFORE `give-up-decision`)
+      means this now executes on EVERY failed attempt — including
+      non-retryable errors that previously never computed retry metadata —
+      so one malformed oversized header crashes the whole turn instead of a
+      graceful classification/fallback. The invalid-Retry-After fallback
+      test covers non-numeric garbage only (RFC-date catch branch), not an
+      oversized integer. Fix: wrap the integer branch in try/catch → nil
+      (exponential fallback), mirroring the `:else` branch; add a model-level
+      test (`retry-after-delay-ms`/`retry-metadata` with a 20-digit value →
+      nil/exponential) and a turn-runtime test (budget-active default,
+      cap-free, persistent retryable failure + oversized `Retry-After` →
+      floors to backoff, window runs to `:deadline`, no throw).
+- [ ] `retry-deadline-for` (turn-runtime/retry.clj) has two textually identical
+      cond-branch bodies (budget-disabled leftover deadline and stale-past
+      deadline): both assoc `:retry-attempt 0` + `:retry nil`, dissoc
+      `:retry-deadline-ms`, and yield nil. Merge into one branch
+      (`(and (some? deadline) (or (not budget-active?) (< deadline (now-ms ctx))))`)
+      with the two intents documented in the existing docstring; behavior
+      unchanged.
