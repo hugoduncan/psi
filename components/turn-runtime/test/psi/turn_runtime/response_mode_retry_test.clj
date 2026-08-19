@@ -568,6 +568,50 @@
         (is (= :deadline (:exhausted-reason outcome)))
         (is (nil? (:max-retries outcome)))))))
 
+(deftest execute-prepared-request-near-long-retry-after-floors-to-backoff-test
+  ;; A PARSEABLE near-Long/MAX integer Retry-After (16 digits, seconds >=
+  ;; 9223372036854775) previously crashed the whole turn with an uncaught
+  ;; ArithmeticException: the integer branch's `* 1000` overflowed for seconds
+  ;; >= 9223372036854776, and even the largest fitting product overflowed
+  ;; retry-metadata's `:resume-at`. Under the budget-active default (cap-free)
+  ;; it now floors to the exponential backoff and the window still runs to
+  ;; :deadline — one malformed near-Long header cannot kill the retry loop.
+  (doseq [retry-after ["9223372036854775" "9223372036854776"]]
+    (let [clock          (atom 0)
+          [ctx session-id] (create-session-context {:persist? false
+                                                    :config {:auto-retry-base-delay-ms 2000
+                                                             :auto-retry-max-delay-ms 60000}
+                                                    :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                                                    :provider-retry-sleep-fn (fn [delay-ms]
+                                                                               (swap! clock + (long delay-ms)))})
+          prepared       (prepared-request ctx session-id)
+          attempts*      (atom 0)]
+      (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                    (fn [& _]
+                      (swap! attempts* inc)
+                      (assoc (error-turn "rate limit exceeded")
+                             :assistant-message {:role "assistant"
+                                                 :content [{:type :error :text "rate limit exceeded"}]
+                                                 :stop-reason :error
+                                                 :error-message "rate limit exceeded"
+                                                 :http-status 429
+                                                 :provider-error/headers {"Retry-After" retry-after}
+                                                 :timestamp (java.time.Instant/now)}))]
+        (let [result    (turn-runtime/execute-prepared-request!
+                         {:provider-registry (atom {})} ctx session-id prepared nil)
+              outcome   (:execution-result/retry-outcome result)
+              events    (provider-events ctx session-id)
+              scheduled (first (filter #(= "provider_retry_scheduled" (:type %)) events))]
+          ;; near-Long Retry-After floors to the exponential backoff, no throw
+          (is (= :exponential-backoff (:delay-source scheduled)))
+          (is (= 2000 (:delay-ms scheduled)))
+          (is (= 2000 (:resume-at scheduled)))
+          ;; budget-active default (timeout/cap keys omitted -> 600000 / nil):
+          ;; give-up happens at the deadline, not a count cap
+          (is (= :retry-exhausted (:failure-reason outcome)))
+          (is (= :deadline (:exhausted-reason outcome)))
+          (is (nil? (:max-retries outcome))))))))
+
 (deftest execute-prepared-request-cancel-during-truncated-final-sleep-test
   ;; Cancellation arriving during the truncated final sleep (overshoot path)
   ;; returns :retry-cancelled, emits the truncated provider_retry_scheduled then

@@ -141,7 +141,10 @@
     {:failure-reason :retry-exhausted :exhausted-reason :deadline}
     (and (some? deadline-ms)
          (pos? (- deadline-ms now))
-         (> (+ now next-delay-ms) deadline-ms))
+         ;; Subtraction-based: `(- deadline-ms now)` is bounded by the window
+         ;; (<= the total-timeout), while `(+ now next-delay-ms)` would
+         ;; overflow for a near-Long/MAX provider `Retry-After` delay.
+         (> next-delay-ms (- deadline-ms now)))
     {:failure-reason :retry-exhausted :exhausted-reason :deadline
      :final-sleep-ms (- deadline-ms now)}
     :else nil))

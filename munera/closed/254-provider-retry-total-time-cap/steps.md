@@ -612,7 +612,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, fifteenth turn)
 
-- [ ] `retry-after-delay-ms` / `retry-metadata` (session-state/model.clj) +
+- [x] `retry-after-delay-ms` / `retry-metadata` (session-state/model.clj) +
       `give-up-decision` (turn-runtime/retry.clj): the 10th-turn oversized
       `Retry-After` fix covers only integers OUTSIDE Long range (20 digits →
       `parse-long-safe` nil → exponential fallback). A PARSEABLE near-Long/MAX
@@ -648,3 +648,25 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       (budget-active default, cap-free, persistent retryable failure +
       16-digit `Retry-After` → floors to backoff, window runs to `:deadline`,
       no throw).
+      → Done: `retry-after-delay-ms` integer branch now caps the accepted
+      seconds — strictly below `(quot Long/MAX_VALUE 1000)` (the `* 1000`
+      overflow boundary) AND below the value whose delay-ms would overflow
+      `retry-metadata`'s `:resume-at` `(+ now-ms delay-ms)` — so both
+      `Retry-After: 9223372036854775` and `9223372036854776` yield nil →
+      exponential floor, no throw (a fitting large value like
+      `9223372036854774` at now-ms 0 is still honored with a non-overflowing
+      `:resume-at`). `give-up-decision`'s overshoot comparison is now
+      subtraction-based (`(> next-delay-ms (- deadline-ms now))` — cannot
+      overflow). New model tests
+      `retry-after-near-long-integer-floors-to-exponential-test` (both 16-digit
+      values → nil/exponential + fitting-boundary `:resume-at` no-overflow
+      case) and turn-runtime
+      `execute-prepared-request-near-long-retry-after-floors-to-backoff-test`
+      (budget-active default, cap-free, persistent retryable failure +
+      16-digit `Retry-After` → floors to backoff, window runs to `:deadline`,
+      no throw). CHANGELOG [Unreleased] Fixed entry extended to name the
+      near-Long `ArithmeticException` class. Validation: model-test 14,
+      retry-test 22, response-mode-test 18, eql-provider-retry-test 5,
+      core-test 16, prompt-lifecycle-test 23 — all green; clj-kondo clean;
+      commit-check:file-lengths / changelog:check /
+      commit-check:dispatch-architecture pass.

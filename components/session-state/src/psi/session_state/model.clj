@@ -540,12 +540,21 @@
       nil
 
       (integer-string? raw)
-      (let [delay-ms (some-> raw parse-long-safe (* 1000))]
-        ;; Non-positive integers (0 / negative) have no meaningful wait, and
-        ;; integers outside Long range (e.g. an oversized Retry-After) are
-        ;; unparsable — both yield nil, flooring to the exponential backoff
-        ;; like the RFC-date branch does for <= 0 / unparsable values, so
-        ;; retry-metadata's `(or retry-after-ms exponential-delay-ms)` falls back.
+      (let [seconds (some-> raw parse-long-safe)
+            ;; Cap the accepted seconds: strictly below Long/MAX_VALUE / 1000
+            ;; (the `* 1000` overflow boundary) and below the value whose
+            ;; delay-ms would overflow retry-metadata's `:resume-at`
+            ;; `(+ now-ms delay-ms)`. A PARSEABLE near-Long/MAX integer
+            ;; (16 digits, seconds >= 9223372036854775) previously slipped
+            ;; through both and crashed the turn with an uncaught
+            ;; ArithmeticException; it now yields nil, flooring to the
+            ;; exponential backoff like the RFC-date branch does for <= 0 /
+            ;; unparsable values, so retry-metadata's
+            ;; `(or retry-after-ms exponential-delay-ms)` falls back.
+            delay-ms (when (and seconds
+                                (< seconds (quot Long/MAX_VALUE 1000))
+                                (<= (* 1000 seconds) (- Long/MAX_VALUE (long now-ms))))
+                       (* 1000 seconds))]
         (when (and delay-ms (pos? delay-ms))
           delay-ms))
 

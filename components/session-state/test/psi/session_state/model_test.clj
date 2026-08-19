@@ -324,3 +324,33 @@
       (is (= 2000 (:delay-ms meta)))
       (is (= :exponential-backoff (:delay-source meta)))
       (is (= 2000 (:resume-at meta))))))
+
+(deftest retry-after-near-long-integer-floors-to-exponential-test
+  ;; A PARSEABLE near-Long/MAX integer Retry-After (16 digits, seconds >=
+  ;; 9223372036854775) previously crashed with an uncaught
+  ;; ArithmeticException: the integer branch's `(* 1000 seconds)` overflowed
+  ;; for seconds >= 9223372036854776, and even the largest seconds whose
+  ;; product fits (9223372036854775) overflowed retry-metadata's
+  ;; `:resume-at` `(+ now-ms delay-ms)`. Both caps live in
+  ;; retry-after-delay-ms, so such values yield nil and retry-metadata floors
+  ;; to the exponential backoff — no throw.
+  (testing "retry-after-delay-ms returns nil for a parseable near-Long/MAX integer"
+    (is (nil? (session/retry-after-delay-ms "9223372036854775" 0)))
+    (is (nil? (session/retry-after-delay-ms "9223372036854776" 0))))
+
+  (testing "retry-metadata falls back to exponential backoff for a near-Long Retry-After"
+    (doseq [retry-after ["9223372036854775" "9223372036854776"]]
+      (let [meta (session/retry-metadata {:retry-after retry-after} 0 2000 0)]
+        (is (= 2000 (:delay-ms meta)))
+        (is (= :exponential-backoff (:delay-source meta)))
+        (is (= 2000 (:resume-at meta))))))
+
+  (testing "a fitting large integer is kept and its :resume-at does not overflow"
+    ;; 9223372036854774 is the largest seconds value whose `* 1000` product
+    ;; fits in Long; with now-ms 0 the product also fits the :resume-at
+    ;; addition, so it is honored (not floored) and nothing throws.
+    (is (= 9223372036854774000 (session/retry-after-delay-ms "9223372036854774" 0)))
+    (let [meta (session/retry-metadata {:retry-after "9223372036854774"} 0 2000 0)]
+      (is (= 9223372036854774000 (:delay-ms meta)))
+      (is (= :retry-after (:delay-source meta)))
+      (is (= 9223372036854774000 (:resume-at meta))))))
