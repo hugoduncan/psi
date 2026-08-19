@@ -609,3 +609,42 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `NumberFormatException` crash path (integer branch lacked the RFC-date
       try/catch; retry metadata runs on every failed attempt pre-decision) and
       the `parse-long-safe` → nil → exponential-floor fix.
+
+## Review follow-up (implementation review, fifteenth turn)
+
+- [ ] `retry-after-delay-ms` / `retry-metadata` (session-state/model.clj) +
+      `give-up-decision` (turn-runtime/retry.clj): the 10th-turn oversized
+      `Retry-After` fix covers only integers OUTSIDE Long range (20 digits →
+      `parse-long-safe` nil → exponential fallback). A PARSEABLE near-Long/MAX
+      integer (16 digits, seconds ≥ 9223372036854775) still crashes the whole
+      turn with `ArithmeticException: long overflow` — verified against the
+      real functions:
+      - `(retry-after-delay-ms "9223372036854776" now)` THROWS: the integer
+        branch's `(some-> raw parse-long-safe (* 1000))` applies `* 1000`
+        OUTSIDE `parse-long-safe`'s try/catch, so a seconds value in
+        [9223372036854776, 9223372036854775807] overflows the ms conversion
+        with no fallback.
+      - `(retry-metadata {:retry-after "9223372036854775"} 0 2000 now)` THROWS:
+        `:resume-at (+ (long now-ms) delay-ms)` overflows for the largest
+        seconds value whose ×1000 fits (delay 9223372036854775000, now ~1.7e12).
+      - `give-up-decision`'s overshoot comparison `(> (+ now next-delay-ms)
+        deadline-ms)` (retry.clj, new code) has the same overflow at the same
+        delay and would throw once the two sites above are guarded.
+      Because `retry-metadata-for` now runs on EVERY failed attempt before
+      `give-up-decision` (the single-predicate reorder), one malformed
+      near-Long/MAX header aborts the whole turn — the exact crash class the
+      10th-turn step intended to close, one digit shorter than its 20-digit
+      test input. The existing tests
+      (`retry-after-oversized-integer-floors-to-exponential-test` /
+      `execute-prepared-request-oversized-retry-after-floors-to-backoff-test`)
+      cover only the out-of-range 20-digit value. Fix: cap the integer
+      branch's accepted seconds (e.g. `(when (< n (quot Long/MAX_VALUE 1000))
+      (* 1000 n))` → nil → exponential floor, or try/catch the `* 1000`
+      mirroring the RFC-date branch), and make the overshoot comparison
+      subtraction-based (`(> next-delay-ms (- deadline-ms now))` — cannot
+      overflow). Add model-level tests (`retry-after-delay-ms` /
+      `retry-metadata` with `Retry-After: 9223372036854775` and
+      `9223372036854776` → nil/exponential, no throw) and a turn-runtime test
+      (budget-active default, cap-free, persistent retryable failure +
+      16-digit `Retry-After` → floors to backoff, window runs to `:deadline`,
+      no throw).

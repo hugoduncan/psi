@@ -398,3 +398,4 @@
   (eql-provider-retry-test 4 → 5). Added the missing CHANGELOG [Unreleased]
   Fixed entry for the oversized-integer `Retry-After` crash fix.
   clj-kondo clean; `bb commit-check:file-lengths` passes; agent-session suite green.
+- implementation review 2026-08-19 (fifteenth turn): added 1 step to be addressed.
