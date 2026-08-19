@@ -317,3 +317,4 @@
     give-up-decision branch order, deadline lifecycle, cancellation, or config semantics.
 - implementation review 2026-08-19 (eighth turn): added 2 steps to be addressed.
 - implementation review 2026-08-19 (ninth turn): added 1 step to be addressed.
+- addressed 8th-turn review steps 2026-08-19: propagated `:retry-min-clock-advance-ms` through `create-context*` opts (new opts-propagation test asserts guard uses the override, ex-data 12345 vs derived 2000); `retry-deadline-for` budget-disabled branch now resets stale `:retry-attempt 0`/`:retry nil` alongside the deadline dissoc, leftover-future-deadline test seeded with attempt-3 + stale retry map asserts fresh window (4 attempts, residue cleared). Retry suite 19 → 20, response-mode 18, model 12 — green; clj-kondo clean; `bb commit-check:file-lengths` passes (eql_introspection_test.clj split landed in prior commit).

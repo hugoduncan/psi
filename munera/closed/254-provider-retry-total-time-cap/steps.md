@@ -386,7 +386,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, eighth turn)
 
-- [ ] `create-context*` (agent-session/context.clj) still silently drops
+- [x] `create-context*` (agent-session/context.clj) still silently drops
       `:retry-min-clock-advance-ms` passed via `create-session-context` opts:
       the 7th-turn seam-key propagation covers `:provider-retry-sleep?` /
       `:provider-retry-sleep-fn` / `:provider-retry-cancelled?` / `:now-fn`
@@ -399,7 +399,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       nothing misbehaves today. Propagate the key through `create-context*`
       alongside the other four seam keys, and add a test that passes it via
       opts and asserts the guard threshold uses it.
-- [ ] `retry-deadline-for` (turn-runtime/retry.clj) budget-disabled branch
+      → Done: `create-context*` now destructures and propagates
+      `:retry-min-clock-advance-ms` alongside the other four seam keys
+      (cond-> guarded by `contains? opts`, after the callback-fns merge);
+      comment updated. New
+      `execute-prepared-request-retry-min-clock-advance-opts-propagation-test`
+      (response_mode_retry_test.clj) passes the key via
+      `create-session-context` opts (budget-active default, cap-free,
+      `:provider-retry-sleep? false`) and asserts the guard fires at the 2nd
+      retry with `:min-retry-clock-advance-ms 12345` in ex-data — the default
+      derivation would be 2000, so the assertion fails if `create-context*`
+      still drops the key.
+- [x] `retry-deadline-for` (turn-runtime/retry.clj) budget-disabled branch
       dissoc's only `:retry-deadline-ms`, leaving the stale `:retry-attempt` /
       `:retry` residue from a prior budget-active window — unlike the stale-past
       branch, which resets `:retry-attempt 0` + `:retry nil` alongside the
@@ -415,6 +426,14 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       deadline, so the residue was never exercised. Reset
       `:retry-attempt`/`:retry` in the budget-disabled branch (mirror the
       stale-past branch) and extend the test to seed attempt + retry map.
+      → Done: `retry-deadline-for` budget-disabled branch now assoc's
+      `:retry-attempt 0` + `:retry nil` alongside the deadline dissoc
+      (mirrors the stale-past branch). The
+      `execute-prepared-request-budget-disabled-ignores-leftover-future-deadline-test`
+      seed extended with `:retry-attempt 3` + stale `:retry` map and now
+      asserts the fresh window runs 4 attempts (`:count-cap`, `:max-retries 3`)
+      with `:retry-attempt` zeroed and `:retry` nil after the run — the residue
+      is not honored and not visible.
 
 ## Review follow-up (implementation review, ninth turn)
 

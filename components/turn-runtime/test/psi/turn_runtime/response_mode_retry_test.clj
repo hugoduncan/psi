@@ -292,7 +292,11 @@
   ;; future deadline binds `deadline-ms` in count-only mode and the overshoot
   ;; branch gives up `:exhausted-reason :deadline` after 1 attempt; with the
   ;; gate, the deadline is cleared at entry and the give-up predicate evaluates
-  ;; only the count-only fallback 3.
+  ;; only the count-only fallback 3. The stale :retry-attempt/:retry residue of
+  ;; the prior window is reset alongside the deadline (8th-turn follow-up):
+  ;; without the reset, a seeded attempt 3 >= the fallback 3 gives up at the
+  ;; FIRST failure with 0 retries, or the backoff resumes mid-sequence with a
+  ;; stale :retry map visible.
   (let [clock          (atom 0)
         [ctx session-id] (create-session-context {:persist? false
                                                   :config {:auto-retry-total-timeout-ms 0
@@ -301,11 +305,18 @@
                                                   :now-fn #(java.time.Instant/ofEpochMilli @clock)})
         _              (swap! (:state* ctx) assoc-in
                               [:agent-session :sessions session-id :data]
-                              ;; future-but-close persisted deadline: without the
-                              ;; fix, the first 2000 ms backoff overshoots the
-                              ;; 1000 ms remaining window → :deadline give-up
+                              ;; future-but-close persisted deadline + stale
+                              ;; :retry-attempt/:retry from the prior window:
+                              ;; without the fix, the first 2000 ms backoff
+                              ;; overshoots the 1000 ms remaining window →
+                              ;; :deadline give-up, and the attempt 3 residue
+                              ;; gives up at the first failure (>= fallback 3)
                               (assoc (ss/get-session-data-in ctx session-id)
-                                     :retry-deadline-ms 1000))
+                                     :retry-deadline-ms 1000
+                                     :retry-attempt 3
+                                     :retry {:resume-at 999999
+                                             :delay-ms 8000
+                                             :delay-source :exponential-backoff}))
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -314,14 +325,19 @@
                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
                      {:provider-registry (atom {})} ctx session-id prepared nil)
-            outcome (:execution-result/retry-outcome result)]
-        ;; count-only fallback 3 bounds the loop: 1 initial + 3 retries
+            outcome (:execution-result/retry-outcome result)
+            sd      (ss/get-session-data-in ctx session-id)]
+        ;; count-only fallback 3 bounds the loop: 1 initial + 3 retries (the
+        ;; stale attempt 3 residue was reset to 0 at entry, not honored)
         (is (= 4 @attempts*))
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :count-cap (:exhausted-reason outcome)))
         (is (= 3 (:max-retries outcome)))
-        ;; the leftover future deadline was cleared at loop entry, not bound
-        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
+        ;; the leftover future deadline AND the stale attempt/resume residue
+        ;; were cleared at loop entry, not bound / not visible
+        (is (nil? (:retry-deadline-ms sd)))
+        (is (zero? (:retry-attempt sd)))
+        (is (nil? (:retry sd)))))))
 
 (deftest execute-prepared-request-retry-after-deadline-bounded-test
   ;; A provider Retry-After delay is respected per attempt but an oversized one is
@@ -664,3 +680,36 @@
         (is (> @attempts* 2))
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :deadline (:exhausted-reason outcome)))))))
+
+(deftest execute-prepared-request-retry-min-clock-advance-opts-propagation-test
+  ;; The :retry-min-clock-advance-ms hot-loop guard threshold override flows
+  ;; through create-session-context opts (propagated to the ctx by
+  ;; create-context*, 8th-turn follow-up) — a cap-free budget-active
+  ;; sleep-disabled test whose smallest delay is below the configured base can
+  ;; raise the guard threshold via the natural opts API instead of assoc'ing
+  ;; the key directly onto the ctx after creation (the silent-drop trap the
+  ;; 7th-turn seam-key propagation closed for the other four keys). The guard's
+  ;; ex-data reports the effective threshold; with the opts key propagated it
+  ;; is the override, not the (min base max) default (2000 with default
+  ;; config) — so the assertion fails if create-context* still drops it.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false
+                                                  :retry-min-clock-advance-ms 12345})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (try
+        (turn-runtime/execute-prepared-request!
+         {:provider-registry (atom {})} ctx session-id prepared nil)
+        (is false "expected Test-seam misconfiguration")
+        (catch clojure.lang.ExceptionInfo e
+          (is (re-find #"Test-seam misconfiguration" (ex-message e)))
+          ;; the opts-passed override reached the ctx and drives the guard
+          ;; threshold (the default derivation would be 2000)
+          (is (= 12345 (:min-retry-clock-advance-ms (ex-data e))))
+          ;; the guard still fires at the 2nd scheduled retry — fast, not a
+          ;; 10-minute spin (wall-clock advance ~0 ms < 12345 ms)
+          (is (= 2 @attempts*)))))))

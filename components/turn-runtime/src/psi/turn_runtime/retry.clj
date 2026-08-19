@@ -31,7 +31,11 @@
    persisted mid-window and rehydrated with :auto-retry-total-timeout-ms
    nil/absent/<= 0) must not bind the loop, so it is cleared and nil is yielded —
    the give-up predicate then evaluates only the count cap, per the design's
-   Approach 1 disable semantics.
+   Approach 1 disable semantics. The stale :retry-attempt/:retry residue of the
+   prior window is reset alongside the deadline (mirroring the stale-past
+   branch): without the reset, a stale attempt >= the count-only fallback 3
+   gives up at the FIRST failure with 0 retries, or the backoff resumes
+   mid-sequence with a stale :retry map visible.
    A persisted deadline already in the past (stale, e.g. a window left open by a
    turn-end path outside the terminal clears, or a session rehydrated after the
    deadline) is treated as expired: the canonical field is cleared and nil is
@@ -48,7 +52,11 @@
       (do
         (ss/apply-root-state-update-in!
          ctx
-         (ss/session-update session-id #(dissoc % :retry-deadline-ms)))
+         (ss/session-update session-id
+                            #(-> %
+                                 (assoc :retry-attempt 0
+                                        :retry nil)
+                                 (dissoc :retry-deadline-ms))))
         nil)
 
       (and (some? deadline) (< deadline (now-ms ctx)))
