@@ -415,3 +415,22 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       deadline, so the residue was never exercised. Reset
       `:retry-attempt`/`:retry` in the budget-disabled branch (mirror the
       stale-past branch) and extend the test to seed attempt + retry map.
+
+## Review follow-up (implementation review, ninth turn)
+
+- [x] `bb commit-check:file-lengths` fails: the 7th-turn follow-up grew
+      `components/agent-session/test/psi/agent_session/eql_introspection_test.clj`
+      to 829 lines (800 limit) by adding
+      `retry-compact-eql-introspection-test` (+33 lines) to it. The provider /
+      request-shape / retry-compact tests (233 lines:
+      `provider-capture-eql-introspection-test`,
+      `current-request-shape-test`, `retry-compact-eql-introspection-test`)
+      are split into a new logically-consistent file
+      `components/agent-session/test/psi/agent_session/provider_introspection_test.clj`
+      (ns `psi.agent-session.provider-introspection-test`), each with its own
+      private copies of the shared helpers (no forwarding vars); the original
+      file drops to 586 lines, loses the now-unused
+      `make-user-msg`/`make-assistant-msg` helpers, and its ns docstring no
+      longer claims provider captures. Both files lint clean (clj-kondo) and
+      the focused suite (8 tests, 162 assertions across both namespaces) is
+      green; `bb commit-check:file-lengths` passes.
