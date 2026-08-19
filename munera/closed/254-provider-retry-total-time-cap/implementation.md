@@ -360,3 +360,4 @@
   per review-task-docs: CHANGELOG [Unreleased] accurately covers the retry behaviour
   change (config keys, :exhausted-reason, :retry-deadline-ms surfaces — verified against
   code); no stale or missing references in README/doc/ramora.
+- implementation review 2026-08-19 (thirteenth turn): added 1 step to be addressed.

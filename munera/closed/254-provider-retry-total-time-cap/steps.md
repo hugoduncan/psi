@@ -499,3 +499,37 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       docstring gains a sentence noting both intents share one branch (same
       cleanup, differing only in the predicate). Behavior unchanged; all
       deadline tests green.
+
+## Review follow-up (implementation review, thirteenth turn)
+
+- [ ] Truncated-final attempt-number mismatch breaks the EQL `provider-retries`
+      final marker. The truncated final sleep's `provider_retry_scheduled`
+      reports `:retry-attempt N+1` (`next-attempt`, via `schedule-and-sleep!`),
+      but the authoritative terminal `provider_request_finished` it supersedes
+      reports `:retry-attempt N` (the pre-sleep failed attempt, via
+      `failed-attempt-finished-event` with the loop's `retry-attempt` binding).
+      The event-based EQL resolver `provider-retry-summary->eql`
+      (agent-session/resolvers/provider_retries.clj) marks a schedule final by
+      `(= (:retry-attempt schedule) (:retry-attempt final))`, so for a
+      truncated-final window the LAST schedule — the truncated one whose
+      `:resume-at` equals the deadline — is displayed
+      `:psi.provider-retry/final? false`, while the second-to-last (full
+      backoff) schedule is `final? true`. Verified empirically with the real
+      flow (budget 5000 / base 2000, injected clock + sleep-fn): events
+      finished(0,false) → scheduled(1, delay 2000 / resume 2000) →
+      finished(1,false) → scheduled(2, delay 3000 / resume 5000) →
+      finished(1,true, `:retry-exhausted :deadline`); EQL retry-attempts =
+      attempt 1 (2000/2000) `final? true`, attempt 2 (3000/5000)
+      `final? false`. The cancel path is consistent
+      (`provider_request_cancelled` reports N+1, matching its truncated
+      schedule), so only the deadline-finalize path is off. Fix: align the
+      truncated-final terminal event's `:retry-attempt` with the truncated
+      schedule it supersedes (report `next-attempt` on the finalize dispatch,
+      keeping the retry-outcome `:retry-attempt`/`:attempt-count` per design),
+      or change the resolver's final-marker rule to mark the last schedule of a
+      provider-request-id as final; add a regression test
+      (eql_provider_retry_test.clj — either the real truncated-final flow from
+      `execute-prepared-request-total-time-window-governs-termination-test`
+      queried through `:psi.agent-session/provider-retries`, or a hand-built
+      finished(1,false) → scheduled(2) → finished(1,true) sequence) asserting
+      the truncated schedule carries `final? true`.
