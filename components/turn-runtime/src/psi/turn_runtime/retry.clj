@@ -26,6 +26,12 @@
 
 (defn retry-deadline-for
   "Loop-entry read-back of the canonical retry deadline, mirroring retry-attempt-for.
+   Budget-disabled (count-only) mode has no deadline at all: a leftover FUTURE
+   canonical :retry-deadline-ms from a prior budget-active window (e.g. a session
+   persisted mid-window and rehydrated with :auto-retry-total-timeout-ms
+   nil/absent/<= 0) must not bind the loop, so it is cleared and nil is yielded —
+   the give-up predicate then evaluates only the count cap, per the design's
+   Approach 1 disable semantics.
    A persisted deadline already in the past (stale, e.g. a window left open by a
    turn-end path outside the terminal clears, or a session rehydrated after the
    deadline) is treated as expired: the canonical field is cleared and nil is
@@ -35,9 +41,17 @@
    after the deadline (process death during a retry sleep leaves :retry-attempt
    > 0 and a stale :retry map) starts its fresh window at attempt 0 with no
    stale retry metadata visible."
-  [ctx session-id]
+  [ctx session-id budget-active?]
   (let [deadline (:retry-deadline-ms (ss/get-session-data-in ctx session-id))]
-    (if (and (some? deadline) (< deadline (now-ms ctx)))
+    (cond
+      (and (some? deadline) (not budget-active?))
+      (do
+        (ss/apply-root-state-update-in!
+         ctx
+         (ss/session-update session-id #(dissoc % :retry-deadline-ms)))
+        nil)
+
+      (and (some? deadline) (< deadline (now-ms ctx)))
       (do
         (ss/apply-root-state-update-in!
          ctx
@@ -47,7 +61,8 @@
                                         :retry nil)
                                  (dissoc :retry-deadline-ms))))
         nil)
-      deadline)))
+
+      :else deadline)))
 
 (def ^:private min-retry-clock-advance-ms
   "Minimum injected-clock advance (ms) between consecutive scheduled retries

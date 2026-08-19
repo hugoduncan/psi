@@ -259,3 +259,31 @@
     model-test 12, eql-provider-retry-test 3, core-test 16 — all green;
     clj-kondo clean on retry.clj + retry test.
 - implementation review 2026-08-19 (sixth turn): added 2 steps to be addressed.
+- implementation-review-followup 2026-08-19 (sixth turn, 2/2 steps done): addressed
+  the 2 sixth-turn review steps.
+  - **Inert-flag real-sleep fix (7 remaining tests).** Dropped the inert
+    `:provider-retry-sleep? false` opts flag from the 7 listed tests
+    (response_mode_test.clj ×4, response_mode_retry_test.clj ×1,
+    prompt_lifecycle_test.clj ×2) and assoc'd the key directly onto the ctx
+    (3 of them into their existing `now-fn` assoc), matching the 5th-turn
+    pattern. All 7 carry an explicit cap or succeed after one retry, so the
+    hot-loop guard never fires. `production-backoff-observes-active-turn-abort`
+    untouched (intentional real-sleep). response-mode-test ~25 s → ~10.9 s.
+  - **Leftover future deadline in count-only mode.** `retry-deadline-for` now
+    takes `budget-active?` and, when budget-disabled + a canonical deadline is
+    present, dissocs the deadline + yields nil — a leftover future deadline
+    from a prior budget-active window can no longer bind `deadline-ms` in
+    count-only mode (was `:exhausted-reason :deadline` instead of count-only
+    count-cap give-up). Loop entry passes `budget-active?`. New test
+    `execute-prepared-request-budget-disabled-ignores-leftover-future-deadline-test`
+    seeds a future-but-close deadline under timeout 0 → 4 attempts,
+    `:count-cap`, `:max-retries 3`, deadline cleared. retry suite 17 → 18.
+  - **Validation.** response-mode-retry-test 18, response-mode-test 18,
+    model-test 12, eql-provider-retry-test 3, core-test 16,
+    prompt-lifecycle-test 23 — all green; clj-kondo clean on all changed
+    files. Full unit suite at fixed seed 1440384773 (same seed as the clean
+    baseline run): 2699 passed / 1 failed — only the documented pre-existing
+    `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+    (unknown model deepseek/deepseek-v4-flash). A `scheduled-deliver` flake at
+    an earlier random seed (534056833) reproduced as pass at the same-seed
+    baseline comparison → pre-existing order/timing flake, not introduced here.

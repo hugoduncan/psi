@@ -398,9 +398,12 @@
 
 (deftest execute-prepared-request-retry-exhaustion-preserves-last-cause-test
   ;; Retryable failures run through the configured retry count then return structured exhaustion data.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 2}})
+  ;; The :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
+  ;; (create-session-context opts do not propagate it to the ctx — established
+  ;; empirically), so the test pays no real backoff time.
+  (let [[ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-max-retries 2}})
+        ctx              (assoc ctx0 :provider-retry-sleep? false)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -500,11 +503,15 @@
 
 (deftest execute-prepared-request-retry-after-header-drives-delay-test
   ;; Provider Retry-After headers are authoritative for retry delay metadata.
+  ;; The :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
+  ;; (create-session-context opts do not propagate it to the ctx — established
+  ;; empirically), so the test pays no real backoff time.
   (let [[ctx0 session-id] (create-session-context {:persist? false
-                                                   :provider-retry-sleep? false
                                                    :config {:auto-retry-base-delay-ms 10
                                                             :auto-retry-max-retries 1}})
-        ctx              (assoc ctx0 :now-fn #(java.time.Instant/ofEpochMilli 1000))
+        ctx              (assoc ctx0
+                                :now-fn #(java.time.Instant/ofEpochMilli 1000)
+                                :provider-retry-sleep? false)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -627,11 +634,15 @@
 (deftest execute-prepared-request-streaming-exception-preserves-retry-headers-test
   ;; Streaming exceptions expose ex-data retry headers through the generic
   ;; streaming error path so retry scheduling can honor provider delay metadata.
+  ;; The :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
+  ;; (create-session-context opts do not propagate it to the ctx — established
+  ;; empirically), so the test pays no real backoff time.
   (let [[ctx0 session-id] (create-session-context {:persist? false
-                                                   :provider-retry-sleep? false
                                                    :config {:auto-retry-base-delay-ms 10
                                                             :auto-retry-max-retries 1}})
-        ctx              (assoc ctx0 :now-fn #(java.time.Instant/ofEpochMilli 1000))
+        ctx              (assoc ctx0
+                                :now-fn #(java.time.Instant/ofEpochMilli 1000)
+                                :provider-retry-sleep? false)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/do-stream!
@@ -667,11 +678,15 @@
   ;; Background streaming :error events may already carry normalized provider
   ;; headers rather than raw :headers; the turn error path must preserve them so
   ;; retry metadata can honor provider Retry-After / rate-limit details.
+  ;; The :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
+  ;; (create-session-context opts do not propagate it to the ctx — established
+  ;; empirically), so the test pays no real backoff time.
   (let [[ctx0 session-id] (create-session-context {:persist? false
-                                                   :provider-retry-sleep? false
                                                    :config {:auto-retry-base-delay-ms 10
                                                             :auto-retry-max-retries 1}})
-        ctx              (assoc ctx0 :now-fn #(java.time.Instant/ofEpochMilli 1000))
+        ctx              (assoc ctx0
+                                :now-fn #(java.time.Instant/ofEpochMilli 1000)
+                                :provider-retry-sleep? false)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/do-stream!

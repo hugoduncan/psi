@@ -34,8 +34,11 @@ count-cap + deadline + overshoot into one decision (no separate loop-body deadli
     falls back to 3 (count-only, behavior-preserving); budget-active default → `nil` (no
     count limiter; deadline bounds). **Never `(long nil)`** (NPE trap).
 - `retry-deadline-for` (loop-entry read-back, mirroring `retry-attempt-for`): reads
-  canonical `:retry-deadline-ms`; if present-but-past (`deadline < (now-ms ctx)`, stale)
-  → dissoc the canonical field and yield `nil` (fresh window); else yield the value.
+  canonical `:retry-deadline-ms`; if budget-disabled (count-only) with a leftover
+  canonical deadline → dissoc it and yield `nil` (a future deadline from a prior
+  budget-active window must not bind the loop); if present-but-past
+  (`deadline < (now-ms ctx)`, stale) → dissoc the canonical field and yield `nil`
+  (fresh window); else yield the value.
 - `give-up-decision` (replaces `failure-reason-for`) returns a structured outcome:
   - non-retryable / retry-disabled → `{:failure-reason ...}` (immediate final).
   - count cap (`some? count-cap` and `retry-attempt >= count-cap`) →

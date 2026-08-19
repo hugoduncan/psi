@@ -515,9 +515,10 @@
      ctx
      (ss/session-update session-id #(dissoc % :provider-retry-abort-requested?)))
     ;; Read the deadline first: retry-deadline-for's stale branch resets
-    ;; :retry-attempt/:retry alongside the expired deadline, so the attempt
-    ;; read-back must observe the fresh-window state.
-    (loop [retry-deadline-ms (retry/retry-deadline-for ctx session-id)
+    ;; :retry-attempt/:retry alongside an expired deadline (and its
+    ;; budget-disabled branch clears any leftover future deadline), so the
+    ;; attempt read-back must observe the fresh-window state.
+    (loop [retry-deadline-ms (retry/retry-deadline-for ctx session-id budget-active?)
            retry-attempt     (retry/retry-attempt-for ctx session-id)
            last-retry-now    nil]
       (let [attempt-data*  (assoc attempt-data :retry-attempt retry-attempt)

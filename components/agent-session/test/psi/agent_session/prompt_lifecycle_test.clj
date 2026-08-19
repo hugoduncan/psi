@@ -683,8 +683,11 @@
 
 (deftest prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test
   (testing "canonical prompt lifecycle should schedule retry/backoff for retryable provider errors"
-    (let [[ctx session-id] (create-session-context {:persist? false
-                                                    :provider-retry-sleep? false})
+    ;; The :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
+    ;; (create-session-context opts do not propagate it to the ctx — established
+    ;; empirically), so the test pays no real backoff time.
+    (let [[ctx0 session-id] (create-session-context {:persist? false})
+          ctx              (assoc ctx0 :provider-retry-sleep? false)
           reg             (:extension-registry ctx)
           seen            (atom [])
           attempts        (atom 0)]
@@ -721,8 +724,11 @@
 (deftest prompt-provider-retry-after-tool-result-does-not-rerun-tool-test
   ;; Provider-boundary retry for a request containing recorded tool results
   ;; retries only that prepared provider request; it does not execute tools again.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false})
+  ;; The :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
+  ;; (create-session-context opts do not propagate it to the ctx — established
+  ;; empirically), so the test pays no real backoff time.
+  (let [[ctx0 session-id] (create-session-context {:persist? false})
+        ctx              (assoc ctx0 :provider-retry-sleep? false)
         provider-attempts* (atom 0)
         tool-runs*         (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!

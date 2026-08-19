@@ -51,10 +51,13 @@
 
 (deftest execute-prepared-request-streaming-retry-discards-failed-partial-output-test
   ;; Failed streaming-attempt partial output is attempt-local; the successful
-  ;; retry owns the final assistant content.
-  (let [[ctx session-id] (create-session-context {:persist? false
-                                                  :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 1}})
+  ;; retry owns the final assistant content. The :provider-retry-sleep? seam
+  ;; flag is assoc'd onto the ctx directly (create-session-context opts do not
+  ;; propagate it to the ctx — established empirically), so the test pays no
+  ;; real backoff time.
+  (let [[ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-max-retries 1}})
+        ctx              (assoc ctx0 :provider-retry-sleep? false)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/do-stream!
@@ -281,6 +284,47 @@
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :count-cap (:exhausted-reason outcome)))
         (is (= 3 (:max-retries outcome)))))))
+
+(deftest execute-prepared-request-budget-disabled-ignores-leftover-future-deadline-test
+  ;; Count-only mode (budget disabled) must not be deadline-bounded by a leftover
+  ;; FUTURE canonical :retry-deadline-ms from a prior budget-active window (e.g.
+  ;; a session persisted mid-window with the deadline still future and rehydrated
+  ;; with :auto-retry-total-timeout-ms nil/absent/<= 0 — a config change /
+  ;; process restart). Without the loop-entry budget-active? gate, the persisted
+  ;; future deadline binds `deadline-ms` in count-only mode and the overshoot
+  ;; branch gives up `:exhausted-reason :deadline` after 1 attempt; with the
+  ;; gate, the deadline is cleared at entry and the give-up predicate evaluates
+  ;; only the count-only fallback 3.
+  (let [clock          (atom 0)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 0
+                                                            :auto-retry-base-delay-ms 2000}})
+        _              (swap! (:state* ctx0) assoc-in
+                              [:agent-session :sessions session-id :data]
+                              ;; future-but-close persisted deadline: without the
+                              ;; fix, the first 2000 ms backoff overshoots the
+                              ;; 1000 ms remaining window → :deadline give-up
+                              (assoc (ss/get-session-data-in ctx0 session-id)
+                                     :retry-deadline-ms 1000))
+        ctx            (assoc ctx0
+                              :provider-retry-sleep? false
+                              :now-fn #(java.time.Instant/ofEpochMilli @clock))
+        prepared       (prepared-request ctx session-id)
+        attempts*      (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        ;; count-only fallback 3 bounds the loop: 1 initial + 3 retries
+        (is (= 4 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :count-cap (:exhausted-reason outcome)))
+        (is (= 3 (:max-retries outcome)))
+        ;; the leftover future deadline was cleared at loop entry, not bound
+        (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-retry-after-deadline-bounded-test
   ;; A provider Retry-After delay is respected per attempt but an oversized one is

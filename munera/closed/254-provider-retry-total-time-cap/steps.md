@@ -232,7 +232,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, sixth turn)
 
-- [ ] Complete the 5th-turn inert-flag real-sleep fix across the remaining
+- [x] Complete the 5th-turn inert-flag real-sleep fix across the remaining
       retry tests. The seam discovery — `:provider-retry-sleep? false` passed
       via `create-session-context` opts is NOT propagated to the ctx
       (`create-context*` destructures known keys only) — was applied only to
@@ -262,7 +262,17 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       (response_mode_test.clj) — it intentionally real-sleeps through the
       interruptible poll seam to test active-turn abort and carries no flag.
       (~23 s of needless real sleep per full-suite run.)
-- [ ] Budget-disabled (count-only) mode can still be deadline-bounded by a
+      → Done: all seven tests now drop the inert opts flag and assoc
+      `:provider-retry-sleep? false` directly onto the ctx (the
+      `retry-after-header-drives-delay` / `streaming-exception-preserves-retry-headers`
+      / `streaming-error-event-provider-headers-drive-retry` tests add the key to
+      their existing `now-fn` assoc). All carry an explicit
+      `:auto-retry-max-retries` (or terminate on success after one retry), so the
+      hot-loop guard never fires. `production-backoff-observes-active-turn-abort`
+      untouched. Suite timing: response-mode-test drops from ~25 s to ~10.9 s,
+      retry suite ~13.2 s → ~11.0 s; the two prompt-lifecycle retry vars no
+      longer pay their ~2 s sleeps.
+- [x] Budget-disabled (count-only) mode can still be deadline-bounded by a
       leftover FUTURE canonical `:retry-deadline-ms` from a prior budget-active
       window. `retry-deadline-for` (retry.clj:27) returns a future deadline
       regardless of `budget-active?`, and the loop's
@@ -282,3 +292,15 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       with a future persisted `:retry-deadline-ms`, budget disabled, no
       explicit cap → gives up only on the count-only fallback 3, never
       `:exhausted-reason :deadline`.
+      → Done: `retry-deadline-for` now takes `budget-active?`; its first branch
+      (budget disabled + a canonical deadline present) dissocs the deadline and
+      yields nil, so count-only mode never binds a leftover future deadline —
+      the `deadline-ms` resolution then evaluates only the count-cap path.
+      The stale-past branch is unchanged (budget-active only). Loop entry in
+      `execute-prepared-request!` passes `budget-active?` (computed above the
+      loop). New `execute-prepared-request-budget-disabled-ignores-leftover-future-deadline-test`
+      (retry_test.clj): seeds a future-but-close `:retry-deadline-ms 1000`
+      under `:auto-retry-total-timeout-ms 0` + injected clock at 0 (without
+      the gate, the 2000 ms first backoff overshoots the 1000 ms window →
+      `:deadline` give-up after 1 attempt) and asserts 4 attempts, `:count-cap`,
+      `:max-retries 3`, and the leftover deadline cleared. retry suite 17 → 18.
