@@ -185,3 +185,31 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       Validation: retry-test 16, response-mode-test 18, model-test 12,
       eql-provider-retry-test 3, core-test 16, prompt-lifecycle retry vars 2
       — all green; clj-kondo clean.
+
+## Review follow-up (implementation review, fifth turn)
+
+- [ ] New retry tests real-sleep because the `:provider-retry-sleep?` seam flag
+      passed via `create-session-context` opts is INERT (`create-context*` in
+      agent-session/context.clj does not propagate it to the ctx — established
+      empirically in the 4th-turn follow-up):
+      `execute-prepared-request-explicit-count-cap-still-bounds-test` (~2 s real
+      sleep) and `execute-prepared-request-count-only-fallback-three-test`
+      (~14 s: 2 s + 4 s + 8 s) sleep against the real wall clock every suite run
+      (measured vs the no-sleep hot-loop guard test: 13.2 s / 25.0 s vs 11.0 s).
+      Assoc `:provider-retry-sleep? false` directly onto the ctx (the pattern
+      the two hot-loop tests already use) or inject a no-op
+      `:provider-retry-sleep-fn`, so the new tests stop paying real backoff time.
+- [ ] `assert-test-seam-no-hot-loop!` (retry.clj) fires only when
+      `(= false (:provider-retry-sleep? ctx))`, but its docstring claims to
+      guard "with :provider-retry-sleep? false (no real sleeps /
+      :provider-retry-sleep-fn)". A test that injects a no-op
+      `:provider-retry-sleep-fn` WITHOUT the `:provider-retry-sleep? false`
+      flag — budget active, nil count-cap, non-advancing clock, persistent
+      failure — still spins to the real 10-min wall-clock deadline undetected
+      (flag nil → `(= false nil)` false → guard skipped; sleeps are no-ops via
+      the sleep-fn). Broaden the condition to
+      `(or (= false (:provider-retry-sleep? ctx)) (some? (:provider-retry-sleep-fn ctx)))`
+      (with a matching ex-info message) and add a test. Safe for all current
+      tests: advancing-clock tests advance >= 2000 ms; the non-advancing
+      sleep-fn tests schedule at most one retry (the guard needs two
+      consecutive clock reads).

@@ -236,3 +236,4 @@
     prompt-lifecycle retry vars 2 — all green; clj-kondo clean on retry.clj +
     core.clj + retry test. No change to give-up-decision branch order, deadline
     lifecycle, cancellation, or config semantics.
+- implementation review 2026-08-19 (fifth turn): added 2 steps to be addressed.
