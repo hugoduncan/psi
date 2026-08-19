@@ -557,7 +557,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, fourteenth turn)
 
-- [ ] `:exhausted-reason` (`:count-cap | :deadline`) is dropped by the EQL
+- [x] `:exhausted-reason` (`:count-cap | :deadline`) is dropped by the EQL
       `provider-retries` introspection surface. `provider-retry-summary->eql`
       (agent-session/resolvers/provider_retries.clj) projects the terminal
       event's `:failure-reason` into `:psi.provider-request/final-status` and
@@ -579,7 +579,17 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       (eql_provider_retry_test.clj:262) already seeds
       `:exhausted-reason :deadline` on the final event and would fail without
       the projection; add a `:count-cap` case alongside.
-- [ ] CHANGELOG [Unreleased] is missing a Fixed entry for the oversized-integer
+      → Done: `:psi.provider-request/exhausted-reason (:exhausted-reason final)`
+      added to `provider-retry-summary->eql` and all three resolver output key
+      lists (by-request-id / by-turn-id / provider-retries). The
+      `provider-retry-truncated-final-schedule-marker-test` now asserts
+      `:exhausted-reason :deadline`, and a new
+      `provider-retry-count-cap-exhausted-reason-test` seeds a count-cap final
+      and asserts `:exhausted-reason :count-cap` (mirrors the deadline case;
+      the existing direct/`provider-retries` queries gained the key). eql
+      provider-retry-test 4 → 5; clj-kondo clean;
+      `bb commit-check:file-lengths` passes.
+- [x] CHANGELOG [Unreleased] is missing a Fixed entry for the oversized-integer
       `Retry-After` crash fix (11th-turn follow-up). A provider-sent numeric
       `Retry-After` outside Long range (e.g. 20 digits) previously threw an
       uncaught `NumberFormatException` from `retry-after-delay-ms`
@@ -594,3 +604,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `Retry-After` outside Long range now floors to the exponential backoff
       instead of crashing the turn with an uncaught `NumberFormatException`")
       before the next commit.
+      → Done: CHANGELOG [Unreleased] `### Fixed` entry added (top of the Fixed
+      section, above the 13th-turn EQL-marker entry): names the uncaught
+      `NumberFormatException` crash path (integer branch lacked the RFC-date
+      try/catch; retry metadata runs on every failed attempt pre-decision) and
+      the `parse-long-safe` → nil → exponential-floor fix.

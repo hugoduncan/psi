@@ -390,3 +390,11 @@
     `bb commit-check:file-lengths` passes; CHANGELOG [Unreleased] Fixed entry added
     (bug_fix is user-visible per changelog protocol).
 - implementation review 2026-08-19 (fourteenth turn): added 2 steps to be addressed.
+- follow-up 2026-08-19 (fourteenth-turn review steps addressed): added
+  `:psi.provider-request/exhausted-reason` to the EQL `provider-retries`
+  projection (resolver map + all three output key lists) so observers can tell
+  `:count-cap` from `:deadline` give-ups; asserted `:deadline` in the existing
+  truncated-final marker test and added a `:count-cap` case
+  (eql-provider-retry-test 4 → 5). Added the missing CHANGELOG [Unreleased]
+  Fixed entry for the oversized-integer `Retry-After` crash fix.
+  clj-kondo clean; `bb commit-check:file-lengths` passes; agent-session suite green.

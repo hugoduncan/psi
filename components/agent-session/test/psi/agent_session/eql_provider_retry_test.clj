@@ -10,6 +10,7 @@
    :psi.provider-request/turn-id
    :psi.provider-request/retry-count
    :psi.provider-request/final-status
+   :psi.provider-request/exhausted-reason
    {:psi.provider-request/retry-attempts
     [:psi.provider-retry/attempt
      :psi.provider-retry/failed-attempt
@@ -73,6 +74,7 @@
                                    :psi.provider-request/turn-id
                                    :psi.provider-request/retry-count
                                    :psi.provider-request/final-status
+                                   :psi.provider-request/exhausted-reason
                                    {:psi.provider-request/retry-attempts
                                     [:psi.provider-retry/attempt
                                      :psi.provider-retry/failed-attempt
@@ -145,6 +147,59 @@
                  :psi.provider-retry/delay-ms 50
                  :psi.provider-retry/delay-source :retry-after
                  :psi.provider-retry/resume-at 100
+                 :psi.provider-retry/rate-limit nil
+                 :psi.provider-retry/final? true}]
+               (:psi.provider-request/retry-attempts by-request)))))))
+
+(deftest provider-retry-count-cap-exhausted-reason-test
+  (testing "a count-cap give-up projects :exhausted-reason :count-cap on the summary"
+    (let [[ctx session-id] (create-session-context)]
+      (test-support/update-state! ctx :provider-events
+                                  into
+                                  [{:type "provider_request_started"
+                                    :provider-request-id "request-count-cap"
+                                    :turn-id "turn-count-cap"
+                                    :retry-attempt 0}
+                                   {:type "provider_request_finished"
+                                    :provider-request-id "request-count-cap"
+                                    :turn-id "turn-count-cap"
+                                    :retry-attempt 0
+                                    :status :failed
+                                    :final? false
+                                    :error-kind :rate-limit
+                                    :error-message "rate limited"}
+                                   {:type "provider_retry_scheduled"
+                                    :provider-request-id "request-count-cap"
+                                    :turn-id "turn-count-cap"
+                                    :failed-attempt 0
+                                    :retry-attempt 1
+                                    :error-kind :rate-limit
+                                    :error-message "rate limited"
+                                    :delay-ms 25
+                                    :delay-source :exponential-backoff
+                                    :resume-at 125}
+                                   {:type "provider_request_finished"
+                                    :provider-request-id "request-count-cap"
+                                    :turn-id "turn-count-cap"
+                                    :retry-attempt 1
+                                    :status :failed
+                                    :final? true
+                                    :failure-reason :retry-exhausted
+                                    :exhausted-reason :count-cap
+                                    :error-kind :rate-limit}])
+      (let [by-request (session/query-in ctx session-id
+                                         (retry-query)
+                                         {:psi.provider-request/id "request-count-cap"})]
+        (is (= :retry-exhausted (:psi.provider-request/final-status by-request)))
+        (is (= :count-cap (:psi.provider-request/exhausted-reason by-request)))
+        (is (= 1 (:psi.provider-request/retry-count by-request)))
+        (is (= [{:psi.provider-retry/attempt 1
+                 :psi.provider-retry/failed-attempt 0
+                 :psi.provider-retry/error-kind :rate-limit
+                 :psi.provider-retry/error-message "rate limited"
+                 :psi.provider-retry/delay-ms 25
+                 :psi.provider-retry/delay-source :exponential-backoff
+                 :psi.provider-retry/resume-at 125
                  :psi.provider-retry/rate-limit nil
                  :psi.provider-retry/final? true}]
                (:psi.provider-request/retry-attempts by-request)))))))
@@ -265,6 +320,7 @@
                                          (retry-query)
                                          {:psi.provider-request/id "request-truncated"})]
         (is (= :retry-exhausted (:psi.provider-request/final-status by-request)))
+        (is (= :deadline (:psi.provider-request/exhausted-reason by-request)))
         (is (= 2 (:psi.provider-request/retry-count by-request)))
         (is (= [{:psi.provider-retry/attempt 1
                  :psi.provider-retry/failed-attempt 0

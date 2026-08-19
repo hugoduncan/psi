@@ -48,6 +48,7 @@
      :psi.provider-request/retry-attempts (mapv #(retry-schedule->eql % (= (:retry-attempt %) final-attempt)) schedules)
      :psi.provider-request/final-status   (or (:failure-reason final)
                                               (:status final))
+     :psi.provider-request/exhausted-reason (:exhausted-reason final)
      :psi.provider-request/error-kind     (:error-kind final)}))
 
 (defn- provider-retry-summaries
@@ -73,6 +74,7 @@
    ::pco/output [:psi.provider-request/turn-id
                  :psi.provider-request/retry-count
                  :psi.provider-request/final-status
+                 :psi.provider-request/exhausted-reason
                  :psi.provider-request/error-kind
                  {:psi.provider-request/retry-attempts
                   [:psi.provider-retry/attempt
@@ -100,6 +102,7 @@
    ::pco/output [:psi.provider-request/id
                  :psi.provider-request/retry-count
                  :psi.provider-request/final-status
+                 :psi.provider-request/exhausted-reason
                  :psi.provider-request/error-kind
                  {:psi.provider-request/retry-attempts
                   [:psi.provider-retry/attempt
@@ -127,6 +130,7 @@
                    :psi.provider-request/turn-id
                    :psi.provider-request/retry-count
                    :psi.provider-request/final-status
+                   :psi.provider-request/exhausted-reason
                    :psi.provider-request/error-kind
                    {:psi.provider-request/retry-attempts
                     [:psi.provider-retry/attempt
