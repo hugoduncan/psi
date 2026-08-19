@@ -142,3 +142,22 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `:retry` map and asserts the fresh window starts at attempt 0 (2 attempts,
       delays [2000 3000], resume-at [7000 10000]) with no stale retry metadata
       after the run.
+
+## Review follow-up (implementation review, fourth turn)
+
+- [ ] Test-seam hot-loop hazard under the budget-active default: with
+      `:provider-retry-sleep? false` (no real sleeps), no injected `:now-fn`
+      (falls back to `Instant/now` wall clock), and no explicit
+      `:auto-retry-max-retries` (sentinel-nil default), a persistent retryable
+      failure now loops until the REAL wall-clock deadline — 10 minutes with
+      the default `:auto-retry-total-timeout-ms 600000` — because the
+      budget-active `count-cap` is nil and `now` advances only by wall time.
+      Pre-change, the same test-seam misconfiguration terminated after the
+      default 3 attempts. All current tests are safe (explicit caps,
+      success-terminating stubs, or injected `:now-fn`), so nothing hangs
+      today, but the failure mode of the seam regressed silently: a future
+      retry test that omits `:now-fn` + an explicit cap hot-loops ~10 min
+      instead of failing fast. Guard or document: e.g. at loop entry, treat
+      `:provider-retry-sleep? false` + budget-active + nil count-cap + no
+      injected `:now-fn` as a test-config error (fail fast), or document that
+      the seam requires an advancing `:now-fn` whenever the budget is active.

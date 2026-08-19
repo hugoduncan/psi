@@ -202,3 +202,5 @@
     (unknown model `deepseek/deepseek-v4-flash`, model-registry, unrelated).
     No change to give-up-decision branch order, deadline lifecycle, or
     cancellation mechanics.
+
+- implementation review 2026-08-18 (fourth turn): added 1 step to be addressed.
