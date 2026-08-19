@@ -288,3 +288,30 @@
     an earlier random seed (534056833) reproduced as pass at the same-seed
     baseline comparison → pre-existing order/timing flake, not introduced here.
 - implementation review 2026-08-19 (seventh turn): added 3 steps to be addressed.
+- implementation review 2026-08-19 (seventh turn, follow-up 3/3 steps done): addressed the 3 seventh-turn review steps.
+  - **Seam-key propagation (context.clj).** `create-context*` now destructures + propagates
+    `:provider-retry-sleep?` / `:provider-retry-sleep-fn` / `:provider-retry-cancelled?` /
+    `:now-fn` onto the ctx (assoc'd after the callback-fns merge; `:now-fn` overrides the
+    default wall clock). Direct-assoc workarounds reverted to the natural opts API across
+    response_mode_retry_test.clj (11), response_mode_test.clj (6), prompt_lifecycle_test.clj
+    (2); 3 sites keep a minimal assoc where the seam fn must close over the ctx to read
+    session state (opts are evaluated before ctx exists). The 4 tests that already passed
+    the flag via opts (previously inert) now genuinely disable sleeps.
+  - **Guard threshold derived (retry.clj).** `min-retry-clock-advance-ms` constant → derived
+    `retry-min-clock-advance-ms` = `(max 1 (min base max))` from config, overridable via
+    `:retry-min-clock-advance-ms` on the ctx; ex-info ex-data reports the threshold. New
+    `execute-prepared-request-small-base-delay-advancing-clock-not-guarded-test` proves a
+    sub-second base delay (10 ms) + delay-driven advancing clock no longer false-positives
+    (retry suite 18 → 19).
+  - **`:retry-deadline-ms` on all three surfaces.** EQL resolver
+    `agent-session-retry-compact` (+`retry-compact-eql-introspection-test`),
+    `diagnostics-in` (config_compaction_test `contains?`), and RPC `session/updated`
+    projection (session_summary + rpc/events select-keys + required keys;
+    `session-updated-payload-includes-retry-contract-test` seeds/asserts;
+    `session-scoped-event-data` fixture updated).
+  - **Validation.** response-mode-retry-test 19, response-mode-test 18,
+    prompt-lifecycle-test 23, rpc-events-test, rpc-test 16, eql-introspection-test 8,
+    eql-provider-retry-test 3, config-compaction-test 8, core-test 16,
+    statechart-actions-test 8, footer-test 8, rpc-prompt-stream/command + rpc-session-
+    navigation — all green; clj-kondo clean on all changed files. No change to
+    give-up-decision branch order, deadline lifecycle, cancellation, or config semantics.

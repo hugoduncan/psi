@@ -290,7 +290,9 @@
                                 scheduler-time-source install-default-ui-capability-provider?
                                 get-session-data-fn list-context-sessions-fn find-skill-fn
                                 resolve-workflow-step-session-config-fn
-                                split-workflow-step-session-conversation-fn execute-workflow-judge-fn]
+                                split-workflow-step-session-conversation-fn execute-workflow-judge-fn
+                                provider-retry-sleep? provider-retry-sleep-fn
+                                provider-retry-cancelled? now-fn]
                          :or {persist? true mutations []
                               install-default-ui-capability-provider? true}
                          :as opts}]
@@ -360,7 +362,17 @@
                       (assoc :split-workflow-step-session-conversation-fn split-workflow-step-session-conversation-fn)
 
                       (contains? opts :execute-workflow-judge-fn)
-                      (assoc :execute-workflow-judge-fn execute-workflow-judge-fn)))
+                      (assoc :execute-workflow-judge-fn execute-workflow-judge-fn))
+                    ;; Retry test-seam keys passed via opts are propagated onto
+                    ;; the ctx (previously silently dropped, forcing tests to
+                    ;; assoc them directly after context creation). Inert outside
+                    ;; the retry seam, so production behavior is unchanged;
+                    ;; :now-fn overrides the default wall-clock callback-fn.
+                    (cond-> {}
+                      (contains? opts :provider-retry-sleep?) (assoc :provider-retry-sleep? provider-retry-sleep?)
+                      (contains? opts :provider-retry-sleep-fn) (assoc :provider-retry-sleep-fn provider-retry-sleep-fn)
+                      (contains? opts :provider-retry-cancelled?) (assoc :provider-retry-cancelled? provider-retry-cancelled?)
+                      (contains? opts :now-fn) (assoc :now-fn now-fn)))
         ctx0 (assoc ctx0 workflow-execution-adapter/adapter-key
                     (workflow-execution-adapter ctx0))
         _ (dispatch-handlers/register-all! ctx0)

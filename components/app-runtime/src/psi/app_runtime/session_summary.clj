@@ -72,6 +72,7 @@
                                :pending-message-count      pending-message-count
                                :retry-attempt              (or (:retry-attempt sd) 0)
                                :retry                      retry
+                               :retry-deadline-ms          (:retry-deadline-ms sd)
                                :interrupt-pending          (boolean (:interrupt-pending sd))
                                :model-provider             (:provider model)
                                :model-id                   (:id model)

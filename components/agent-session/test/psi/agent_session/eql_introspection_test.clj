@@ -794,3 +794,36 @@
                                      [:psi.request-shape/headroom-tokens]}])
               h2 (-> r2 :psi.agent-session/request-shape :psi.request-shape/headroom-tokens)]
           (is (< h2 h1)))))))
+
+(deftest retry-compact-eql-introspection-test
+  (testing "retry-compact resolver exposes retry-attempt / retry / retry-deadline-ms"
+    (let [[ctx session-id] (create-session-context)
+          now-ms           (System/currentTimeMillis)
+          _                (ss/apply-root-state-update-in!
+                            ctx
+                            (ss/session-update session-id #(assoc %
+                                                                  :retry-attempt 2
+                                                                  :retry {:active? true
+                                                                          :attempt 2
+                                                                          :delay-ms 8000
+                                                                          :delay-source :retry-after
+                                                                          :resume-at (+ now-ms 8000)}
+                                                                  :retry-deadline-ms (+ now-ms 600000))))
+          r (session/query-in ctx session-id
+                              [:psi.agent-session/retry-attempt
+                               :psi.agent-session/retry-deadline-ms
+                               :psi.agent-session/retry
+                               :psi.agent-session/auto-retry-enabled])]
+      (is (= 2 (:psi.agent-session/retry-attempt r)))
+      (is (= (+ now-ms 600000) (:psi.agent-session/retry-deadline-ms r)))
+      (is (= {:active? true
+              :attempt 2
+              :delay-ms 8000
+              :delay-source :retry-after
+              :resume-at (+ now-ms 8000)}
+             (:psi.agent-session/retry r)))
+      (is (true? (:psi.agent-session/auto-retry-enabled r)))))
+  (testing "retry-deadline-ms resolves nil when no window is open"
+    (let [[ctx session-id] (create-session-context)
+          r (session/query-in ctx session-id [:psi.agent-session/retry-deadline-ms])]
+      (is (nil? (:psi.agent-session/retry-deadline-ms r))))))

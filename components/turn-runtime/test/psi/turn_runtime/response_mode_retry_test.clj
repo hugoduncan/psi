@@ -52,12 +52,11 @@
 (deftest execute-prepared-request-streaming-retry-discards-failed-partial-output-test
   ;; Failed streaming-attempt partial output is attempt-local; the successful
   ;; retry owns the final assistant content. The :provider-retry-sleep? seam
-  ;; flag is assoc'd onto the ctx directly (create-session-context opts do not
-  ;; propagate it to the ctx — established empirically), so the test pays no
-  ;; real backoff time.
-  (let [[ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-max-retries 1}})
-        ctx              (assoc ctx0 :provider-retry-sleep? false)
+  ;; flag flows through create-session-context opts (propagated to the ctx by
+  ;; create-context*), so the test pays no real backoff time.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-max-retries 1}
+                                                  :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/do-stream!
@@ -200,14 +199,13 @@
   ;; retry loop: termination happens at the injected-clock deadline, not at a
   ;; default count cap, and the final sleep is truncated to the remaining window.
   (let [clock          (atom 0)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 5000
-                                                            :auto-retry-base-delay-ms 2000
-                                                            :auto-retry-max-delay-ms 60000}})
-        ctx            (assoc ctx0
-                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
-                              :provider-retry-sleep-fn (fn [delay-ms]
-                                                         (swap! clock + (long delay-ms))))
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 5000
+                                                           :auto-retry-base-delay-ms 2000
+                                                           :auto-retry-max-delay-ms 60000}
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                                                  :provider-retry-sleep-fn (fn [delay-ms]
+                                                                             (swap! clock + (long delay-ms)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -239,12 +237,12 @@
 (deftest execute-prepared-request-explicit-count-cap-still-bounds-test
   ;; An explicitly configured small :auto-retry-max-retries remains a hard cap
   ;; even with the total-time budget active (:exhausted-reason :count-cap, no
-  ;; truncated final sleep). The :provider-retry-sleep? seam flag is assoc'd
-  ;; onto the ctx directly (create-session-context opts do not propagate it to
-  ;; the ctx — established empirically), so the test pays no real backoff time.
-  (let [[ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-max-retries 1}})
-        ctx              (assoc ctx0 :provider-retry-sleep? false)
+  ;; truncated final sleep). The :provider-retry-sleep? seam flag flows through
+  ;; create-session-context opts (propagated to the ctx by create-context*), so
+  ;; the test pays no real backoff time.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-max-retries 1}
+                                                  :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -265,12 +263,12 @@
 (deftest execute-prepared-request-count-only-fallback-three-test
   ;; Budget disabled (total-timeout <= 0) with no explicit cap uses the preserved
   ;; count-only fallback of 3 as the sole give-up limiter. The
-  ;; :provider-retry-sleep? seam flag is assoc'd onto the ctx directly
-  ;; (create-session-context opts do not propagate it to the ctx — established
-  ;; empirically), so the test pays no real backoff time.
-  (let [[ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 0}})
-        ctx              (assoc ctx0 :provider-retry-sleep? false)
+  ;; :provider-retry-sleep? seam flag flows through create-session-context opts
+  ;; (propagated to the ctx by create-context*), so the test pays no real
+  ;; backoff time.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 0}
+                                                  :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -296,19 +294,18 @@
   ;; gate, the deadline is cleared at entry and the give-up predicate evaluates
   ;; only the count-only fallback 3.
   (let [clock          (atom 0)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 0
-                                                            :auto-retry-base-delay-ms 2000}})
-        _              (swap! (:state* ctx0) assoc-in
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 0
+                                                           :auto-retry-base-delay-ms 2000}
+                                                  :provider-retry-sleep? false
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)})
+        _              (swap! (:state* ctx) assoc-in
                               [:agent-session :sessions session-id :data]
                               ;; future-but-close persisted deadline: without the
                               ;; fix, the first 2000 ms backoff overshoots the
                               ;; 1000 ms remaining window → :deadline give-up
-                              (assoc (ss/get-session-data-in ctx0 session-id)
+                              (assoc (ss/get-session-data-in ctx session-id)
                                      :retry-deadline-ms 1000))
-        ctx            (assoc ctx0
-                              :provider-retry-sleep? false
-                              :now-fn #(java.time.Instant/ofEpochMilli @clock))
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -330,12 +327,11 @@
   ;; A provider Retry-After delay is respected per attempt but an oversized one is
   ;; truncated to the remaining window: give-up :deadline at the deadline.
   (let [clock          (atom 0)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 5000}})
-        ctx            (assoc ctx0
-                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
-                              :provider-retry-sleep-fn (fn [delay-ms]
-                                                         (swap! clock + (long delay-ms))))
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 5000}
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                                                  :provider-retry-sleep-fn (fn [delay-ms]
+                                                                             (swap! clock + (long delay-ms)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -369,13 +365,12 @@
   ;; Cancellation during a pending backoff returns :retry-cancelled and clears the
   ;; window deadline via its own unconditional clear (not the per-sleep preserve).
   (let [cancelled?      (atom false)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 600000}})
-        ctx             (assoc ctx0
-                               :provider-retry-cancelled? (fn [_session-id] @cancelled?)
-                               :provider-retry-sleep-fn
-                               (fn [_delay-ms]
-                                 (reset! cancelled? true)))
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 600000}
+                                                  :provider-retry-cancelled? (fn [_session-id] @cancelled?)
+                                                  :provider-retry-sleep-fn
+                                                  (fn [_delay-ms]
+                                                    (reset! cancelled? true))})
         prepared        (prepared-request ctx session-id)
         attempts*       (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -393,12 +388,14 @@
 (deftest execute-prepared-request-deadline-preserved-inter-attempt-test
   ;; The window deadline survives the inter-attempt (per-sleep) clear: it is
   ;; present in canonical state during a retry sleep, and a later success window
-  ;; close clears it.
+  ;; close clears it. The :provider-retry-sleep-fn must close over the ctx to
+  ;; read session state, so it is assoc'd after context creation (opts are
+  ;; evaluated before the ctx exists); :now-fn flows through opts.
   (let [deadline-in-sleep* (atom nil)
         [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 600000}})
+                                                   :config {:auto-retry-total-timeout-ms 600000}
+                                                   :now-fn #(java.time.Instant/ofEpochMilli 0)})
         ctx             (assoc ctx0
-                               :now-fn #(java.time.Instant/ofEpochMilli 0)
                                :provider-retry-sleep-fn
                                (fn [_delay-ms]
                                  (reset! deadline-in-sleep*
@@ -433,24 +430,23 @@
   ;; and a stale :retry map) starts its fresh window at attempt 0 with no stale
   ;; retry metadata.
   (let [clock           (atom 5000)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 5000
-                                                            :auto-retry-base-delay-ms 2000}})
-        _               (swap! (:state* ctx0) assoc-in
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 5000
+                                                           :auto-retry-base-delay-ms 2000}
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                                                  :provider-retry-sleep-fn (fn [delay-ms]
+                                                                             (swap! clock + (long delay-ms)))})
+        _               (swap! (:state* ctx) assoc-in
                                [:agent-session :sessions session-id :data]
                                ;; stale mid-window state: deadline past (now 5000),
                                ;; attempt 3 with a stale :retry map left by a
                                ;; process death during a retry sleep
-                               (assoc (ss/get-session-data-in ctx0 session-id)
+                               (assoc (ss/get-session-data-in ctx session-id)
                                       :retry-deadline-ms 1000
                                       :retry-attempt 3
                                       :retry {:delay-ms 16000
                                               :delay-source :exponential-backoff
                                               :resume-at 20000}))
-        ctx             (assoc ctx0
-                               :now-fn #(java.time.Instant/ofEpochMilli @clock)
-                               :provider-retry-sleep-fn (fn [delay-ms]
-                                                          (swap! clock + (long delay-ms))))
         prepared        (prepared-request ctx session-id)
         attempts*       (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -481,14 +477,13 @@
   ;; there is no immediate give-up, and the loop must not retry back-to-back with
   ;; an immediate 0-delay until the deadline.
   (let [clock          (atom 0)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 600000
-                                                            :auto-retry-base-delay-ms 2000
-                                                            :auto-retry-max-delay-ms 60000}})
-        ctx            (assoc ctx0
-                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
-                              :provider-retry-sleep-fn (fn [delay-ms]
-                                                         (swap! clock + (long delay-ms))))
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 600000
+                                                           :auto-retry-base-delay-ms 2000
+                                                           :auto-retry-max-delay-ms 60000}
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                                                  :provider-retry-sleep-fn (fn [delay-ms]
+                                                                             (swap! clock + (long delay-ms)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -523,20 +518,19 @@
   (let [clock          (atom 0)
         sleep-calls*   (atom 0)
         cancelled?     (atom false)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 5000
-                                                            :auto-retry-base-delay-ms 2000
-                                                            :auto-retry-max-delay-ms 60000}})
-        ctx            (assoc ctx0
-                              :now-fn #(java.time.Instant/ofEpochMilli @clock)
-                              :provider-retry-cancelled? (fn [_session-id] @cancelled?)
-                              :provider-retry-sleep-fn
-                              (fn [delay-ms]
-                                (swap! sleep-calls* inc)
-                                (swap! clock + (long delay-ms))
-                                ;; flip cancellation during the truncated final sleep (2nd)
-                                (when (= 2 @sleep-calls*)
-                                  (reset! cancelled? true))))
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 5000
+                                                           :auto-retry-base-delay-ms 2000
+                                                           :auto-retry-max-delay-ms 60000}
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                                                  :provider-retry-cancelled? (fn [_session-id] @cancelled?)
+                                                  :provider-retry-sleep-fn
+                                                  (fn [delay-ms]
+                                                    (swap! sleep-calls* inc)
+                                                    (swap! clock + (long delay-ms))
+                                                    ;; flip cancellation during the truncated final sleep (2nd)
+                                                    (when (= 2 @sleep-calls*)
+                                                      (reset! cancelled? true)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -567,10 +561,10 @@
   ;; :now-fn) must fail fast as a test-config error instead of hot-looping to
   ;; the real wall-clock deadline (10 minutes with the default timeout) — the
   ;; pre-change default 3-attempt cap bounded the same misconfiguration. The
-  ;; seam keys are assoc'd onto the ctx directly (create-session-context opts
-  ;; do not propagate :provider-retry-sleep? / :now-fn to the ctx).
-  (let [[ctx0 session-id] (create-session-context {:persist? false})
-        ctx              (assoc ctx0 :provider-retry-sleep? false)
+  ;; seam keys flow through create-session-context opts (propagated to the ctx
+  ;; by create-context*).
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -594,8 +588,8 @@
   ;; failure — the sleep-fn makes the waits no-ops, so the loop would hot-loop
   ;; to the real wall-clock deadline unless the guard fires (the sleep? flag
   ;; alone being nil would skip the guard).
-  (let [[ctx0 session-id] (create-session-context {:persist? false})
-        ctx              (assoc ctx0 :provider-retry-sleep-fn (fn [_delay-ms]))
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep-fn (fn [_delay-ms])})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -618,12 +612,11 @@
   ;; (documented seam contract: an ADVANCING :now-fn is required whenever the
   ;; budget is active).
   (let [clock          (atom 0)
-        [ctx0 session-id] (create-session-context {:persist? false
-                                                   :config {:auto-retry-total-timeout-ms 5000
-                                                            :auto-retry-base-delay-ms 2000}})
-        ctx            (assoc ctx0
-                              :provider-retry-sleep? false
-                              :now-fn #(java.time.Instant/ofEpochMilli @clock))
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 5000
+                                                           :auto-retry-base-delay-ms 2000}
+                                                  :provider-retry-sleep? false
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -639,3 +632,35 @@
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :deadline (:exhausted-reason outcome)))
         (is (nil? (:max-retries outcome)))))))
+
+(deftest execute-prepared-request-small-base-delay-advancing-clock-not-guarded-test
+  ;; The seam guard's clock-advance threshold is derived from the configured
+  ;; backoff delays ((min base max), floored at 1), so a budget-active, cap-free
+  ;; test with a sub-second base delay and a correctly advancing injected clock
+  ;; does NOT trip a false-positive Test-seam misconfiguration at the 2nd retry
+  ;; (review follow-up, 7th turn — the old hardcoded 1000 ms threshold fired for
+  ;; any advance < 1000 ms, e.g. the standard delay-driven pattern under
+  ;; :auto-retry-base-delay-ms 10).
+  (let [clock          (atom 0)
+        [ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms 100
+                                                           :auto-retry-base-delay-ms 10
+                                                           :auto-retry-max-delay-ms 1000}
+                                                  :provider-retry-sleep? false
+                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)})
+        prepared       (prepared-request ctx session-id)
+        attempts*      (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    ;; advance the injected clock past the next backoff each attempt
+                    (swap! clock + 10)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        ;; no throw: the derived threshold (10) is not exceeded by the
+        ;; delay-driven 10 ms advance; the window runs to the :deadline
+        (is (> @attempts* 2))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))))))

@@ -64,13 +64,23 @@
 
       :else deadline)))
 
-(def ^:private min-retry-clock-advance-ms
+(defn- retry-min-clock-advance-ms
   "Minimum injected-clock advance (ms) between consecutive scheduled retries
    below which a sleep-disabled, budget-active, cap-free retry seam is treated
-   as a non-advancing (hot-loop) clock. A real wall clock advances ~0-1 ms
-   between fast stub attempts; an injected clock that drives a window advances
-   by its configured delays (>= 2000 ms), so 1000 ms cleanly separates them."
-  1000)
+   as a non-advancing (hot-loop) clock. Derived from the configured backoff
+   delays — (min :auto-retry-base-delay-ms :auto-retry-max-delay-ms), floored
+   at 1 — so a delay-driven advancing clock (advance >= the smallest configured
+   delay) never trips a false positive even with sub-second base delays (e.g.
+   :auto-retry-base-delay-ms 10), while a constant clock (advance 0) and real
+   wall-clock jitter (~0-1 ms between fast stub attempts) still do. Overridable
+   per-test via :retry-min-clock-advance-ms on the ctx (e.g. for a cap-free
+   budget-active test whose smallest delay is a provider Retry-After below the
+   configured base)."
+  [ctx]
+  (or (:retry-min-clock-advance-ms ctx)
+      (let [base-ms (long (get-in ctx [:config :auto-retry-base-delay-ms] 2000))
+            max-ms  (long (get-in ctx [:config :auto-retry-max-delay-ms] 60000))]
+        (max 1 (min base-ms max-ms)))))
 
 (defn assert-test-seam-no-hot-loop!
   "Fail fast when the test-seam retry loop cannot reach its deadline: with real
@@ -88,22 +98,27 @@
    All session contexts supply a default wall-clock :now-fn
    (java.time.Instant/now) and create fresh fn instances, so 'no injected
    :now-fn' cannot be detected statically; the behavioral check below treats an
-   injected clock that advanced < min-retry-clock-advance-ms between retries as
-   non-advancing. last-retry-now is the previous scheduled retry's now-ms (nil
-   on the first retry), now the current failed attempt's."
+   injected clock that advanced < (retry-min-clock-advance-ms ctx) between
+   retries as non-advancing. The threshold is derived from the configured
+   backoff delays (override: :retry-min-clock-advance-ms on the ctx), so
+   sub-second base delays do not false-positive. last-retry-now is the previous
+   scheduled retry's now-ms (nil on the first retry), now the current failed
+   attempt's."
   [ctx budget-active? count-cap last-retry-now now]
-  (when (and (or (= false (:provider-retry-sleep? ctx))
-                 (some? (:provider-retry-sleep-fn ctx)))
-             budget-active?
-             (nil? count-cap)
-             (some? last-retry-now)
-             (< (- now last-retry-now) min-retry-clock-advance-ms))
-    (throw (ex-info "Test-seam misconfiguration: real retry sleeps disabled (:provider-retry-sleep? false or :provider-retry-sleep-fn) with an active :auto-retry-total-timeout-ms budget, no explicit :auto-retry-max-retries, and a non-advancing clock would hot-loop a persistent retryable failure until the real wall-clock deadline. Inject an ADVANCING :now-fn (e.g. an atom-backed clock advanced by :provider-retry-sleep-fn) or set an explicit :auto-retry-max-retries."
-                    {:provider-retry-sleep? (:provider-retry-sleep? ctx)
-                     :provider-retry-sleep-fn (some? (:provider-retry-sleep-fn ctx))
-                     :auto-retry-total-timeout-ms (get-in ctx [:config :auto-retry-total-timeout-ms])
-                     :auto-retry-max-retries (get-in ctx [:config :auto-retry-max-retries])
-                     :clock-advance-ms (- now last-retry-now)}))))
+  (let [min-advance (retry-min-clock-advance-ms ctx)]
+    (when (and (or (= false (:provider-retry-sleep? ctx))
+                   (some? (:provider-retry-sleep-fn ctx)))
+               budget-active?
+               (nil? count-cap)
+               (some? last-retry-now)
+               (< (- now last-retry-now) min-advance))
+      (throw (ex-info "Test-seam misconfiguration: real retry sleeps disabled (:provider-retry-sleep? false or :provider-retry-sleep-fn) with an active :auto-retry-total-timeout-ms budget, no explicit :auto-retry-max-retries, and a non-advancing clock would hot-loop a persistent retryable failure until the real wall-clock deadline. Inject an ADVANCING :now-fn (e.g. an atom-backed clock advanced by :provider-retry-sleep-fn) or set an explicit :auto-retry-max-retries."
+                      {:provider-retry-sleep? (:provider-retry-sleep? ctx)
+                       :provider-retry-sleep-fn (some? (:provider-retry-sleep-fn ctx))
+                       :auto-retry-total-timeout-ms (get-in ctx [:config :auto-retry-total-timeout-ms])
+                       :auto-retry-max-retries (get-in ctx [:config :auto-retry-max-retries])
+                       :clock-advance-ms (- now last-retry-now)
+                       :min-retry-clock-advance-ms min-advance})))))
 
 (defn give-up-decision
   "Single-sourced retry termination decision (count cap + total-time deadline +

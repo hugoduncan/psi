@@ -307,7 +307,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, seventh turn)
 
-- [ ] `create-context*` (agent-session/context.clj) silently drops the retry
+- [x] `create-context*` (agent-session/context.clj) silently drops the retry
       test-seam keys passed via `create-session-context` opts: the
       destructured opts list does not include `:provider-retry-sleep?`,
       `:provider-retry-sleep-fn`, `:now-fn`, or `:provider-retry-cancelled?`,
@@ -321,7 +321,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       opts and ignored; then the direct-assoc workarounds in the retry /
       response-mode / prompt-lifecycle tests can revert to the natural opts
       API.
-- [ ] `assert-test-seam-no-hot-loop!` (retry.clj) uses the hardcoded
+      → Done: `create-context*` now destructures and propagates
+      `:provider-retry-sleep?` / `:provider-retry-sleep-fn` /
+      `:provider-retry-cancelled?` / `:now-fn` onto the ctx (assoc'd after
+      the callback-fns merge, so `:now-fn` overrides the default wall-clock).
+      All direct-assoc workarounds reverted to the natural opts API in
+      response_mode_retry_test.clj (11 sites), response_mode_test.clj (6),
+      prompt_lifecycle_test.clj (2); the 3 sites whose seam fn must close
+      over the ctx to read session state keep a minimal assoc with an updated
+      comment (opts are evaluated before the ctx exists). The 4 pre-existing
+      tests that already passed the flag via opts (previously inert) now
+      actually disable sleeps. clj-kondo clean.
+- [x] `assert-test-seam-no-hot-loop!` (retry.clj) uses the hardcoded
       `min-retry-clock-advance-ms` 1000 ms threshold: an injected clock that
       advances by less than 1000 ms between scheduled retries trips the guard
       even though the loop terminates at the injected deadline — a FALSE
@@ -338,7 +349,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `(min :auto-retry-base-delay-ms :auto-retry-max-delay-ms)` or a small
       jitter bound), make it configurable, or document a minimum-delay
       constraint.
-- [ ] The new top-level `:retry-deadline-ms` session field is absent from
+      → Done: the hardcoded 1000 ms constant is replaced by
+      `retry-min-clock-advance-ms` (retry.clj), derived from the configured
+      delays — `(max 1 (min :auto-retry-base-delay-ms :auto-retry-max-delay-ms))`
+      — and overridable per-test via `:retry-min-clock-advance-ms` on the
+      ctx. Docstring + ex-info updated (message now reports the derived
+      threshold in ex-data). New
+      `execute-prepared-request-small-base-delay-advancing-clock-not-guarded-test`
+      (retry_test.clj): budget-active, cap-free, base delay 10, standard
+      delay-driven advancing clock → no guard throw, window runs to
+      `:deadline` (> 2 attempts; the old 1000 ms threshold would have thrown
+      at the 2nd retry). retry suite 18 → 19.
+- [x] The new top-level `:retry-deadline-ms` session field is absent from
       every surface that already exposes its siblings `:retry-attempt` /
       `:retry`: the EQL session resolver `agent-session-retry-compact`
       (agent-session/resolvers/session.clj ~270), the session introspection
@@ -349,3 +371,14 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       so an observer cannot tell when the window closes. Add
       `:retry-deadline-ms` to the three surfaces, or explicitly document it
       as intentionally internal.
+      → Done: `:retry-deadline-ms` added to all three surfaces —
+      `agent-session-retry-compact` resolver output/values
+      (`:psi.agent-session/retry-deadline-ms`), `diagnostics-in`
+      (`:retry-deadline-ms`), and the `session/updated` projection
+      (session_summary.clj summary + rpc/events.clj select-keys +
+      required-event-payload-keys). Tests: `retry-compact-eql-introspection-test`
+      (queries the resolver with a seeded window, nil without),
+      `diagnostics-test` contains? check (config_compaction_test.clj), and
+      `session-updated-payload-includes-retry-contract-test` seeds/asserts
+      the field (rpc_events_test.clj, key-set + value), fixture
+      `session-scoped-event-data` updated for the new required key.
