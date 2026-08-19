@@ -670,3 +670,37 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       core-test 16, prompt-lifecycle-test 23 — all green; clj-kondo clean;
       commit-check:file-lengths / changelog:check /
       commit-check:dispatch-architecture pass.
+
+## Review follow-up (implementation review, sixteenth turn)
+
+- [ ] Zero `:auto-retry-base-delay-ms` (or `:auto-retry-max-delay-ms`) with the
+      budget active hot-loops in PRODUCTION. `exponential-backoff-ms` yields 0
+      for a 0 base (or max), `sleep-for-retry!` skips non-positive delays, and
+      `assert-test-seam-no-hot-loop!` fires only under the sleep-disabled test
+      seams (`:provider-retry-sleep? false` / `:provider-retry-sleep-fn` —
+      never set on a production ctx), so a persistent retryable failure retries
+      back-to-back with zero delay until the REAL wall-clock deadline (10 min
+      default) — pre-change the default count cap 3 bounded the same
+      misconfiguration to 4 instant attempts. This also breaks design Approach
+      5's guarantee that "the budget-active default never retries back-to-back
+      with an immediate 0-delay until the deadline": the non-positive
+      `Retry-After` floor (`(when (pos? delay-ms) ...)` → exponential) lands on
+      0 when the exponential itself is 0. Fix: floor the per-attempt delay to a
+      positive minimum (clamp base/max to >= 1, or `(max 1 delay-ms)` at the
+      point the slept delay is chosen) so the budget-active default always
+      sleeps between attempts — and/or extend the hot-loop guard to the
+      production path (zero delay + active budget + nil cap is always a
+      misconfiguration). Add a turn-runtime test: budget active, cap-free,
+      base 0 → first scheduled `:delay-ms` positive and the loop sleeps, never
+      zero-delay back-to-back.
+- [ ] `mementum/knowledge/provider-retry-total-time-window.md` is stale: it was
+      written at the first closure (2026-08-18), BEFORE the 4th–15th-turn
+      follow-ups, and omits post-closure facts a future AI session needs — the
+      `assert-test-seam-no-hot-loop!` behavioral guard + derived/overridable
+      `:retry-min-clock-advance-ms` threshold, the `create-context*` seam-key
+      propagation (retry seam keys now flow through `create-session-context`
+      opts, replacing the direct-assoc workaround), the `:retry-deadline-ms`
+      EQL/RPC/introspection surfaces, the `:exhausted-reason` EQL
+      provider-retries projection, and the oversized/near-Long `Retry-After`
+      floor fixes. Refresh the page (status stays done) per mementum's
+      stale-knowledge protocol before closing.

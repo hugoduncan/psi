@@ -400,3 +400,4 @@
   clj-kondo clean; `bb commit-check:file-lengths` passes; agent-session suite green.
 - implementation review 2026-08-19 (fifteenth turn): added 1 step to be addressed.
 - addressed 15th-turn review step (2026-08-19): near-Long/MAX parseable `Retry-After` long-overflow closed. `retry-after-delay-ms` integer branch caps accepted seconds (below `(quot Long/MAX_VALUE 1000)` and below the `:resume-at` overflow boundary); `give-up-decision` overshoot comparison is subtraction-based. New model test (16-digit values → nil/exponential + fitting-boundary no-overflow) + turn-runtime test (16-digit → backoff floor → `:deadline`, no throw); CHANGELOG Fixed entry extended. model-test 14, retry-test 22, response-mode 18, eql-provider-retry 5, core 16, prompt-lifecycle 23 green; clj-kondo clean; commit checks pass.
+- implementation review 2026-08-19 (sixteenth turn): added 2 steps to be addressed.
