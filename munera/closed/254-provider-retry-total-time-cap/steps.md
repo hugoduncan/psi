@@ -1243,3 +1243,22 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       15-second deadline at the first retry decision, then advances the retrying
       request past that deadline and asserts its success is returned and the
       retry window is cleared.
+
+## Review follow-up (documentation review, final turn)
+
+- [ ] Align `doc/configuration.md`'s retry-setting type contract with the typed
+      runtime boundary. The settings table currently says only `integer`,
+      `non-negative integer`, or `positive integer`, but
+      `resolve-retry-limiters!` / `resolve-retry-delays!` accept only integers
+      within the signed 64-bit (`long`) range and reject fractional, wrong-type,
+      and out-of-range values with `Invalid retry configuration`. State the
+      64-bit range constraint (and retain the existing inactive-setting timing)
+      so valid-looking EDN big integers are not documented as accepted.
+- [ ] Add `CHANGELOG.md` [Unreleased] Fixed coverage for the user-visible retry
+      configuration fixes landed after the prior documentation review: malformed
+      or fractional limiter/delay values and negative count caps now fail with an
+      informative retry-configuration error instead of leaking coercion/comparison
+      exceptions or being silently truncated/accepted, and near-`Long/MAX_VALUE`
+      configured exponential delays no longer overflow retry metadata or the
+      production sleep deadline. Existing entries cover timeout-deadline and
+      provider-header overflow, but not these operator-config paths.

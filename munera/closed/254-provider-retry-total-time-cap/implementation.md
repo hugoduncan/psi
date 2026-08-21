@@ -464,3 +464,4 @@
 - addressed 1 review step.
 - test review 2026-08-21 (final turn): no new actionable feedback.
 - test-shaper review 2026-08-21 (post-boundary tests): added 0 steps to be addressed.
+- documentation review 2026-08-21 (final turn): added 2 steps to be addressed.
