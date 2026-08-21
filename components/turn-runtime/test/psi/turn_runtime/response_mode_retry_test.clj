@@ -50,6 +50,18 @@
                        :error-message message
                        :timestamp (java.time.Instant/now)}})
 
+(defn- assert-guard-terminal-lifecycle
+  [ctx session-id]
+  (let [events       (provider-events ctx session-id)
+        final-event  (last events)
+        session-data (ss/get-session-data-in ctx session-id)]
+    (is (= 3 (count (filter #(= "provider_request_finished" (:type %)) events))))
+    (is (= [true :failed] ((juxt :final? :status) final-event)))
+    (is (= [0 nil false]
+           [(:retry-attempt session-data)
+            (:retry session-data)
+            (contains? session-data :retry-deadline-ms)]))))
+
 (deftest execute-prepared-request-streaming-retry-discards-failed-partial-output-test
   ;; Failed streaming-attempt partial output is attempt-local; the successful
   ;; retry owns the final assistant content. The :provider-retry-sleep? seam
@@ -665,10 +677,7 @@
         (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-hot-loop-test-seam-guard-test
-  ;; A persistent retryable failure under the sleep-disabled, budget-active,
-  ;; cap-free test seam with a non-advancing clock (default wall-clock :now-fn)
-  ;; fails fast as a test-config error instead of hot-looping to the real
-  ;; 10-minute wall-clock deadline (pre-change 3-attempt cap bounded it).
+  ;; A non-advancing, sleep-disabled, cap-free retry seam fails fast.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
@@ -685,24 +694,10 @@
       ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
       ;; not a 10-minute spin
       (is (= 2 @attempts*))
-      (let [events       (provider-events ctx session-id)
-            final-event  (last events)
-            session-data (ss/get-session-data-in ctx session-id)]
-        (is (= ["provider_request_started" "provider_request_finished"
-                "provider_retry_scheduled" "provider_request_started"
-                "provider_request_finished" "provider_request_finished"]
-               (mapv :type events)))
-        (is (true? (:final? final-event)))
-        (is (= :failed (:status final-event)))
-        (is (= 0 (:retry-attempt session-data)))
-        (is (nil? (:retry session-data)))
-        (is (not (contains? session-data :retry-deadline-ms)))))))
+      (assert-guard-terminal-lifecycle ctx session-id))))
 
 (deftest execute-prepared-request-sleep-fn-seam-guard-test
-  ;; The seam guard also covers an injected no-op :provider-retry-sleep-fn
-  ;; WITHOUT the :provider-retry-sleep? false flag: budget active, nil cap,
-  ;; non-advancing clock, persistent failure — the waits are no-ops so the
-  ;; loop would hot-loop unless the guard fires (the sleep? flag alone skips).
+  ;; The guard also covers an injected no-op sleep function without the flag.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :provider-retry-sleep-fn (fn [_delay-ms])})
         prepared         (prepared-request ctx session-id)
@@ -719,18 +714,7 @@
       ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
       ;; not a 10-minute spin
       (is (= 2 @attempts*))
-      (let [events       (provider-events ctx session-id)
-            final-event  (last events)
-            session-data (ss/get-session-data-in ctx session-id)]
-        (is (= ["provider_request_started" "provider_request_finished"
-                "provider_retry_scheduled" "provider_request_started"
-                "provider_request_finished" "provider_request_finished"]
-               (mapv :type events)))
-        (is (true? (:final? final-event)))
-        (is (= :failed (:status final-event)))
-        (is (= 0 (:retry-attempt session-data)))
-        (is (nil? (:retry session-data)))
-        (is (not (contains? session-data :retry-deadline-ms)))))))
+      (assert-guard-terminal-lifecycle ctx session-id))))
 
 (deftest execute-prepared-request-advancing-clock-test-seam-not-guarded-test
   ;; The seam guard only fires on a non-advancing clock: an injected clock that

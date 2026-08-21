@@ -144,8 +144,13 @@
    test whose smallest delay is a provider Retry-After below the configured
    base)."
   [ctx {:keys [base-delay-ms max-delay-ms]}]
-  (or (:retry-min-clock-advance-ms ctx)
-      (min base-delay-ms max-delay-ms)))
+  (if (contains? ctx :retry-min-clock-advance-ms)
+    (let [override (:retry-min-clock-advance-ms ctx)]
+      (when-not (and (long-integer? override) (pos? override))
+        (invalid-retry-policy! :retry-min-clock-advance-ms override
+                               "must be a positive integer"))
+      (long override))
+    (min base-delay-ms max-delay-ms)))
 
 (defn assert-test-seam-no-hot-loop!
   "Fail fast when the test-seam retry loop cannot reach its deadline: with real
@@ -170,19 +175,21 @@
    retry's now-ms (nil on the first retry), now the current failed attempt's."
   [ctx retry-policy last-retry-now now]
   (let [{:keys [budget-active? count-cap]} retry-policy
-        min-advance (retry-min-clock-advance-ms ctx retry-policy)]
+        min-advance (retry-min-clock-advance-ms ctx retry-policy)
+        clock-advance (when (some? last-retry-now)
+                        (max 0 (-' now last-retry-now)))]
     (when (and (or (= false (:provider-retry-sleep? ctx))
                    (some? (:provider-retry-sleep-fn ctx)))
                budget-active?
                (nil? count-cap)
-               (some? last-retry-now)
-               (< (- now last-retry-now) min-advance))
+               (some? clock-advance)
+               (< clock-advance min-advance))
       (throw (ex-info "Test-seam misconfiguration: real retry sleeps disabled (:provider-retry-sleep? false or :provider-retry-sleep-fn) with an active :auto-retry-total-timeout-ms budget, no explicit :auto-retry-max-retries, and a non-advancing clock would hot-loop a persistent retryable failure until the real wall-clock deadline. Inject an ADVANCING :now-fn (e.g. an atom-backed clock advanced by :provider-retry-sleep-fn) or set an explicit :auto-retry-max-retries."
                       {:provider-retry-sleep? (:provider-retry-sleep? ctx)
                        :provider-retry-sleep-fn (some? (:provider-retry-sleep-fn ctx))
                        :auto-retry-total-timeout-ms (get-in ctx [:config :auto-retry-total-timeout-ms])
                        :auto-retry-max-retries (get-in ctx [:config :auto-retry-max-retries])
-                       :clock-advance-ms (- now last-retry-now)
+                       :clock-advance-ms clock-advance
                        :min-retry-clock-advance-ms min-advance})))))
 
 (defn give-up-decision

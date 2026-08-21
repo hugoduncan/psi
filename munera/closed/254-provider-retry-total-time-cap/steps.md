@@ -1102,7 +1102,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       error boundary that emits a final failed provider event, clears the retry
       window, and rethrows. Both sleep-disabled seam tests assert the terminal
       lifecycle and cleared attempt, retry metadata, and deadline.
-- [ ] Make the hot-loop guard's threshold and clock comparison robust at their
+- [x] Make the hot-loop guard's threshold and clock comparison robust at their
       boundary. `:retry-min-clock-advance-ms` is consumed without validation, so a
       negative override disables the guard and a wrong type leaks a comparison
       exception; `(- now last-retry-now)` is checked arithmetic and can itself
@@ -1111,3 +1111,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       positive long integer and compare clock samples without overflow (treat a
       backward clock as non-advancing), with focused tests for invalid overrides
       and a backward/extreme injected clock.
+      → Done: explicit threshold overrides now require a positive long integer.
+      Clock advance uses arbitrary-precision subtraction, clamps backward movement
+      to zero, and shares that safe value between the predicate and ex-data.
+      Focused tests cover malformed overrides and a full-range backward clock.

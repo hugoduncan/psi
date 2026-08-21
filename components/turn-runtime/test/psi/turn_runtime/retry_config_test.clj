@@ -235,6 +235,49 @@
       (is (= expected-min
              (:min-retry-clock-advance-ms (ex-data guard-error)))))))
 
+(deftest retry-clock-advance-override-is-validated-test
+  ;; An explicit guard threshold is a positive long integer; malformed seam
+  ;; configuration fails at the retry boundary with the offending key/value.
+  (let [[ctx _] (create-session-context session-model/default-config)
+        policy  (->> (retry/resolve-retry-limiters! ctx)
+                     (retry/resolve-retry-delays! ctx))]
+    (doseq [override [-1 0 1.5 "10"]]
+      (let [error (try
+                    (retry/assert-test-seam-no-hot-loop!
+                     (assoc ctx
+                            :provider-retry-sleep? false
+                            :retry-min-clock-advance-ms override)
+                     policy
+                     nil
+                     0)
+                    nil
+                    (catch clojure.lang.ExceptionInfo caught
+                      caught))]
+        (is (= "Invalid retry configuration: retry-min-clock-advance-ms must be a positive integer"
+               (ex-message error)))
+        (is (= {:config-key :retry-min-clock-advance-ms
+                :value override
+                :requirement "must be a positive integer"}
+               (ex-data error)))))))
+
+(deftest retry-clock-advance-extreme-backward-clock-is-safe-test
+  ;; A clock moving backward across the full long range is non-advancing; the
+  ;; guard reports zero elapsed time rather than overflowing subtraction.
+  (let [[ctx _] (create-session-context session-model/default-config)
+        policy  (->> (retry/resolve-retry-limiters! ctx)
+                     (retry/resolve-retry-delays! ctx))
+        error   (try
+                  (retry/assert-test-seam-no-hot-loop!
+                   (assoc ctx :provider-retry-sleep? false)
+                   policy
+                   Long/MAX_VALUE
+                   Long/MIN_VALUE)
+                  nil
+                  (catch clojure.lang.ExceptionInfo caught
+                    caught))]
+    (is (re-find #"^Test-seam misconfiguration" (ex-message error)))
+    (is (= 0 (:clock-advance-ms (ex-data error))))))
+
 (deftest retry-clear-mode-is-required-test
   ;; Retry deadline lifecycle cannot be selected by omission or truthiness.
   (let [[ctx session-id] (create-session-context {})]
