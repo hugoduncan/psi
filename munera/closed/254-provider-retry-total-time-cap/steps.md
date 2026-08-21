@@ -1132,3 +1132,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       overshoot comparison proves it is bounded by `next-delay-ms`. Focused
       coverage spans `Long/MIN_VALUE` → `Long/MAX_VALUE` without overflow and
       verifies bounded final-sleep conversion.
+
+## Review follow-up (code-shaper eighth re-review)
+
+- [ ] Harden `rate-limit-reset->timing` at the same provider-header arithmetic
+      boundary as `retry-after-delay-ms`. A parseable extreme negative
+      `RateLimit-Reset` value reaches checked `(* 1000 n)` and throws
+      `ArithmeticException`, while ordinary negative values produce nonsensical
+      negative `:reset-after-ms` / `:reset-at` metadata. The relative-seconds
+      branch also computes `(+ now-ms reset-after-ms)` instead of using the
+      shared `saturating-epoch-add` authority established by the fourth
+      code-shaper re-review. Reject non-positive/out-of-range reset values (or
+      omit their timing metadata), route relative epoch addition through the
+      shared saturating helper, and add focused model tests for negative,
+      extreme, and near-Long clock inputs so malformed rate-limit telemetry
+      cannot abort an otherwise valid retry decision.
