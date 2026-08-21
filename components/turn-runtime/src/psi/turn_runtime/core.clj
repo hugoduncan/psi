@@ -504,13 +504,7 @@
                          :base-ai-options (or (:prepared-request/ai-options prepared-request) {})
                          :response-mode (response-mode-for ctx session-id prepared-request)}
         retry-enabled?  (:auto-retry-enabled (ss/get-session-data-in ctx session-id))
-        budget-timeout-ms (long (or (get-in ctx [:config :auto-retry-total-timeout-ms]) 0))
-        budget-active?  (pos? budget-timeout-ms)
-        explicit-cap    (get-in ctx [:config :auto-retry-max-retries])
-        count-cap       (cond
-                          (some? explicit-cap) explicit-cap
-                          (not budget-active?) 3
-                          :else nil)]
+        policy-preview  (retry/retry-policy-preview ctx)]
     (ss/apply-root-state-update-in!
      ctx
      (ss/session-update session-id #(dissoc % :provider-retry-abort-requested?)))
@@ -518,7 +512,7 @@
     ;; :retry-attempt/:retry alongside an expired deadline (and its
     ;; budget-disabled branch clears any leftover future deadline), so the
     ;; attempt read-back must observe the fresh-window state.
-    (loop [retry-deadline-ms (retry/retry-deadline-for ctx session-id budget-active?)
+    (loop [retry-deadline-ms (retry/retry-deadline-for ctx session-id (:budget-active? policy-preview))
            retry-attempt     (retry/retry-attempt-for ctx session-id)
            last-retry-now    nil]
       (let [attempt-data*  (assoc attempt-data :retry-attempt retry-attempt)
@@ -545,11 +539,29 @@
             (execution-result ctx session-id prepared-request attempt-data* attempt-result nil))
           (let [{:keys [retryable? error-message] :as error-fields}
                 (retry/provider-error-fields assistant-msg)
+                retry-eligible?  (and retryable? retry-enabled?)
+                retry-policy     (when retry-eligible?
+                                   (try
+                                     (retry/resolve-retry-policy! ctx)
+                                     (catch clojure.lang.ExceptionInfo error
+                                       (retry/dispatch-provider-event!
+                                        ctx
+                                        "provider_request_finished"
+                                        (failed-attempt-finished-event
+                                         session-id turn-id attempt-data* attempt-result retry-attempt
+                                         error-fields true {}))
+                                       (retry/clear-active-retry! ctx session-id progress-queue true)
+                                       (throw error))))
+                effective-policy (or retry-policy policy-preview)
+                budget-timeout-ms (:budget-timeout-ms effective-policy)
+                budget-active?  (:budget-active? effective-policy)
+                count-cap       (:count-cap effective-policy)
                 now              (retry/now-ms ctx)
-                retry-metadata   (retry/retry-metadata-for ctx assistant-msg retry-attempt)
+                retry-metadata   (when retry-eligible?
+                                   (retry/retry-metadata-for ctx assistant-msg retry-attempt retry-policy))
                 next-delay-ms    (:delay-ms retry-metadata)
                 deadline-ms      (or retry-deadline-ms
-                                     (when (and retryable? retry-enabled? budget-active?)
+                                     (when (and retry-eligible? budget-active?)
                                        (retry/deadline-ms now budget-timeout-ms)))
                 decision         (retry/give-up-decision {:retryable? retryable?
                                                           :retry-enabled? retry-enabled?
@@ -573,22 +585,6 @@
                                                  :last-error-message error-message})
                                    exhausted? (assoc :exhausted? true
                                                      :exhausted-reason (:exhausted-reason decision)))]
-            ;; Delay config becomes active only when this enabled, retryable
-            ;; failure will schedule a full or truncated retry sleep. Validate
-            ;; before emitting the ordinary non-final attempt event; when the
-            ;; config is invalid, close the provider lifecycle before rethrowing.
-            (when-not immediate-final?
-              (try
-                (retry/validate-retry-config! ctx)
-                (catch clojure.lang.ExceptionInfo error
-                  (retry/dispatch-provider-event!
-                   ctx
-                   "provider_request_finished"
-                   (failed-attempt-finished-event
-                    session-id turn-id attempt-data* attempt-result retry-attempt
-                    error-fields true {}))
-                  (retry/clear-active-retry! ctx session-id progress-queue true)
-                  (throw error))))
             (retry/dispatch-provider-event!
              ctx
              "provider_request_finished"

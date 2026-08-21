@@ -18,15 +18,71 @@
   [ctx session-id]
   (or (:retry-attempt (ss/get-session-data-in ctx session-id)) 0))
 
-(defn validate-retry-config!
-  "Rejects retry delays that would permit a provider-request storm."
+(def ^:private retry-policy-defaults
+  {:auto-retry-total-timeout-ms 600000
+   :auto-retry-max-retries nil
+   :auto-retry-base-delay-ms 2000
+   :auto-retry-max-delay-ms 60000})
+
+(defn- long-integer?
+  [value]
+  (and (integer? value)
+       (<= Long/MIN_VALUE value Long/MAX_VALUE)))
+
+(defn- invalid-retry-policy!
+  [config-key value requirement]
+  (throw (ex-info (str "Invalid retry configuration: " (name config-key) " " requirement)
+                  {:config-key config-key
+                   :value value
+                   :requirement requirement})))
+
+(defn resolve-retry-policy!
+  "Resolves and validates the operator retry policy into long-valued runtime
+   fields. Call only when an enabled, retryable failure is eligible to schedule;
+   inactive retry settings must not block successful or terminal requests."
   [ctx]
-  (let [base-ms (long (get-in ctx [:config :auto-retry-base-delay-ms] 2000))
-        max-ms  (long (get-in ctx [:config :auto-retry-max-delay-ms] 60000))]
-    (when-not (and (pos? base-ms) (pos? max-ms))
-      (throw (ex-info "Invalid retry configuration: :auto-retry-base-delay-ms and :auto-retry-max-delay-ms must both be positive"
-                      {:auto-retry-base-delay-ms base-ms
-                       :auto-retry-max-delay-ms max-ms})))))
+  (let [config     (:config ctx)
+        configured (fn [config-key]
+                     (get config config-key (get retry-policy-defaults config-key)))
+        timeout    (configured :auto-retry-total-timeout-ms)
+        count-cap  (configured :auto-retry-max-retries)
+        base-delay (configured :auto-retry-base-delay-ms)
+        max-delay  (configured :auto-retry-max-delay-ms)]
+    (when-not (or (nil? timeout) (long-integer? timeout))
+      (invalid-retry-policy! :auto-retry-total-timeout-ms timeout
+                             "must be an integer or nil"))
+    (when-not (or (nil? count-cap)
+                  (and (long-integer? count-cap) (not (neg? count-cap))))
+      (invalid-retry-policy! :auto-retry-max-retries count-cap
+                             "must be a non-negative integer or nil"))
+    (doseq [[config-key value] [[:auto-retry-base-delay-ms base-delay]
+                                [:auto-retry-max-delay-ms max-delay]]]
+      (when-not (and (long-integer? value) (pos? value))
+        (invalid-retry-policy! config-key value "must be a positive integer")))
+    (let [timeout-ms (some-> timeout long)
+          budget-active? (boolean (and timeout-ms (pos? timeout-ms)))]
+      {:budget-timeout-ms (or timeout-ms 0)
+       :budget-active? budget-active?
+       :explicit-count-cap (some-> count-cap long)
+       :count-cap (cond
+                    (some? count-cap) (long count-cap)
+                    (not budget-active?) 3
+                    :else nil)
+       :base-delay-ms (long base-delay)
+       :max-delay-ms (long max-delay)})))
+
+(defn retry-policy-preview
+  "Non-throwing policy preview used only before settings become active at an
+   enabled, retryable failure. Invalid raw values remain inert at this stage."
+  [ctx]
+  (let [timeout       (get-in ctx [:config :auto-retry-total-timeout-ms] 600000)
+        explicit-cap  (get-in ctx [:config :auto-retry-max-retries])
+        budget-active? (boolean (and (long-integer? timeout) (pos? timeout)))]
+    {:budget-active? budget-active?
+     :count-cap (cond
+                  (and (long-integer? explicit-cap) (not (neg? explicit-cap))) (long explicit-cap)
+                  (not budget-active?) 3
+                  :else nil)}))
 
 (defn deadline-ms
   "Adds a positive timeout to epoch millis, saturating at Long/MAX_VALUE."
@@ -191,10 +247,10 @@
      :retryable? (contains? #{:rate-limit :timeout :overloaded :provider-unavailable :transport} error-kind)}))
 
 (defn retry-metadata-for
-  [ctx assistant-message retry-attempt]
-  (let [base-ms              (get-in ctx [:config :auto-retry-base-delay-ms] 2000)
-        max-ms               (get-in ctx [:config :auto-retry-max-delay-ms] 60000)
-        exponential-delay-ms (session-model/exponential-backoff-ms retry-attempt base-ms max-ms)
+  [ctx assistant-message retry-attempt {:keys [base-delay-ms max-delay-ms]}]
+  (let [exponential-delay-ms (session-model/exponential-backoff-ms retry-attempt
+                                                                   base-delay-ms
+                                                                   max-delay-ms)
         now                  (now-ms ctx)]
     (session-model/retry-metadata (:provider-error/headers assistant-message)
                                   retry-attempt

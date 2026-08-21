@@ -90,6 +90,57 @@
         (is (= ["provider_request_started" "provider_request_finished"]
                (mapv :type (provider-events ctx session-id))))))))
 
+(deftest successful-request-ignores-malformed-retry-policy-test
+  ;; Raw retry policy is inactive when no retryable failure reaches scheduling.
+  (let [[ctx session-id] (create-session-context {:auto-retry-total-timeout-ms "600000"
+                                                  :auto-retry-max-retries {:attempts 3}
+                                                  :auto-retry-base-delay-ms 1.5
+                                                  :auto-retry-max-delay-ms "60000"})
+        prepared         (prepared-request ctx session-id)]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (provider-result {:role "assistant"
+                                                                       :content [{:type :text :text "done"}]
+                                                                       :stop-reason :stop
+                                                                       :timestamp (java.time.Instant/now)}))]
+      (is (= :stop
+             (:execution-result/stop-reason
+              (turn-runtime/execute-prepared-request!
+               ai-ctx ctx session-id prepared nil)))))))
+
+(deftest malformed-active-retry-policy-fails-informatively-test
+  ;; Each documented integer setting rejects wrong types, fractions, and
+  ;; negative count caps at the retry-policy boundary rather than leaking a
+  ;; coercion/comparison exception.
+  (doseq [[config-key value requirement]
+          [[:auto-retry-total-timeout-ms "600000" "must be an integer or nil"]
+           [:auto-retry-total-timeout-ms 1.5 "must be an integer or nil"]
+           [:auto-retry-max-retries {:attempts 3} "must be a non-negative integer or nil"]
+           [:auto-retry-max-retries 1.5 "must be a non-negative integer or nil"]
+           [:auto-retry-max-retries -1 "must be a non-negative integer or nil"]
+           [:auto-retry-base-delay-ms "2000" "must be a positive integer"]
+           [:auto-retry-base-delay-ms 1.5 "must be a positive integer"]
+           [:auto-retry-max-delay-ms {} "must be a positive integer"]
+           [:auto-retry-max-delay-ms 1.5 "must be a positive integer"]]]
+    (let [[ctx session-id] (create-session-context {config-key value})
+          prepared         (prepared-request ctx session-id)]
+      (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                       (provider-result {:role "assistant"
+                                                                         :content [{:type :error :text "Connection reset"}]
+                                                                         :stop-reason :error
+                                                                         :error-message "Connection reset"
+                                                                         :timestamp (java.time.Instant/now)}))]
+        (let [error (try
+                      (turn-runtime/execute-prepared-request!
+                       ai-ctx ctx session-id prepared nil)
+                      nil
+                      (catch clojure.lang.ExceptionInfo error
+                        error))]
+          (is (re-find #"^Invalid retry configuration:" (ex-message error)))
+          (is (= {:config-key config-key
+                  :value value
+                  :requirement requirement}
+                 (ex-data error))))))))
+
 (deftest retryable-failure-validates-before-scheduling-test
   ;; Invalid active retry delay config rejects after the failed attempt but
   ;; before retry state or a provider_retry_scheduled event is emitted.
