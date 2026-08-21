@@ -817,3 +817,17 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       event; an invalid config emits one final failed `provider_request_finished`
       event and then rethrows, without scheduling or retry-state writes. The
       regression test asserts the terminal event's lifecycle and error fields.
+
+## Review follow-up (implementation review, twenty-first turn)
+
+- [ ] Clear canonical retry-window state when retry-delay validation rejects a
+      retryable failure. The new validation-error catch in
+      `execute-prepared-request!` emits a terminal `provider_request_finished`
+      event and immediately rethrows, but unlike every other terminal path it
+      never calls `retry/clear-active-retry!` with deadline clearing enabled. A
+      session rehydrated mid-window can therefore enter this path with persisted
+      `:retry-attempt`, `:retry`, and `:retry-deadline-ms`; after the terminal
+      configuration error those fields remain visible and can contaminate the
+      next turn. Clear the terminal retry state before rethrowing, and extend
+      `retryable-failure-validates-before-scheduling-test` with seeded active
+      retry/deadline state that is absent/reset after the exception.
