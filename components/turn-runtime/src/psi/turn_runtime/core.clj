@@ -627,7 +627,7 @@
               (let [next-attempt   (inc retry-attempt)
                     truncated-meta (assoc retry-metadata
                                           :delay-ms final-sleep-ms
-                                          :resume-at (+ now final-sleep-ms))
+                                          :resume-at deadline-ms)
                     cancelled?     (schedule-and-sleep! ctx session-id turn-id progress-queue attempt-data*
                                                         retry-attempt next-attempt truncated-meta
                                                         error-fields deadline-ms final-sleep-ms false)]

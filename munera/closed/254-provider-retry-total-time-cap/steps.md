@@ -1156,7 +1156,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper ninth re-review)
 
-- [ ] Remove the truncated-final branch's remaining independent epoch addition.
+- [x] Remove the truncated-final branch's remaining independent epoch addition.
       `execute-prepared-request!` (`turn-runtime/core.clj`) builds
       `truncated-meta` with `:resume-at (+ now final-sleep-ms)`, even though the
       fourth code-shaper re-review established
@@ -1169,3 +1169,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       future arithmetic changes cannot drift, and add focused truncated-final
       boundary coverage asserting the emitted/persisted `:resume-at` equals the
       retry-window deadline.
+      → Done: truncated-final metadata now uses the already-computed
+      `deadline-ms` directly. The total-window runtime test captures canonical
+      retry state at each injected sleep boundary and asserts both emitted and
+      persisted `:resume-at` values equal the retry-window deadline for the
+      truncated final sleep.

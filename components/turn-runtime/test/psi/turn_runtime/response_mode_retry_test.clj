@@ -209,18 +209,21 @@
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-total-time-window-governs-termination-test
-  ;; The total-time window (sentinel-nil count cap, budget active) bounds the
-  ;; loop: termination at the injected-clock deadline, final sleep truncated.
-  (let [clock          (atom 0)
-        [ctx session-id] (create-session-context {:persist? false
-                                                  :config {:auto-retry-total-timeout-ms 5000
-                                                           :auto-retry-base-delay-ms 2000
-                                                           :auto-retry-max-delay-ms 60000}
-                                                  :now-fn #(java.time.Instant/ofEpochMilli @clock)
-                                                  :provider-retry-sleep-fn (fn [delay-ms]
-                                                                             (swap! clock + (long delay-ms)))})
-        prepared       (prepared-request ctx session-id)
-        attempts*      (atom 0)]
+  ;; The active total-time window terminates at the injected-clock deadline.
+  (let [clock             (atom 0)
+        retry-resume-at   (atom nil)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-total-timeout-ms 5000
+                                                            :auto-retry-base-delay-ms 2000
+                                                            :auto-retry-max-delay-ms 60000}
+                                                   :now-fn #(java.time.Instant/ofEpochMilli @clock)})
+        sleep-fn          (fn [delay-ms]
+                            (reset! retry-resume-at
+                                    (get-in (ss/get-session-data-in ctx0 session-id) [:retry :resume-at]))
+                            (swap! clock + (long delay-ms)))
+        ctx               (assoc ctx0 :provider-retry-sleep-fn sleep-fn)
+        prepared          (prepared-request ctx session-id)
+        attempts*         (atom 0)]
     (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
                                                      (swap! attempts* inc)
                                                      (error-turn "Connection reset by peer"))]
@@ -233,13 +236,11 @@
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :deadline (:exhausted-reason outcome)))
         (is (true? (:exhausted? outcome)))
-        ;; budget-active default path has no count limiter to report
         (is (nil? (:max-retries outcome)))
-        ;; full first sleep, then truncated final sleep to the deadline (5000)
         (is (= [2000 3000] (mapv :delay-ms scheduled)))
         (is (= [2000 5000] (mapv :resume-at scheduled)))
+        (is (= 5000 @retry-resume-at))
         (is (= :exponential-backoff (:delay-source (last scheduled))))
-        ;; authoritative terminal event after the truncated sleep
         (is (= :retry-exhausted (:failure-reason (last events))))
         (is (= :deadline (:exhausted-reason (last events))))
         (is (true? (:final? (last events))))
