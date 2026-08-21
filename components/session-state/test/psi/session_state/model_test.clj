@@ -389,7 +389,8 @@
 
 (deftest retry-metadata-preserves-zero-exponential-delay-test
   ;; Retry metadata remains a faithful model of its inputs. The turn runtime
-  ;; rejects non-positive base/max config before any provider request.
+  ;; rejects non-positive base/max config only when an enabled retryable failure
+  ;; reaches retry scheduling.
   (testing "retry-metadata preserves a zero exponential delay"
     (let [meta (session/retry-metadata {} 0 0 0)]
       (is (zero? (:delay-ms meta)))

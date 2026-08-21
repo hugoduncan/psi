@@ -1197,7 +1197,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, latest turn)
 
-- [ ] Correct the stale retry-delay validation comments in
+- [x] Correct the stale retry-delay validation comments in
       `components/session-state/src/psi/session_state/model.clj` (`retry-metadata`)
       and `components/session-state/test/psi/session_state/model_test.clj`
       (`retry-metadata-preserves-zero-exponential-delay-test`). They still claim

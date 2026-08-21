@@ -602,9 +602,10 @@
 (defn retry-metadata
   [headers attempt exponential-delay-ms now-ms]
   (let [retry-after-ms (retry-after-delay-ms (header-value headers "retry-after" "x-retry-after") now-ms)
-        ;; Runtime config validation rejects non-positive base/max delays before
-        ;; provider execution. Keep metadata shaping faithful to its inputs;
-        ;; callers outside the turn runtime can still observe an invalid zero.
+        ;; Runtime config validation rejects non-positive base/max delays only
+        ;; when an enabled retryable failure reaches retry scheduling. Keep
+        ;; metadata shaping faithful to its inputs; callers outside the turn
+        ;; runtime can still observe an invalid zero.
         delay-ms       (long (or retry-after-ms exponential-delay-ms))
         rate-limit     (merge
                         (when-some [limit (some-> (header-value headers "ratelimit-limit" "x-ratelimit-limit") str str/trim parse-long-safe)]
