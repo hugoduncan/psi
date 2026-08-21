@@ -1,7 +1,9 @@
 # Current Capabilities
 
 - Agent sessions with turn execution, provider-boundary retry/backoff
-  observability, speed/effort controls, mid-conversation system messages.
+  observability, and operator-configurable retry policy: retryable provider
+  failures default to a 10-minute total-time window instead of a fixed attempt
+  cap. Also includes speed/effort controls and mid-conversation system messages.
 - Custom providers from user-global or project-local `models.edn`, including
   the documented DeepSeek `deepseek-v4-flash` setup over its
   Anthropic-compatible endpoint with adaptive-thinking support.

@@ -973,7 +973,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (documentation re-review)
 
-- [ ] Summarize the new default provider retry policy in both required overview
+- [x] Summarize the new default provider retry policy in both required overview
       surfaces. `README.md` currently links to `doc/configuration.md` without
       mentioning that retryable provider failures now use a configurable
       10-minute total-time window instead of the former default attempt cap, and
@@ -981,3 +981,5 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       observability" without recording the total-time limiter or operator config
       surface. Add concise overview text to both, linking the README detail to
       `doc/configuration.md`; keep the full key-by-key reference there.
+      → Done: both overview surfaces now summarize the configurable 10-minute
+      total-time default; README links directly to the detailed retry policy.

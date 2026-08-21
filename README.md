@@ -138,6 +138,11 @@ reference, runtime scoped setters, outbound model API proxy environment variable
 - [`doc/configuration.md`](doc/configuration.md)
 - [`doc/custom-providers.md`](doc/custom-providers.md)
 
+By default, retryable provider failures use exponential backoff within a
+configurable 10-minute total-time window rather than a fixed attempt cap. See
+[Provider auto-retry policy](doc/configuration.md#provider-auto-retry-policy)
+for configuration and disable semantics.
+
 ### Built-in Tools
 
 `read` `bash` `edit` `write` `psi-tool`

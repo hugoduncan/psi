@@ -1,3 +1,4 @@
+- addressed 1 documentation re-review step.
 - addressed 1 test-shaper second re-review step.
 - test-shaper second re-review 2026-08-21: added 1 step to be addressed.
 - test-shaper re-review 2026-08-21: added 1 step to be addressed.
