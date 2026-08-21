@@ -1283,7 +1283,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (documentation review, current turn)
 
-- [ ] Qualify the retry-window summary in `ramora/IMPLEMENTED.md` with the
+- [x] Qualify the retry-window summary in `ramora/IMPLEMENTED.md` with the
       implemented elapsed-time boundary already documented in
       `doc/configuration.md` and `CHANGELOG.md`: the default 10-minute window
       opens at the first retry decision (excluding initial-request execution)
@@ -1292,3 +1292,6 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       says only “10-minute total-time window,” which can be read as a hard
       10-minute end-to-end limit and is inconsistent with the authoritative
       runtime behavior.
+      → Done: the capability summary now states when the window opens, excludes
+      initial-request execution, and makes the between-attempt deadline boundary
+      and in-flight-success behavior explicit.
