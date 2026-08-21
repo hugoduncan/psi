@@ -798,3 +798,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       while retryable transport failure executes once then rejects before emitting
       `provider_retry_scheduled` or writing retry state. The prior base/max test
       moved into the new namespace and now asserts this scheduling boundary.
+
+## Review follow-up (implementation review, twentieth turn)
+
+- [ ] Preserve a terminal provider-event lifecycle when retry-delay validation
+      rejects a retryable failure. `execute-prepared-request!` currently dispatches
+      `provider_request_finished` with `:final? false` before calling
+      `retry/validate-retry-config!`; validation then throws before either
+      `provider_retry_scheduled` or a final/cancelled provider event is emitted.
+      The new `retryable-failure-validates-before-scheduling-test` asserts only the
+      event type sequence, so it accepts this stranded non-final request; EQL
+      `provider-retries` consequently has no final event/status for the failed
+      provider request. Reorder or explicitly finalize the validation-error path
+      so the completed provider attempt has an authoritative terminal event while
+      still rejecting before retry state/scheduling, and assert the terminal
+      event fields (including `:final?`) in the regression test.
