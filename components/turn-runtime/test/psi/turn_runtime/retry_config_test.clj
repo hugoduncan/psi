@@ -141,6 +141,50 @@
                   :requirement requirement}
                  (ex-data error))))))))
 
+(deftest near-long-delay-is-inactive-for-non-retryable-failure-test
+  ;; A terminal failure never constructs exponential metadata from inactive
+  ;; near-Long delay settings.
+  (let [[ctx session-id] (create-session-context {:auto-retry-base-delay-ms Long/MAX_VALUE
+                                                  :auto-retry-max-delay-ms Long/MAX_VALUE})
+        prepared         (prepared-request ctx session-id)]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (provider-result {:role "assistant"
+                                                                       :content [{:type :error :text "invalid api key"}]
+                                                                       :stop-reason :error
+                                                                       :error-message "invalid api key"
+                                                                       :http-status 401
+                                                                       :timestamp (java.time.Instant/now)}))]
+      (is (= :non-retryable
+             (get-in (turn-runtime/execute-prepared-request!
+                      ai-ctx ctx session-id prepared nil)
+                     [:execution-result/retry-outcome :failure-reason]))))))
+
+(deftest near-long-delay-metadata-saturates-test
+  ;; Valid near-Long delay settings cap both exponential multiplication and
+  ;; resume-time addition instead of overflowing before scheduling.
+  (let [[ctx session-id] (create-session-context {:auto-retry-total-timeout-ms 0
+                                                  :auto-retry-max-retries 1
+                                                  :auto-retry-base-delay-ms Long/MAX_VALUE
+                                                  :auto-retry-max-delay-ms Long/MAX_VALUE})
+        ctx              (assoc ctx
+                                :provider-retry-sleep? false
+                                :now-fn (constantly (java.time.Instant/ofEpochMilli 1)))
+        prepared         (prepared-request ctx session-id)]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (provider-result {:role "assistant"
+                                                                       :content [{:type :error :text "Connection reset"}]
+                                                                       :stop-reason :error
+                                                                       :error-message "Connection reset"
+                                                                       :timestamp (java.time.Instant/now)}))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       ai-ctx ctx session-id prepared nil)
+            scheduled (some #(when (= "provider_retry_scheduled" (:type %)) %)
+                            (provider-events ctx session-id))]
+        (is (= :count-cap
+               (get-in result [:execution-result/retry-outcome :exhausted-reason])))
+        (is (= Long/MAX_VALUE (:delay-ms scheduled)))
+        (is (= Long/MAX_VALUE (:resume-at scheduled)))))))
+
 (deftest retryable-failure-validates-before-scheduling-test
   ;; Invalid active retry delay config rejects after the failed attempt but
   ;; before retry state or a provider_retry_scheduled event is emitted.

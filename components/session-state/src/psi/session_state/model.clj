@@ -496,8 +496,22 @@
           #"(?i)too.many.tokens"])))
 
 (defn exponential-backoff-ms
+  "Returns base-ms doubled per attempt and capped at max-ms without numeric
+   overflow or floating-point coercion."
   [attempt base-ms max-ms]
-  (min max-ms (long (* base-ms (Math/pow 2 attempt)))))
+  (loop [remaining (max 0 (long attempt))
+         delay     (min (long base-ms) (long max-ms))]
+    (cond
+      (zero? remaining) delay
+      (>= delay max-ms) (long max-ms)
+      (> delay (quot (long max-ms) 2)) (long max-ms)
+      :else (recur (dec remaining) (* 2 delay)))))
+
+(defn- saturating-epoch-add
+  [epoch-ms delay-ms]
+  (if (> epoch-ms (- Long/MAX_VALUE delay-ms))
+    Long/MAX_VALUE
+    (+ epoch-ms delay-ms)))
 
 (defn- parse-long-safe
   [s]
@@ -599,5 +613,5 @@
      :attempt (int attempt)
      :delay-ms delay-ms
      :delay-source (if retry-after-ms :retry-after :exponential-backoff)
-     :resume-at (+ (long now-ms) delay-ms)
+     :resume-at (saturating-epoch-add (long now-ms) delay-ms)
      :rate-limit (when (seq rate-limit) rate-limit)}))
