@@ -20,6 +20,41 @@
                          content)
            [{:type :done :reason stop-reason}]))))
 
+(def ^:private stop-reasons
+  #{:stop :length :tool-use :error :aborted})
+
+(defn- assistant-message-valid?
+  [{:keys [content stop-reason error-message] :as assistant-message}]
+  (and (map? assistant-message)
+       (contains? stop-reasons stop-reason)
+       (if (= :error stop-reason)
+         (string? error-message)
+         (sequential? content))))
+
+(defn- stream-event-valid?
+  [{:keys [type content-index delta reason error-message] :as event}]
+  (and (map? event)
+       (case type
+         :start true
+         :text-delta (and (nat-int? content-index) (string? delta))
+         :done (contains? stop-reasons reason)
+         :error (string? error-message)
+         false)))
+
+(defn- stream-events-valid?
+  [events]
+  (and (sequential? events)
+       (seq events)
+       (every? stream-event-valid? events)
+       (#{:done :error} (:type (last events)))))
+
+(defn- response-payload-valid?
+  [shape payload]
+  (case shape
+    :stream-events (stream-events-valid? payload)
+    :assistant-message (assistant-message-valid? payload)
+    false))
+
 (defn- response->events
   [response]
   (let [response-map? (map? response)
@@ -30,17 +65,18 @@
 
                            (and response-map?
                                 (contains? response :assistant-message))
-                           (conj :assistant-message))]
+                           (conj :assistant-message))
+        selected-shape (first supported-shapes)
+        payload (get response selected-shape)]
     (when-not (and response-map?
                    (= 1 (count supported-shapes))
-                   (some? (get response (first supported-shapes))))
+                   (response-payload-valid? selected-shape payload))
       (throw (ex-info "Invalid scripted provider response"
                       {:response response
                        :supported-shapes [:stream-events :assistant-message]})))
-    (case (first supported-shapes)
-      :stream-events (:stream-events response)
-      :assistant-message (assistant-message->events
-                          (:assistant-message response)))))
+    (case selected-shape
+      :stream-events payload
+      :assistant-message (assistant-message->events payload))))
 
 (defn nullable-provider-context
   "Return an isolated AI context whose provider executes `response-fn` through

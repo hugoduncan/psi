@@ -896,7 +896,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (test-shaper second re-review)
 
-- [ ] Validate the selected scripted response payload, not only the outer shape
+- [x] Validate the selected scripted response payload, not only the outer shape
       discriminator, in `retry-provider-test-support/response->events`. A non-nil
       `{:assistant-message {}}` currently passes the new guard and is converted
       into synthetic `:start` / `:done` events with a nil stop reason; malformed
@@ -906,3 +906,10 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       contract for each supported payload (including a non-nil assistant-message
       `:stop-reason`) and add focused malformed-payload cases that assert the
       informative boundary error.
+      → Done: `response->events` now validates the selected payload before
+      conversion. Assistant messages require a recognized stop reason plus
+      sequential content (success) or an error message (error); explicit streams
+      require a non-empty sequence of supported, minimally valid events ending in
+      `:done` or `:error`. Focused tests cover malformed assistant messages,
+      collection shape, event payloads/types, and terminal events. Helper and both
+      consuming retry suites pass; changed tests lint clean.
