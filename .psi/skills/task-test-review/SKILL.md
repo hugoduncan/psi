@@ -10,5 +10,7 @@ advertise: false
   ∧ ∀b ∈ observable_behaviour(design(task)). ∃t ∈ tests(task). covers(t, b)
   ∧ ∀d ∈ infra_deps(tests(task)). injectable(d) ∧ nullable(d) ∧ ¬mock(d) ∧ ¬stub(d)
 
-inject state, not behaviour
-limit test coverage to the changes introduced by the task.
+- inject state, not behaviour
+- limit test coverage to the changes introduced by the task.
+- no test-only code paths in production
+- no test-only arguments or options
