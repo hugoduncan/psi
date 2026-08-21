@@ -1067,3 +1067,16 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       construction, and production interruptible-sleep deadlines all call it;
       the duplicate `retry/deadline-ms` helper was removed. Existing focused
       model/runtime tests retain overflow-boundary coverage for all three callers.
+
+## Review follow-up (code-shaper fifth re-review)
+
+- [ ] Use one injected-clock sample for each failed-attempt retry decision and its
+      metadata. `execute-prepared-request!` reads `now` for deadline construction,
+      give-up decisions, truncation, and hot-loop tracking, but
+      `retry-metadata-for` immediately calls `now-ms` again to construct
+      `:resume-at` and parse time-based `Retry-After` headers. One logical decision
+      therefore has two time origins; an advancing injected clock (or a slow metadata
+      path) can make the emitted full-retry `:resume-at` disagree with the deadline /
+      guard instant and can consume test-clock advances unexpectedly. Pass the loop's
+      `now` into metadata shaping (or return one attempt-time data shape) so computation
+      is locally coherent, and add a focused clock-count / `:resume-at` regression test.
