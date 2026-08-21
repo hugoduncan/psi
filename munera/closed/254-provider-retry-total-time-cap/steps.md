@@ -1118,7 +1118,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper seventh re-review)
 
-- [ ] Make `give-up-decision`'s remaining-window arithmetic safe across the same
+- [x] Make `give-up-decision`'s remaining-window arithmetic safe across the same
       full-range injected/persisted clock boundary now covered by the hot-loop
       guard. Its overshoot branch still evaluates `(- deadline-ms now)` twice
       with checked long subtraction; for example, a persisted deadline of
@@ -1127,3 +1127,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       remainder once with arbitrary-precision subtraction (or compare without
       subtraction overflow), then convert only a bounded `:final-sleep-ms` to
       long. Add focused `give-up-decision` coverage for the extreme clock range.
+      → Done: `give-up-decision` now computes the remaining window once with
+      arbitrary-precision subtraction and converts it to long only after the
+      overshoot comparison proves it is bounded by `next-delay-ms`. Focused
+      coverage spans `Long/MIN_VALUE` → `Long/MAX_VALUE` without overflow and
+      verifies bounded final-sleep conversion.

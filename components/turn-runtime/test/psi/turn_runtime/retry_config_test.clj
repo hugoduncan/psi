@@ -278,6 +278,24 @@
     (is (re-find #"^Test-seam misconfiguration" (ex-message error)))
     (is (= 0 (:clock-advance-ms (ex-data error))))))
 
+(deftest give-up-decision-extreme-clock-range-is-safe-test
+  ;; Remaining-window arithmetic spans the full long range without overflow;
+  ;; conversion to long occurs only when an overshoot bounds the final sleep.
+  (let [base-decision {:retryable? true
+                       :retry-enabled? true
+                       :retry-attempt 0
+                       :count-cap nil
+                       :deadline-ms Long/MAX_VALUE
+                       :now Long/MIN_VALUE}]
+    (is (nil? (retry/give-up-decision
+               (assoc base-decision :next-delay-ms Long/MAX_VALUE))))
+    (is (= {:failure-reason :retry-exhausted
+            :exhausted-reason :deadline
+            :final-sleep-ms (dec Long/MAX_VALUE)}
+           (retry/give-up-decision
+            (assoc base-decision :next-delay-ms Long/MAX_VALUE
+                   :now 1))))))
+
 (deftest retry-clear-mode-is-required-test
   ;; Retry deadline lifecycle cannot be selected by omission or truthiness.
   (let [[ctx session-id] (create-session-context {})]

@@ -202,22 +202,24 @@
    the prior failure-reason-for: non-retryable → retry-disabled → count-cap →
    deadline (count-cap wins when both hold)."
   [{:keys [retryable? retry-enabled? retry-attempt count-cap deadline-ms next-delay-ms now]}]
-  (cond
-    (not retryable?) {:failure-reason :non-retryable}
-    (not retry-enabled?) {:failure-reason :retry-disabled}
-    (and (some? count-cap) (>= retry-attempt count-cap))
-    {:failure-reason :retry-exhausted :exhausted-reason :count-cap}
-    (and (some? deadline-ms) (>= now deadline-ms))
-    {:failure-reason :retry-exhausted :exhausted-reason :deadline}
-    (and (some? deadline-ms)
-         (pos? (- deadline-ms now))
-         ;; Subtraction-based: `(- deadline-ms now)` is bounded by the window
-         ;; (<= the total-timeout), while `(+ now next-delay-ms)` would
-         ;; overflow for a near-Long/MAX provider `Retry-After` delay.
-         (> next-delay-ms (- deadline-ms now)))
-    {:failure-reason :retry-exhausted :exhausted-reason :deadline
-     :final-sleep-ms (- deadline-ms now)}
-    :else nil))
+  (let [remaining-window-ms (when (some? deadline-ms)
+                              (-' deadline-ms now))]
+    (cond
+      (not retryable?) {:failure-reason :non-retryable}
+      (not retry-enabled?) {:failure-reason :retry-disabled}
+      (and (some? count-cap) (>= retry-attempt count-cap))
+      {:failure-reason :retry-exhausted :exhausted-reason :count-cap}
+      (and (some? deadline-ms) (>= now deadline-ms))
+      {:failure-reason :retry-exhausted :exhausted-reason :deadline}
+      (and (some? remaining-window-ms)
+           (pos? remaining-window-ms)
+           ;; Arbitrary-precision subtraction keeps persisted/injected clocks
+           ;; safe across the full long range. An overshot remainder is bounded
+           ;; by next-delay-ms, so only that final sleep is converted to long.
+           (> next-delay-ms remaining-window-ms))
+      {:failure-reason :retry-exhausted :exhausted-reason :deadline
+       :final-sleep-ms (long remaining-window-ms)}
+      :else nil)))
 
 (defn attempt-id-for
   [provider-request-id retry-attempt]
