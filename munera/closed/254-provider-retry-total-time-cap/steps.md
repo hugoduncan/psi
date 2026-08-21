@@ -1087,7 +1087,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper sixth re-review)
 
-- [ ] Preserve a terminal provider-event lifecycle and clear canonical retry-window
+- [x] Preserve a terminal provider-event lifecycle and clear canonical retry-window
       state when `assert-test-seam-no-hot-loop!` rejects a retry seam. The guard
       currently runs after the failed attempt has emitted
       `provider_request_finished` with `:final? false`, and throws before either a
@@ -1098,6 +1098,10 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       the guard before the ordinary non-final emission), then extend both guard
       tests to assert a final failed event and reset `:retry-attempt` / `:retry` /
       `:retry-deadline-ms` state.
+      → Done: retry policy resolution and the hot-loop guard now share one terminal
+      error boundary that emits a final failed provider event, clears the retry
+      window, and rethrows. Both sleep-disabled seam tests assert the terminal
+      lifecycle and cleared attempt, retry metadata, and deadline.
 - [ ] Make the hot-loop guard's threshold and clock comparison robust at their
       boundary. `:retry-min-clock-advance-ms` is consumed without validation, so a
       negative override disables the guard and a wrong type leaks a comparison

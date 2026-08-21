@@ -541,20 +541,22 @@
           (let [{:keys [retryable? error-message] :as error-fields}
                 (retry/provider-error-fields assistant-msg)
                 retry-eligible?  (and retryable? retry-enabled?)
-                resolve-policy!  (fn [resolve]
-                                   (try
-                                     (resolve)
-                                     (catch clojure.lang.ExceptionInfo error
-                                       (retry/dispatch-provider-event!
-                                        ctx
-                                        "provider_request_finished"
-                                        (failed-attempt-finished-event
-                                         session-id turn-id attempt-data* attempt-result retry-attempt
-                                         error-fields true {}))
-                                       (retry/clear-active-retry! ctx session-id progress-queue :window-close)
-                                       (throw error))))
+                run-terminal-error-boundary!
+                (fn [operation]
+                  (try
+                    (operation)
+                    (catch clojure.lang.ExceptionInfo error
+                      (retry/dispatch-provider-event!
+                       ctx
+                       "provider_request_finished"
+                       (failed-attempt-finished-event
+                        session-id turn-id attempt-data* attempt-result retry-attempt
+                        error-fields true {}))
+                      (retry/clear-active-retry! ctx session-id progress-queue :window-close)
+                      (throw error))))
                 retry-limiters   (when retry-eligible?
-                                   (resolve-policy! #(retry/resolve-retry-limiters! ctx)))
+                                   (run-terminal-error-boundary!
+                                    #(retry/resolve-retry-limiters! ctx)))
                 effective-policy (or retry-limiters policy-preview)
                 budget-timeout-ms (:budget-timeout-ms effective-policy)
                 budget-active?  (:budget-active? effective-policy)
@@ -571,7 +573,8 @@
                                                             :next-delay-ms 0
                                                             :now now})
                 retry-policy     (when (and retry-eligible? (nil? immediate-decision))
-                                   (resolve-policy! #(retry/resolve-retry-delays! ctx retry-limiters)))
+                                   (run-terminal-error-boundary!
+                                    #(retry/resolve-retry-delays! ctx retry-limiters)))
                 retry-metadata   (when retry-policy
                                    (retry/retry-metadata-for assistant-msg retry-attempt retry-policy now))
                 next-delay-ms    (:delay-ms retry-metadata)
@@ -651,7 +654,8 @@
                 ;; Fail fast on a non-advancing-clock hot loop under the
                 ;; sleep-disabled, budget-active, cap-free test seam (review
                 ;; follow-up, 4th turn): the loop cannot reach its deadline.
-                (retry/assert-test-seam-no-hot-loop! ctx retry-policy last-retry-now now)
+                (run-terminal-error-boundary!
+                 #(retry/assert-test-seam-no-hot-loop! ctx retry-policy last-retry-now now))
                 (let [cancelled? (schedule-and-sleep! ctx session-id turn-id progress-queue attempt-data*
                                                       retry-attempt next-attempt retry-metadata
                                                       error-fields deadline-ms (:delay-ms retry-metadata) true)]

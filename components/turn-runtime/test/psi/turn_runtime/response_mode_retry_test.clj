@@ -684,7 +684,19 @@
       ;; the guard needs two consecutive clock reads to detect the
       ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
       ;; not a 10-minute spin
-      (is (= 2 @attempts*)))))
+      (is (= 2 @attempts*))
+      (let [events       (provider-events ctx session-id)
+            final-event  (last events)
+            session-data (ss/get-session-data-in ctx session-id)]
+        (is (= ["provider_request_started" "provider_request_finished"
+                "provider_retry_scheduled" "provider_request_started"
+                "provider_request_finished" "provider_request_finished"]
+               (mapv :type events)))
+        (is (true? (:final? final-event)))
+        (is (= :failed (:status final-event)))
+        (is (= 0 (:retry-attempt session-data)))
+        (is (nil? (:retry session-data)))
+        (is (not (contains? session-data :retry-deadline-ms)))))))
 
 (deftest execute-prepared-request-sleep-fn-seam-guard-test
   ;; The seam guard also covers an injected no-op :provider-retry-sleep-fn
@@ -706,7 +718,19 @@
       ;; the guard needs two consecutive clock reads to detect the
       ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
       ;; not a 10-minute spin
-      (is (= 2 @attempts*)))))
+      (is (= 2 @attempts*))
+      (let [events       (provider-events ctx session-id)
+            final-event  (last events)
+            session-data (ss/get-session-data-in ctx session-id)]
+        (is (= ["provider_request_started" "provider_request_finished"
+                "provider_retry_scheduled" "provider_request_started"
+                "provider_request_finished" "provider_request_finished"]
+               (mapv :type events)))
+        (is (true? (:final? final-event)))
+        (is (= :failed (:status final-event)))
+        (is (= 0 (:retry-attempt session-data)))
+        (is (nil? (:retry session-data)))
+        (is (not (contains? session-data :retry-deadline-ms)))))))
 
 (deftest execute-prepared-request-advancing-clock-test-seam-not-guarded-test
   ;; The seam guard only fires on a non-advancing clock: an injected clock that
