@@ -1,3 +1,4 @@
+- addressed 1 code-shaper re-review step.
 - addressed 3 code-shaper review steps.
 - addressed 1 documentation re-review step.
 - addressed 1 test-shaper second re-review step.

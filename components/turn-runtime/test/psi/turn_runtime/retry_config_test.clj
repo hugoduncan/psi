@@ -200,6 +200,31 @@
         (is (= "Invalid retry clear mode" (ex-message error)))
         (is (= mode (:mode (ex-data error))))))))
 
+(deftest count-cap-terminal-ignores-invalid-retry-delay-config-test
+  ;; An already-reached count cap terminates before inactive delay validation.
+  (let [[ctx session-id] (create-session-context {:auto-retry-max-retries 0
+                                                  :auto-retry-base-delay-ms 0})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (provider-result {:role "assistant"
+                                                                       :content [{:type :error :text "Connection reset"}]
+                                                                       :stop-reason :error
+                                                                       :error-message "Connection reset"
+                                                                       :timestamp (java.time.Instant/now)}))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     ai-ctx ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)
+            events  (provider-events ctx session-id)]
+        (is (= 1 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :count-cap (:exhausted-reason outcome)))
+        (is (= 0 (:max-retries outcome)))
+        (is (= ["provider_request_started" "provider_request_finished"]
+               (mapv :type events)))
+        (is (true? (:final? (last events))))))))
+
 (deftest retryable-failure-validates-before-scheduling-test
   ;; Invalid active retry delay config rejects after the failed attempt but
   ;; before retry state or a provider_retry_scheduled event is emitted.

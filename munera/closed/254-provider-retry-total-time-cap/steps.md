@@ -992,7 +992,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper re-review)
 
-- [ ] Split retry-policy resolution so limiter fields needed by `give-up-decision`
+- [x] Split retry-policy resolution so limiter fields needed by `give-up-decision`
       (`:auto-retry-total-timeout-ms` / `:auto-retry-max-retries`) are resolved
       before the decision, but delay fields are validated/resolved only when the
       decision will actually schedule a full or truncated sleep. The new
@@ -1006,3 +1006,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       validation, and add a regression test asserting cap 0 + invalid delay
       returns the normal `:retry-exhausted` / `:count-cap` outcome with one
       provider attempt and no scheduled retry.
+      → Done: retry policy resolution now has typed limiter and delay phases;
+      the existing single decision function runs before active delay validation,
+      then runs with metadata only when scheduling remains possible. Cap 0 plus
+      an invalid delay terminates normally after one provider attempt with
+      `:count-cap` and no retry schedule.

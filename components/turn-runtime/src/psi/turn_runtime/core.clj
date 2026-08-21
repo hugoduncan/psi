@@ -540,9 +540,9 @@
           (let [{:keys [retryable? error-message] :as error-fields}
                 (retry/provider-error-fields assistant-msg)
                 retry-eligible?  (and retryable? retry-enabled?)
-                retry-policy     (when retry-eligible?
+                resolve-policy!  (fn [resolve]
                                    (try
-                                     (retry/resolve-retry-policy! ctx)
+                                     (resolve)
                                      (catch clojure.lang.ExceptionInfo error
                                        (retry/dispatch-provider-event!
                                         ctx
@@ -552,24 +552,36 @@
                                          error-fields true {}))
                                        (retry/clear-active-retry! ctx session-id progress-queue :window-close)
                                        (throw error))))
-                effective-policy (or retry-policy policy-preview)
+                retry-limiters   (when retry-eligible?
+                                   (resolve-policy! #(retry/resolve-retry-limiters! ctx)))
+                effective-policy (or retry-limiters policy-preview)
                 budget-timeout-ms (:budget-timeout-ms effective-policy)
                 budget-active?  (:budget-active? effective-policy)
                 count-cap       (:count-cap effective-policy)
                 now              (retry/now-ms ctx)
-                retry-metadata   (when retry-eligible?
-                                   (retry/retry-metadata-for ctx assistant-msg retry-attempt retry-policy))
-                next-delay-ms    (:delay-ms retry-metadata)
                 deadline-ms      (or retry-deadline-ms
                                      (when (and retry-eligible? budget-active?)
                                        (retry/deadline-ms now budget-timeout-ms)))
-                decision         (retry/give-up-decision {:retryable? retryable?
-                                                          :retry-enabled? retry-enabled?
-                                                          :retry-attempt retry-attempt
-                                                          :count-cap count-cap
-                                                          :deadline-ms deadline-ms
-                                                          :next-delay-ms next-delay-ms
-                                                          :now now})
+                immediate-decision (retry/give-up-decision {:retryable? retryable?
+                                                            :retry-enabled? retry-enabled?
+                                                            :retry-attempt retry-attempt
+                                                            :count-cap count-cap
+                                                            :deadline-ms deadline-ms
+                                                            :next-delay-ms 0
+                                                            :now now})
+                retry-policy     (when (and retry-eligible? (nil? immediate-decision))
+                                   (resolve-policy! #(retry/resolve-retry-delays! ctx retry-limiters)))
+                retry-metadata   (when retry-policy
+                                   (retry/retry-metadata-for ctx assistant-msg retry-attempt retry-policy))
+                next-delay-ms    (:delay-ms retry-metadata)
+                decision         (or immediate-decision
+                                     (retry/give-up-decision {:retryable? retryable?
+                                                              :retry-enabled? retry-enabled?
+                                                              :retry-attempt retry-attempt
+                                                              :count-cap count-cap
+                                                              :deadline-ms deadline-ms
+                                                              :next-delay-ms next-delay-ms
+                                                              :now now}))
                 failure-reason   (:failure-reason decision)
                 final-sleep-ms   (:final-sleep-ms decision)
                 exhausted?       (= :retry-exhausted failure-reason)

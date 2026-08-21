@@ -36,18 +36,17 @@
                    :value value
                    :requirement requirement})))
 
-(defn resolve-retry-policy!
-  "Resolves and validates the operator retry policy into long-valued runtime
-   fields. Call only when an enabled, retryable failure is eligible to schedule;
-   inactive retry settings must not block successful or terminal requests."
+(defn- configured-policy-value
+  [ctx config-key]
+  (get (:config ctx) config-key (get retry-policy-defaults config-key)))
+
+(defn resolve-retry-limiters!
+  "Resolves the retry policy fields required to decide immediate termination.
+   Call only for an enabled, retryable failure. Delay settings remain inert
+   until that decision establishes that a retry sleep will be scheduled."
   [ctx]
-  (let [config     (:config ctx)
-        configured (fn [config-key]
-                     (get config config-key (get retry-policy-defaults config-key)))
-        timeout    (configured :auto-retry-total-timeout-ms)
-        count-cap  (configured :auto-retry-max-retries)
-        base-delay (configured :auto-retry-base-delay-ms)
-        max-delay  (configured :auto-retry-max-delay-ms)]
+  (let [timeout   (configured-policy-value ctx :auto-retry-total-timeout-ms)
+        count-cap (configured-policy-value ctx :auto-retry-max-retries)]
     (when-not (or (nil? timeout) (long-integer? timeout))
       (invalid-retry-policy! :auto-retry-total-timeout-ms timeout
                              "must be an integer or nil"))
@@ -55,11 +54,7 @@
                   (and (long-integer? count-cap) (not (neg? count-cap))))
       (invalid-retry-policy! :auto-retry-max-retries count-cap
                              "must be a non-negative integer or nil"))
-    (doseq [[config-key value] [[:auto-retry-base-delay-ms base-delay]
-                                [:auto-retry-max-delay-ms max-delay]]]
-      (when-not (and (long-integer? value) (pos? value))
-        (invalid-retry-policy! config-key value "must be a positive integer")))
-    (let [timeout-ms (some-> timeout long)
+    (let [timeout-ms     (some-> timeout long)
           budget-active? (boolean (and timeout-ms (pos? timeout-ms)))]
       {:budget-timeout-ms (or timeout-ms 0)
        :budget-active? budget-active?
@@ -67,9 +62,22 @@
        :count-cap (cond
                     (some? count-cap) (long count-cap)
                     (not budget-active?) 3
-                    :else nil)
-       :base-delay-ms (long base-delay)
-       :max-delay-ms (long max-delay)})))
+                    :else nil)})))
+
+(defn resolve-retry-delays!
+  "Completes a resolved limiter policy with validated, long-valued delay fields.
+   Call only after the termination decision establishes that a full or
+   truncated retry sleep will be scheduled."
+  [ctx limiter-policy]
+  (let [base-delay (configured-policy-value ctx :auto-retry-base-delay-ms)
+        max-delay  (configured-policy-value ctx :auto-retry-max-delay-ms)]
+    (doseq [[config-key value] [[:auto-retry-base-delay-ms base-delay]
+                                [:auto-retry-max-delay-ms max-delay]]]
+      (when-not (and (long-integer? value) (pos? value))
+        (invalid-retry-policy! config-key value "must be a positive integer")))
+    (assoc limiter-policy
+           :base-delay-ms (long base-delay)
+           :max-delay-ms (long max-delay))))
 
 (defn retry-policy-preview
   "Non-throwing policy preview used only before settings become active at an
