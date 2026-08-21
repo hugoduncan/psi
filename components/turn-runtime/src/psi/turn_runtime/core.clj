@@ -458,7 +458,7 @@
     (let [cancelled? (retry/sleep-for-retry! ctx session-id sleep-ms)]
       (when preserve-clear?
         (when-not (= false (:provider-retry-sleep? ctx))
-          (retry/clear-active-retry! ctx session-id progress-queue false)))
+          (retry/clear-active-retry! ctx session-id progress-queue :between-attempts)))
       cancelled?)))
 
 (defn- cancelled-retry-path!
@@ -470,7 +470,7 @@
    attempt-data attempt-result retry-attempt next-attempt error-fields]
   (let [retry-outcome (retry/cancelled-retry-outcome turn-id retry-attempt next-attempt
                                                      count-cap retry-enabled? error-fields)]
-    (retry/clear-active-retry! ctx session-id progress-queue true)
+    (retry/clear-active-retry! ctx session-id progress-queue :window-close)
     (retry/dispatch-provider-event!
      ctx
      "provider_request_cancelled"
@@ -535,7 +535,7 @@
                 :retry-attempt retry-attempt
                 :status :succeeded
                 :final? true}))
-            (retry/clear-active-retry! ctx session-id progress-queue true)
+            (retry/clear-active-retry! ctx session-id progress-queue :window-close)
             (execution-result ctx session-id prepared-request attempt-data* attempt-result nil))
           (let [{:keys [retryable? error-message] :as error-fields}
                 (retry/provider-error-fields assistant-msg)
@@ -550,7 +550,7 @@
                                         (failed-attempt-finished-event
                                          session-id turn-id attempt-data* attempt-result retry-attempt
                                          error-fields true {}))
-                                       (retry/clear-active-retry! ctx session-id progress-queue true)
+                                       (retry/clear-active-retry! ctx session-id progress-queue :window-close)
                                        (throw error))))
                 effective-policy (or retry-policy policy-preview)
                 budget-timeout-ms (:budget-timeout-ms effective-policy)
@@ -600,7 +600,7 @@
               ;; count-cap / deadline-reached.
               immediate-final?
               (do
-                (retry/clear-active-retry! ctx session-id progress-queue true)
+                (retry/clear-active-retry! ctx session-id progress-queue :window-close)
                 (execution-result ctx session-id prepared-request attempt-data* attempt-result retry-outcome))
 
               ;; Final-sleep (overshoot): the next full delay would push past the
@@ -629,7 +629,7 @@
                       {:failure-reason :retry-exhausted
                        :exhausted? true
                        :exhausted-reason :deadline}))
-                    (retry/clear-active-retry! ctx session-id progress-queue true)
+                    (retry/clear-active-retry! ctx session-id progress-queue :window-close)
                     (execution-result ctx session-id prepared-request attempt-data* attempt-result retry-outcome))))
 
               ;; Retry with the full next delay.

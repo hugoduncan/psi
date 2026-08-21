@@ -6,7 +6,8 @@
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.retry-provider-test-support :as retry-provider]
-   [psi.turn-runtime.core :as turn-runtime]))
+   [psi.turn-runtime.core :as turn-runtime]
+   [psi.turn-runtime.retry :as retry]))
 
 (defn- create-session-context
   ([]
@@ -184,6 +185,20 @@
                (get-in result [:execution-result/retry-outcome :exhausted-reason])))
         (is (= Long/MAX_VALUE (:delay-ms scheduled)))
         (is (= Long/MAX_VALUE (:resume-at scheduled)))))))
+
+(deftest retry-clear-mode-is-required-test
+  ;; Retry deadline lifecycle cannot be selected by omission or truthiness.
+  (let [[ctx session-id] (create-session-context {})]
+    (is (thrown? clojure.lang.ArityException
+                 (apply retry/clear-active-retry! [ctx session-id nil])))
+    (doseq [mode [nil false true :unknown]]
+      (let [error (try
+                    (retry/clear-active-retry! ctx session-id nil mode)
+                    nil
+                    (catch clojure.lang.ExceptionInfo error
+                      error))]
+        (is (= "Invalid retry clear mode" (ex-message error)))
+        (is (= mode (:mode (ex-data error))))))))
 
 (deftest retryable-failure-validates-before-scheduling-test
   ;; Invalid active retry delay config rejects after the failed attempt but

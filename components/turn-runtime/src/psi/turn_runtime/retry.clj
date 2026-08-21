@@ -276,17 +276,30 @@
                          (some? retry-deadline-ms) (assoc :retry-deadline-ms retry-deadline-ms))))
   (emit-retry-updated-progress! progress-queue session-id))
 
+(def ^:private retry-clear-modes
+  #{:between-attempts :window-close})
+
+(defn- assert-retry-clear-mode!
+  [mode]
+  (when-not (contains? retry-clear-modes mode)
+    (throw (ex-info "Invalid retry clear mode"
+                    {:mode mode
+                     :supported-modes retry-clear-modes}))))
+
 (defn retry-clear-needed?
-  [session-data clear-deadline?]
+  [session-data mode]
+  (assert-retry-clear-mode! mode)
   (boolean
    (or (:retry session-data)
        (pos? (or (:retry-attempt session-data) 0))
        (:provider-retry-abort-requested? session-data)
-       (and clear-deadline? (some? (:retry-deadline-ms session-data))))))
+       (and (= :window-close mode)
+            (some? (:retry-deadline-ms session-data))))))
 
 (defn clear-active-retry!
-  [ctx session-id progress-queue & [clear-deadline?]]
-  (when (retry-clear-needed? (ss/get-session-data-in ctx session-id) clear-deadline?)
+  [ctx session-id progress-queue mode]
+  (assert-retry-clear-mode! mode)
+  (when (retry-clear-needed? (ss/get-session-data-in ctx session-id) mode)
     (ss/apply-root-state-update-in!
      ctx
      (ss/session-update session-id
@@ -294,7 +307,7 @@
                                      (assoc :retry-attempt 0
                                             :retry nil)
                                      (dissoc :provider-retry-abort-requested?))
-                           clear-deadline? (dissoc :retry-deadline-ms))))
+                           (= :window-close mode) (dissoc :retry-deadline-ms))))
     (emit-retry-updated-progress! progress-queue session-id)))
 
 (defn active-turn-cancelled?
