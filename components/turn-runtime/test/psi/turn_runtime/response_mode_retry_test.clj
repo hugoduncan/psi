@@ -166,10 +166,11 @@
         (is (nil? (:http-status scheduled)))))))
 
 (deftest execute-prepared-request-retry-disabled-classifies-without-scheduling-test
-  ;; Disabled retry records one failed attempt and exposes a skipped-retry outcome.
+  ;; Disabled retry ignores invalid retry delays and returns a skipped-retry outcome.
   (let [[ctx session-id] (create-session-context {:persist? false
                                                   :provider-retry-sleep? false
-                                                  :config {:auto-retry-max-retries 3}})
+                                                  :config {:auto-retry-max-retries 3
+                                                           :auto-retry-base-delay-ms 0}})
         _               (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
                                (assoc (ss/get-session-data-in ctx session-id)
                                       :auto-retry-enabled false))

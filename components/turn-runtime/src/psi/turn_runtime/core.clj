@@ -511,7 +511,8 @@
                           (some? explicit-cap) explicit-cap
                           (not budget-active?) 3
                           :else nil)]
-    (retry/validate-retry-config! ctx)
+    (when retry-enabled?
+      (retry/validate-retry-config! ctx))
     (ss/apply-root-state-update-in!
      ctx
      (ss/session-update session-id #(dissoc % :provider-retry-abort-requested?)))

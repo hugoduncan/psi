@@ -763,7 +763,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, eighteenth turn)
 
-- [ ] Gate `retry/validate-retry-config!` on `retry-enabled?` (or defer it until a
+- [x] Gate `retry/validate-retry-config!` on `retry-enabled?` (or defer it until a
       retry is actually eligible). `execute-prepared-request!` currently validates
       `:auto-retry-base-delay-ms` / `:auto-retry-max-delay-ms` unconditionally before
       the initial provider attempt, so a session with `:auto-retry-enabled false`
@@ -774,3 +774,6 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `:auto-retry-enabled` is the master on/off for retries as a whole. Add a
       regression test combining disabled auto-retry with a non-positive delay and
       assert one provider attempt plus the normal retry-disabled outcome.
+      → Done: delay validation now runs only when `retry-enabled?`; the existing
+      retry-disabled regression test now supplies a zero base delay and still
+      asserts one provider attempt plus the normal `:retry-disabled` outcome.
