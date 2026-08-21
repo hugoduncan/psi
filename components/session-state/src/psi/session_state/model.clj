@@ -585,17 +585,18 @@
 (defn rate-limit-reset->timing
   [header-value now-ms]
   (when-let [n (some-> header-value str str/trim parse-long-safe)]
-    (cond
-      (>= n 1000000000000)
-      {:reset-at n}
+    (when (pos? n)
+      (cond
+        (>= n 1000000000000)
+        {:reset-at n}
 
-      (>= n 1000000000)
-      {:reset-at (* 1000 n)}
+        (>= n 1000000000)
+        {:reset-at (* 1000 n)}
 
-      :else
-      (let [reset-after-ms (* 1000 n)]
-        {:reset-after-ms reset-after-ms
-         :reset-at (+ (long now-ms) reset-after-ms)}))))
+        :else
+        (let [reset-after-ms (* 1000 n)]
+          {:reset-after-ms reset-after-ms
+           :reset-at (saturating-epoch-add (long now-ms) reset-after-ms)})))))
 
 (defn retry-metadata
   [headers attempt exponential-delay-ms now-ms]

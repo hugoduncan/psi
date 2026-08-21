@@ -1,3 +1,4 @@
+- addressed 1 code-shaper eighth re-review step.
 - addressed 1 code-shaper seventh re-review step.
 - addressed 1 code-shaper fourth re-review step.
 - addressed 1 code-shaper third re-review step.

@@ -355,6 +355,28 @@
       (is (= :retry-after (:delay-source meta)))
       (is (= 9223372036854774000 (:resume-at meta))))))
 
+(deftest rate-limit-reset-invalid-and-boundary-timing-test
+  ;; Malformed RateLimit-Reset telemetry must be omitted rather than aborting
+  ;; retry metadata construction or exposing nonsensical negative timing.
+  (testing "non-positive and extreme negative values have no timing metadata"
+    (doseq [reset ["0" "-1" (str Long/MIN_VALUE)]]
+      (is (nil? (session/rate-limit-reset->timing reset 1000)))
+      (is (nil? (get-in (session/retry-metadata {"RateLimit-Reset" reset}
+                                                0
+                                                2000
+                                                1000)
+                        [:rate-limit])))))
+
+  (testing "relative reset epoch addition saturates near Long/MAX_VALUE"
+    (is (= {:reset-after-ms 2000
+            :reset-at Long/MAX_VALUE}
+           (session/rate-limit-reset->timing "2" (dec Long/MAX_VALUE)))))
+
+  (testing "relative reset epoch addition remains exact near Long/MIN_VALUE"
+    (is (= {:reset-after-ms 2000
+            :reset-at (+ Long/MIN_VALUE 2000)}
+           (session/rate-limit-reset->timing "2" Long/MIN_VALUE)))))
+
 (deftest retry-metadata-preserves-zero-exponential-delay-test
   ;; Retry metadata remains a faithful model of its inputs. The turn runtime
   ;; rejects non-positive base/max config before any provider request.

@@ -1135,7 +1135,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper eighth re-review)
 
-- [ ] Harden `rate-limit-reset->timing` at the same provider-header arithmetic
+- [x] Harden `rate-limit-reset->timing` at the same provider-header arithmetic
       boundary as `retry-after-delay-ms`. A parseable extreme negative
       `RateLimit-Reset` value reaches checked `(* 1000 n)` and throws
       `ArithmeticException`, while ordinary negative values produce nonsensical
@@ -1147,3 +1147,9 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       shared saturating helper, and add focused model tests for negative,
       extreme, and near-Long clock inputs so malformed rate-limit telemetry
       cannot abort an otherwise valid retry decision.
+      → Done: non-positive reset values (including `Long/MIN_VALUE`) are omitted
+      before seconds-to-milliseconds conversion, so malformed telemetry cannot
+      overflow or expose negative timing. Relative reset deadlines now use the
+      shared `saturating-epoch-add` authority. Focused model coverage exercises
+      helper/retry-metadata omission plus near-Long/MAX saturation and
+      near-Long/MIN exact addition; existing retry-header tests remain green.
