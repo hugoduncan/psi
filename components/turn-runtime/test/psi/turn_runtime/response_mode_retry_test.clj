@@ -234,6 +234,33 @@
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
         (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
 
+(deftest execute-prepared-request-retry-decision-samples-clock-once-test
+  ;; One failed-attempt decision owns one clock sample; retry metadata must use
+  ;; that same instant rather than consuming a second, advancing sample.
+  (let [clock-reads*     (atom 0)
+        [ctx session-id] (create-session-context
+                          {:persist? false
+                           :config {:auto-retry-total-timeout-ms 5000
+                                    :auto-retry-max-retries 1}
+                           :now-fn #(java.time.Instant/ofEpochMilli
+                                     (case (swap! clock-reads* inc)
+                                       1 1000
+                                       2 9000))
+                           :provider-retry-sleep? false})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (if (= 1 (swap! attempts* inc))
+                                                       (error-turn "Connection reset by peer")
+                                                       {:assistant-message {:role "assistant"
+                                                                            :content []
+                                                                            :stop-reason :stop}}))]
+      (turn-runtime/execute-prepared-request! ai-ctx ctx session-id prepared nil)
+      (let [scheduled (first (filter #(= "provider_retry_scheduled" (:type %))
+                                     (provider-events ctx session-id)))]
+        (is (= 1 @clock-reads*))
+        (is (= 3000 (:resume-at scheduled)))))))
+
 (deftest execute-prepared-request-explicit-count-cap-still-bounds-test
   ;; An explicitly configured small :auto-retry-max-retries remains a hard cap
   ;; even with the budget active (:exhausted-reason :count-cap, no truncated

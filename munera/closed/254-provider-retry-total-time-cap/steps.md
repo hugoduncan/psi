@@ -1070,7 +1070,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper fifth re-review)
 
-- [ ] Use one injected-clock sample for each failed-attempt retry decision and its
+- [x] Use one injected-clock sample for each failed-attempt retry decision and its
       metadata. `execute-prepared-request!` reads `now` for deadline construction,
       give-up decisions, truncation, and hot-loop tracking, but
       `retry-metadata-for` immediately calls `now-ms` again to construct
@@ -1080,3 +1080,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       guard instant and can consume test-clock advances unexpectedly. Pass the loop's
       `now` into metadata shaping (or return one attempt-time data shape) so computation
       is locally coherent, and add a focused clock-count / `:resume-at` regression test.
+      → Done: `execute-prepared-request!` passes its failed-attempt `now` sample into
+      `retry-metadata-for`; metadata no longer reads the injected clock independently.
+      A focused runtime test uses an advancing clock and asserts one read plus
+      `:resume-at` derived from that same sample.

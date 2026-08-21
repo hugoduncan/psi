@@ -573,7 +573,7 @@
                 retry-policy     (when (and retry-eligible? (nil? immediate-decision))
                                    (resolve-policy! #(retry/resolve-retry-delays! ctx retry-limiters)))
                 retry-metadata   (when retry-policy
-                                   (retry/retry-metadata-for ctx assistant-msg retry-attempt retry-policy))
+                                   (retry/retry-metadata-for assistant-msg retry-attempt retry-policy now))
                 next-delay-ms    (:delay-ms retry-metadata)
                 decision         (or immediate-decision
                                      (retry/give-up-decision {:retryable? retryable?

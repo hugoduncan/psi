@@ -87,7 +87,7 @@
                   :else nil)}))
 
 (defn now-ms
-  "Injected-clock epoch millis for the retry window, mirroring retry-metadata-for."
+  "Injected-clock epoch millis for a retry decision."
   [ctx]
   (let [now-fn (or (:now-fn ctx) #(java.time.Instant/now))]
     (.toEpochMilli ^java.time.Instant (now-fn))))
@@ -237,11 +237,10 @@
      :retryable? (contains? #{:rate-limit :timeout :overloaded :provider-unavailable :transport} error-kind)}))
 
 (defn retry-metadata-for
-  [ctx assistant-message retry-attempt {:keys [base-delay-ms max-delay-ms]}]
+  [assistant-message retry-attempt {:keys [base-delay-ms max-delay-ms]} now]
   (let [exponential-delay-ms (session-model/exponential-backoff-ms retry-attempt
                                                                    base-delay-ms
-                                                                   max-delay-ms)
-        now                  (now-ms ctx)]
+                                                                   max-delay-ms)]
     (session-model/retry-metadata (:provider-error/headers assistant-message)
                                   retry-attempt
                                   exponential-delay-ms
