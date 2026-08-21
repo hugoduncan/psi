@@ -777,3 +777,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       → Done: delay validation now runs only when `retry-enabled?`; the existing
       retry-disabled regression test now supplies a zero base delay and still
       asserts one provider attempt plus the normal `:retry-disabled` outcome.
+
+## Review follow-up (implementation review, nineteenth turn)
+
+- [ ] Defer `retry/validate-retry-config!` until an enabled, retryable provider
+      failure is actually eligible to enter retry scheduling. The eighteenth-turn
+      fix gates validation only on session-level `retry-enabled?`, but
+      `execute-prepared-request!` still validates before the initial provider
+      attempt whenever retries are enabled. Consequently a non-positive retry
+      delay prevents an otherwise successful request, or a terminal
+      non-retryable failure such as HTTP 401, from executing even though no retry
+      delay can be used. This is the same inactive-config problem as the fixed
+      retry-disabled case at a narrower eligibility boundary. Add regression
+      coverage proving invalid delay settings do not block a successful initial
+      request or a non-retryable failure, while a retryable failure still rejects
+      the configuration before scheduling any retry.
