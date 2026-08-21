@@ -589,25 +589,6 @@
           (is (= :deadline (:exhausted-reason outcome)))
           (is (nil? (:max-retries outcome))))))))
 
-(deftest execute-prepared-request-rejects-non-positive-retry-delay-config-test
-  ;; Non-positive base/max delays are rejected before the first provider call,
-  ;; preventing a cap-free production retry storm.
-  (doseq [config [{:auto-retry-base-delay-ms 0 :auto-retry-max-delay-ms 60000}
-                  {:auto-retry-base-delay-ms 2000 :auto-retry-max-delay-ms 0}]]
-    (let [[ctx session-id] (create-session-context {:persist? false :config config})
-          prepared         (prepared-request ctx session-id)
-          attempts*        (atom 0)]
-      (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                    (fn [& _]
-                      (swap! attempts* inc)
-                      (error-turn "Connection reset by peer"))]
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"Invalid retry configuration"
-             (turn-runtime/execute-prepared-request!
-              {:provider-registry (atom {})} ctx session-id prepared nil)))
-        (is (zero? @attempts*))))))
-
 (deftest execute-prepared-request-saturates-overflowing-retry-deadline-test
   ;; A near-Long/MAX timeout saturates; a zero count cap keeps this deterministic.
   (let [[ctx session-id] (create-session-context {:persist? false

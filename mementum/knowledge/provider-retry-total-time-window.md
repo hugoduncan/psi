@@ -28,10 +28,11 @@ primary give-up condition; attempt count is an operator-set hard cap.
   deadline alone bounds). `:max-retries` on retry-outcome reports this `count-cap`.
 - **NPE trap**: never `(long sentinel-nil)` — a sentinel default must be treated as
   "no cap", not coerced.
-- **Delay validation (17th/18th-turn follow-ups)**: when auto-retry is enabled,
-  `execute-prepared-request!` rejects non-positive `:auto-retry-base-delay-ms` /
-  `:auto-retry-max-delay-ms` before the first provider request. Disabled auto-retry
-  ignores these inactive settings and still executes the provider request once.
+- **Delay validation (17th–19th-turn follow-ups)**: `execute-prepared-request!`
+  rejects non-positive `:auto-retry-base-delay-ms` /
+  `:auto-retry-max-delay-ms` only after an enabled, retryable failure reaches the
+  retry-scheduling boundary. Successful requests, non-retryable failures, and
+  disabled auto-retry ignore these inactive settings and still execute once.
   The prior 1 ms fallback prevented a literal zero-delay loop but still permitted
   roughly 1000 requests/second for the default 10-minute cap-free window, so it
   was not a safe production bound.

@@ -511,8 +511,6 @@
                           (some? explicit-cap) explicit-cap
                           (not budget-active?) 3
                           :else nil)]
-    (when retry-enabled?
-      (retry/validate-retry-config! ctx))
     (ss/apply-root-state-update-in!
      ctx
      (ss/session-update session-id #(dissoc % :provider-retry-abort-requested?)))
@@ -585,6 +583,11 @@
                 immediate-final? (assoc :failure-reason failure-reason)
                 (and immediate-final? exhausted?) (assoc :exhausted? true
                                                          :exhausted-reason (:exhausted-reason decision)))))
+            ;; Delay config becomes active only when this enabled, retryable
+            ;; failure will schedule a full or truncated retry sleep. Successes
+            ;; and terminal failures must not be blocked by irrelevant settings.
+            (when-not immediate-final?
+              (retry/validate-retry-config! ctx))
             (cond
               ;; Immediate final (no sleep): non-retryable / retry-disabled /
               ;; count-cap / deadline-reached.

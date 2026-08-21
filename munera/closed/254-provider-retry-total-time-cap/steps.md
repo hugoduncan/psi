@@ -780,7 +780,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, nineteenth turn)
 
-- [ ] Defer `retry/validate-retry-config!` until an enabled, retryable provider
+- [x] Defer `retry/validate-retry-config!` until an enabled, retryable provider
       failure is actually eligible to enter retry scheduling. The eighteenth-turn
       fix gates validation only on session-level `retry-enabled?`, but
       `execute-prepared-request!` still validates before the initial provider
@@ -792,3 +792,9 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       coverage proving invalid delay settings do not block a successful initial
       request or a non-retryable failure, while a retryable failure still rejects
       the configuration before scheduling any retry.
+      → Done: validation now runs only when the give-up decision will enter a
+      full or truncated retry-scheduling branch. New retry-config tests
+      prove success and HTTP 401 execute normally with an invalid inactive delay,
+      while retryable transport failure executes once then rejects before emitting
+      `provider_retry_scheduled` or writing retry state. The prior base/max test
+      moved into the new namespace and now asserts this scheduling boundary.
