@@ -355,22 +355,16 @@
       (is (= :retry-after (:delay-source meta)))
       (is (= 9223372036854774000 (:resume-at meta))))))
 
-(deftest retry-metadata-floors-zero-exponential-to-positive-delay-test
-  ;; A configured :auto-retry-base-delay-ms / :auto-retry-max-delay-ms of 0
-  ;; yields a zero exponential delay (0), which sleep-for-retry!'s `(pos? ...)`
-  ;; guard skips — under the budget-active default (cap-free) a persistent
-  ;; retryable failure would hot-loop back-to-back with zero delay until the
-  ;; real wall-clock deadline (review follow-up, 16th turn). retry-metadata
-  ;; floors the chosen delay to a positive minimum (1 ms), so the loop always
-  ;; sleeps between attempts and the scheduled :delay-ms / :resume-at stay
-  ;; positive.
-  (testing "retry-metadata floors a zero exponential delay to 1 ms"
+(deftest retry-metadata-preserves-zero-exponential-delay-test
+  ;; Retry metadata remains a faithful model of its inputs. The turn runtime
+  ;; rejects non-positive base/max config before any provider request.
+  (testing "retry-metadata preserves a zero exponential delay"
     (let [meta (session/retry-metadata {} 0 0 0)]
-      (is (= 1 (:delay-ms meta)))
+      (is (zero? (:delay-ms meta)))
       (is (= :exponential-backoff (:delay-source meta)))
-      (is (= 1 (:resume-at meta)))))
+      (is (zero? (:resume-at meta)))))
 
-  (testing "a positive Retry-After still wins over the floored exponential"
+  (testing "a positive Retry-After still wins over the zero exponential"
     (let [meta (session/retry-metadata {:retry-after "5"} 0 0 0)]
       (is (= 5000 (:delay-ms meta)))
       (is (= :retry-after (:delay-source meta)))

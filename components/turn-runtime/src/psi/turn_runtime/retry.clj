@@ -18,6 +18,23 @@
   [ctx session-id]
   (or (:retry-attempt (ss/get-session-data-in ctx session-id)) 0))
 
+(defn validate-retry-config!
+  "Rejects retry delays that would permit a provider-request storm."
+  [ctx]
+  (let [base-ms (long (get-in ctx [:config :auto-retry-base-delay-ms] 2000))
+        max-ms  (long (get-in ctx [:config :auto-retry-max-delay-ms] 60000))]
+    (when-not (and (pos? base-ms) (pos? max-ms))
+      (throw (ex-info "Invalid retry configuration: :auto-retry-base-delay-ms and :auto-retry-max-delay-ms must both be positive"
+                      {:auto-retry-base-delay-ms base-ms
+                       :auto-retry-max-delay-ms max-ms})))))
+
+(defn deadline-ms
+  "Adds a positive timeout to epoch millis, saturating at Long/MAX_VALUE."
+  [now timeout-ms]
+  (if (> now (- Long/MAX_VALUE timeout-ms))
+    Long/MAX_VALUE
+    (+ now timeout-ms)))
+
 (defn now-ms
   "Injected-clock epoch millis for the retry window, mirroring retry-metadata-for."
   [ctx]

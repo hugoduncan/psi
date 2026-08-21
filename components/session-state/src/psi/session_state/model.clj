@@ -585,19 +585,10 @@
 (defn retry-metadata
   [headers attempt exponential-delay-ms now-ms]
   (let [retry-after-ms (retry-after-delay-ms (header-value headers "retry-after" "x-retry-after") now-ms)
-        ;; Floor the per-attempt delay to a positive minimum (1 ms): a configured
-        ;; :auto-retry-base-delay-ms / :auto-retry-max-delay-ms of 0 yields a
-        ;; zero exponential, and sleep-for-retry!'s `(pos? ...)` guard skips
-        ;; non-positive delays — under the budget-active default (cap-free) a
-        ;; persistent retryable failure would then hot-loop back-to-back with
-        ;; zero delay until the REAL wall-clock deadline (10 min default;
-        ;; pre-change the default count cap 3 bounded the same misconfiguration
-        ;; to 4 instant attempts). The floor guarantees the loop always sleeps
-        ;; between attempts (design Approach 5's never-back-to-back guarantee)
-        ;; and keeps the scheduled :delay-ms / :resume-at positive. A
-        ;; non-positive `Retry-After` already floors to nil (exponential) above,
-        ;; so this only ever raises a zero exponential.
-        delay-ms       (max 1 (long (or retry-after-ms exponential-delay-ms)))
+        ;; Runtime config validation rejects non-positive base/max delays before
+        ;; provider execution. Keep metadata shaping faithful to its inputs;
+        ;; callers outside the turn runtime can still observe an invalid zero.
+        delay-ms       (long (or retry-after-ms exponential-delay-ms))
         rate-limit     (merge
                         (when-some [limit (some-> (header-value headers "ratelimit-limit" "x-ratelimit-limit") str str/trim parse-long-safe)]
                           {:limit limit})

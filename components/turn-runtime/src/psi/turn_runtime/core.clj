@@ -511,6 +511,7 @@
                           (some? explicit-cap) explicit-cap
                           (not budget-active?) 3
                           :else nil)]
+    (retry/validate-retry-config! ctx)
     (ss/apply-root-state-update-in!
      ctx
      (ss/session-update session-id #(dissoc % :provider-retry-abort-requested?)))
@@ -550,7 +551,7 @@
                 next-delay-ms    (:delay-ms retry-metadata)
                 deadline-ms      (or retry-deadline-ms
                                      (when (and retryable? retry-enabled? budget-active?)
-                                       (+ now budget-timeout-ms)))
+                                       (retry/deadline-ms now budget-timeout-ms)))
                 decision         (retry/give-up-decision {:retryable? retryable?
                                                           :retry-enabled? retry-enabled?
                                                           :retry-attempt retry-attempt

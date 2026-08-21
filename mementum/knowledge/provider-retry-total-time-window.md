@@ -28,20 +28,19 @@ primary give-up condition; attempt count is an operator-set hard cap.
   deadline alone bounds). `:max-retries` on retry-outcome reports this `count-cap`.
 - **NPE trap**: never `(long sentinel-nil)` — a sentinel default must be treated as
   "no cap", not coerced.
-- **Positive-delay floor (16th-turn follow-up)**: the per-attempt delay chosen by
-  `retry-metadata` is floored to a positive minimum (`(max 1 delay-ms)`), so a
-  configured `:auto-retry-base-delay-ms` / `:auto-retry-max-delay-ms` of `0` (a
-  misconfiguration) yields a 1 ms sleep instead of a 0-delay back-to-back hot loop
-  until the real wall-clock deadline — `sleep-for-retry!` skips non-positive delays
-  and the test-seam hot-loop guard fires only under sleep-disabled test seams, so
-  pre-fix production hot-looped. The budget-active default therefore ALWAYS sleeps
-  between attempts (design Approach 5 guarantee).
+- **Delay validation (17th-turn follow-up)**: `execute-prepared-request!` rejects
+  non-positive `:auto-retry-base-delay-ms` / `:auto-retry-max-delay-ms` before the
+  first provider request. The prior 1 ms fallback prevented a literal zero-delay
+  loop but still permitted roughly 1000 requests/second for the default 10-minute
+  cap-free window, so it was not a safe production bound.
 
 ## Deadline lifecycle
 
 - Deadline is a **top-level canonical session field** (`:retry-deadline-ms`, optional
   `[:maybe :int]` in `agent-session-schema`), written by `mark-active-retry!` when the
-  window opens, threaded through the loop `recur` binding.
+  window opens, threaded through the loop `recur` binding. Deadline construction is
+  saturating: a positive timeout that would overflow `now + timeout` yields
+  `Long/MAX_VALUE` instead of throwing `ArithmeticException`.
 - The inter-attempt (per-sleep) `clear-active-retry!` **preserves** the deadline
   (`:clear-deadline? false`); the true-window-close clears (success / final-give-up /
   cancel) **clear** it (`:clear-deadline? true`). The cancel path has its OWN

@@ -588,41 +588,40 @@
           (is (= :deadline (:exhausted-reason outcome)))
           (is (nil? (:max-retries outcome))))))))
 
-(deftest execute-prepared-request-zero-base-delay-floored-to-positive-sleep-test
-  ;; Zero :auto-retry-base-delay-ms / :auto-retry-max-delay-ms previously
-  ;; yielded :delay-ms 0, which sleep-for-retry! skips — under the
-  ;; budget-active default (cap-free) a persistent retryable failure hot-looped
-  ;; back-to-back with zero delay until the real wall-clock deadline (16th-turn
-  ;; follow-up). retry-metadata now floors the delay to 1 ms, so the first
-  ;; scheduled :delay-ms is positive and the loop always sleeps between
-  ;; attempts; the injected 3 ms budget bounds the loop to 4 attempts.
-  (doseq [config [{:auto-retry-total-timeout-ms 3 :auto-retry-base-delay-ms 0 :auto-retry-max-delay-ms 60000}
-                  {:auto-retry-total-timeout-ms 3 :auto-retry-base-delay-ms 2000 :auto-retry-max-delay-ms 0}]]
-    (let [clock          (atom 0)
-          sleeps*        (atom [])
-          [ctx session-id] (create-session-context {:persist? false :config config
-                                                    :now-fn #(java.time.Instant/ofEpochMilli @clock)
-                                                    :provider-retry-sleep-fn (fn [delay-ms]
-                                                                               (swap! sleeps* conj (long delay-ms))
-                                                                               (swap! clock + (long delay-ms)))})
-          prepared       (prepared-request ctx session-id)
-          attempts*      (atom 0)]
+(deftest execute-prepared-request-rejects-non-positive-retry-delay-config-test
+  ;; Non-positive base/max delays are rejected before the first provider call,
+  ;; preventing a cap-free production retry storm.
+  (doseq [config [{:auto-retry-base-delay-ms 0 :auto-retry-max-delay-ms 60000}
+                  {:auto-retry-base-delay-ms 2000 :auto-retry-max-delay-ms 0}]]
+    (let [[ctx session-id] (create-session-context {:persist? false :config config})
+          prepared         (prepared-request ctx session-id)
+          attempts*        (atom 0)]
       (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                    (fn [& _] (swap! attempts* inc) (error-turn "Connection reset by peer"))]
-        (let [result    (turn-runtime/execute-prepared-request!
-                         {:provider-registry (atom {})} ctx session-id prepared nil)
-              outcome   (:execution-result/retry-outcome result)
-              events    (provider-events ctx session-id)
-              scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
-          (is (every? pos? (mapv :delay-ms scheduled)))
-          (is (= [1 1 1] (mapv :delay-ms scheduled)))
-          (is (= [1 1 1] @sleeps*))
-          (is (= 4 @attempts*))
-          (is (= :retry-exhausted (:failure-reason outcome)))
-          (is (= :deadline (:exhausted-reason outcome)))
-          (is (nil? (:max-retries outcome)))
-          (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
-          (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id)))))))))
+                    (fn [& _]
+                      (swap! attempts* inc)
+                      (error-turn "Connection reset by peer"))]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Invalid retry configuration"
+             (turn-runtime/execute-prepared-request!
+              {:provider-registry (atom {})} ctx session-id prepared nil)))
+        (is (zero? @attempts*))))))
+
+(deftest execute-prepared-request-saturates-overflowing-retry-deadline-test
+  ;; A near-Long/MAX timeout saturates; a zero count cap keeps this deterministic.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-total-timeout-ms Long/MAX_VALUE
+                                                           :auto-retry-max-retries 0}
+                                                  :now-fn #(java.time.Instant/ofEpochMilli 1)})
+        prepared         (prepared-request ctx session-id)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _] (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :count-cap (:exhausted-reason outcome)))
+        (is (= 0 (:max-retries outcome)))))))
 
 (deftest execute-prepared-request-cancel-during-truncated-final-sleep-test
   ;; Cancellation arriving during the truncated final sleep (overshoot path)

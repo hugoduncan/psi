@@ -735,7 +735,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, seventeenth turn)
 
-- [ ] Replace the 1 ms production fallback for a zero base/max retry delay with a
+- [x] Replace the 1 ms production fallback for a zero base/max retry delay with a
       floor that actually prevents a provider-request storm, or reject the invalid
       configuration before entering the retry loop. `retry-metadata`
       (session-state/model.clj) currently applies `(max 1 ...)`; under the default
@@ -745,7 +745,11 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       performance failure described by the 16th-turn follow-up. Pin a safe minimum
       or validation rule and add a runtime test proving the misconfiguration is
       bounded without relying on a 3 ms synthetic budget.
-- [ ] Make retry-window deadline construction overflow-safe for large positive
+      → Done: `retry/validate-retry-config!` rejects non-positive base/max delays
+      before the first provider request; `retry-metadata` no longer masks invalid
+      input with a 1 ms fallback. The runtime test covers both invalid keys and
+      asserts zero provider attempts.
+- [x] Make retry-window deadline construction overflow-safe for large positive
       `:auto-retry-total-timeout-ms` values. `execute-prepared-request!`
       (turn-runtime/core.clj) computes `(+ now budget-timeout-ms)` with checked long
       arithmetic; an operator value near `Long/MAX_VALUE` therefore throws
@@ -753,3 +757,6 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       bounded window or rejecting the config. Validate/cap the timeout (or use a
       subtraction/saturating deadline calculation) and add a focused runtime test
       covering the overflow boundary.
+      → Done: `retry/deadline-ms` performs subtraction-guarded saturating addition;
+      overflow yields `Long/MAX_VALUE`. A focused runtime test opens the boundary
+      window and verifies normal count-cap termination without an exception.

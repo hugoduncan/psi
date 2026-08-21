@@ -403,3 +403,4 @@
 - implementation review 2026-08-19 (sixteenth turn): added 2 steps to be addressed.
 - addressed 16th-turn review steps (2026-08-19): zero base/max delay hot-loop closed (retry-metadata floors per-attempt delay to a positive minimum (max 1); new model + turn-runtime tests; CHANGELOG Fixed entry) and stale mementum knowledge page refreshed in place with 4th–16th-turn facts (status stays done).
 - implementation review 2026-08-21: added 2 steps to be addressed.
+- addressed 2 seventeenth-turn review steps: invalid non-positive retry delays now fail before provider execution; retry deadline construction saturates on overflow.
