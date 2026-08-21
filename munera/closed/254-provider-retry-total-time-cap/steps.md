@@ -1177,7 +1177,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, current turn)
 
-- [ ] Make the integer `Retry-After` acceptance bound safe across the full injected
+- [x] Make the integer `Retry-After` acceptance bound safe across the full injected
       clock range. `retry-after-delay-ms` (`session-state/model.clj`) evaluates
       `(- Long/MAX_VALUE (long now-ms))` with checked long subtraction before it
       can decide whether a parsed positive delay fits; with `now-ms =
@@ -1188,3 +1188,9 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       epoch helper, then add model-level coverage for a positive integer header at
       `Long/MIN_VALUE` and a runtime regression proving an extreme injected clock
       cannot abort an otherwise valid retry decision.
+      → Done: the integer acceptance comparison now computes available epoch
+      range with arbitrary-precision subtraction, preserving the existing Long
+      delay bound without overflowing at `Long/MIN_VALUE`. Model coverage asserts
+      a one-second header remains valid at the minimum clock; the runtime
+      regression drives the real retry loop from that clock through a full and
+      truncated `Retry-After` sleep to deadline exhaustion without aborting.

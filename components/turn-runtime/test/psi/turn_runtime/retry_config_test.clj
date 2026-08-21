@@ -161,6 +161,44 @@
                       ai-ctx ctx session-id prepared nil)
                      [:execution-result/retry-outcome :failure-reason]))))))
 
+(deftest min-clock-retry-after-does-not-overflow-test
+  ;; A positive integer Retry-After remains valid at the minimum injected clock;
+  ;; epoch-range validation must not overflow before the retry decision.
+  (let [clock            (atom Long/MIN_VALUE)
+        ctx              (session/create-context
+                          (test-support/safe-context-opts
+                           {:persist? false
+                            :config {:auto-retry-total-timeout-ms 1500
+                                     :auto-retry-base-delay-ms 2000
+                                     :auto-retry-max-delay-ms 60000}
+                            :now-fn #(java.time.Instant/ofEpochMilli @clock)
+                            :provider-retry-sleep-fn #(swap! clock + (long %))}))
+        session-id       (:session-id (session/new-session-in! ctx nil {}))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (provider-result
+                                                      {:role "assistant"
+                                                       :content [{:type :error :text "rate limit exceeded"}]
+                                                       :stop-reason :error
+                                                       :error-message "rate limit exceeded"
+                                                       :http-status 429
+                                                       :provider-error/headers {"Retry-After" "1"}
+                                                       :timestamp (java.time.Instant/now)}))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       ai-ctx ctx session-id prepared nil)
+            outcome   (:execution-result/retry-outcome result)
+            scheduled (filter #(= "provider_retry_scheduled" (:type %))
+                              (provider-events ctx session-id))]
+        (is (= 2 @attempts*))
+        (is (= [1000 500] (mapv :delay-ms scheduled)))
+        (is (= [(+ Long/MIN_VALUE 1000) (+ Long/MIN_VALUE 1500)]
+               (mapv :resume-at scheduled)))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))
+        (is (nil? (:max-retries outcome)))))))
+
 (deftest near-long-delay-metadata-saturates-test
   ;; Valid near-Long delay settings cap both exponential multiplication and
   ;; resume-time addition instead of overflowing before scheduling.

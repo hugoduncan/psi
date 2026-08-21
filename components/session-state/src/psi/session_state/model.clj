@@ -568,7 +568,8 @@
             ;; `(or retry-after-ms exponential-delay-ms)` falls back.
             delay-ms (when (and seconds
                                 (< seconds (quot Long/MAX_VALUE 1000))
-                                (<= (* 1000 seconds) (- Long/MAX_VALUE (long now-ms))))
+                                (<= (* 1000 seconds)
+                                    (-' Long/MAX_VALUE (long now-ms))))
                        (* 1000 seconds))]
         (when (and delay-ms (pos? delay-ms))
           delay-ms))

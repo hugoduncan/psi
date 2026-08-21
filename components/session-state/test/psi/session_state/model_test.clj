@@ -353,7 +353,17 @@
     (let [meta (session/retry-metadata {:retry-after "9223372036854774"} 0 2000 0)]
       (is (= 9223372036854774000 (:delay-ms meta)))
       (is (= :retry-after (:delay-source meta)))
-      (is (= 9223372036854774000 (:resume-at meta))))))
+      (is (= 9223372036854774000 (:resume-at meta)))))
+
+  (testing "a positive integer is accepted at the minimum injected clock"
+    (is (= 1000 (session/retry-after-delay-ms "1" Long/MIN_VALUE)))
+    (let [meta (session/retry-metadata {:retry-after "1"}
+                                       0
+                                       2000
+                                       Long/MIN_VALUE)]
+      (is (= 1000 (:delay-ms meta)))
+      (is (= :retry-after (:delay-source meta)))
+      (is (= (+ Long/MIN_VALUE 1000) (:resume-at meta))))))
 
 (deftest rate-limit-reset-invalid-and-boundary-timing-test
   ;; Malformed RateLimit-Reset telemetry must be omitted rather than aborting

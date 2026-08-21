@@ -1,3 +1,4 @@
+- addressed 1 implementation review step.
 - addressed 1 code-shaper ninth re-review step.
 - addressed 1 code-shaper eighth re-review step.
 - addressed 1 code-shaper seventh re-review step.
