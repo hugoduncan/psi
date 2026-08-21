@@ -1194,3 +1194,16 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       a one-second header remains valid at the minimum clock; the runtime
       regression drives the real retry loop from that clock through a full and
       truncated `Retry-After` sleep to deadline exhaustion without aborting.
+
+## Review follow-up (implementation review, latest turn)
+
+- [ ] Correct the stale retry-delay validation comments in
+      `components/session-state/src/psi/session_state/model.clj` (`retry-metadata`)
+      and `components/session-state/test/psi/session_state/model_test.clj`
+      (`retry-metadata-preserves-zero-exponential-delay-test`). They still claim
+      non-positive base/max settings are rejected before any provider request,
+      but the implemented scheduling-boundary contract deliberately allows the
+      initial provider request (and successful/non-retryable outcomes) and
+      validates those settings only when an enabled retryable failure would
+      schedule a retry sleep. Align the comments with the runtime behavior,
+      design, user documentation, and regression tests.
