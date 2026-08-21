@@ -916,7 +916,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (test-shaper third re-review)
 
-- [ ] Exercise malformed scripted responses through the public
+- [x] Exercise malformed scripted responses through the public
       `nullable-provider-context` provider boundary instead of dereferencing the
       private `response->events` var in every helper test. The current tests are
       coupled to the helper's internal decomposition, so a behavior-preserving
@@ -925,7 +925,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       informative boundary error — is not directly proved. Keep a narrow public
       boundary assertion for the error message/ex-data and retain table-driven
       malformed cases without reaching through `#'` private-var access.
-- [ ] Tighten scripted payload validation to reject structurally malformed but
+- [x] Tighten scripted payload validation to reject structurally malformed but
       currently accepted sequences. A successful `:assistant-message` accepts any
       sequential `:content` (for example `[nil]` or an unsupported content map),
       which `assistant-message->events` silently drops into an empty successful
@@ -935,3 +935,11 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       content-item and stream-topology invariants used by this test provider, then
       add representative malformed cases proving each invalid partition fails at
       the scripted-provider boundary with a meaningful error.
+      → Done: helper tests now invoke the provider returned by
+      `nullable-provider-context` and assert the boundary error message/ex-data;
+      no private-var access remains. Successful assistant content is restricted
+      to text items with string text, and explicit streams require one leading
+      `:start`, only text deltas in the body, and exactly one final terminal event.
+      Table-driven cases cover malformed content, events before start, duplicate /
+      misplaced starts, and early / duplicate terminals. Helper plus consuming
+      retry suites pass (28 tests, 193 assertions); changed files lint clean.

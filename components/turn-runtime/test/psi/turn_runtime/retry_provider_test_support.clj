@@ -23,13 +23,20 @@
 (def ^:private stop-reasons
   #{:stop :length :tool-use :error :aborted})
 
+(defn- content-item-valid?
+  [{:keys [type text] :as item}]
+  (and (map? item)
+       (= :text type)
+       (string? text)))
+
 (defn- assistant-message-valid?
   [{:keys [content stop-reason error-message] :as assistant-message}]
   (and (map? assistant-message)
        (contains? stop-reasons stop-reason)
        (if (= :error stop-reason)
          (string? error-message)
-         (sequential? content))))
+         (and (sequential? content)
+              (every? content-item-valid? content)))))
 
 (defn- stream-event-valid?
   [{:keys [type content-index delta reason error-message] :as event}]
@@ -45,8 +52,10 @@
   [events]
   (and (sequential? events)
        (seq events)
-       (every? stream-event-valid? events)
-       (#{:done :error} (:type (last events)))))
+       (= :start (:type (first events)))
+       (every? #(= :text-delta (:type %)) (butlast (rest events)))
+       (#{:done :error} (:type (last events)))
+       (every? stream-event-valid? events)))
 
 (defn- response-payload-valid?
   [shape payload]
