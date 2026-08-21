@@ -89,6 +89,58 @@
         (is (= :deadline (:exhausted-reason outcome)))
         (is (nil? (:max-retries outcome)))))))
 
+(deftest retry-window-excludes-provider-execution-time-test
+  ;; The retry window opens after the initial failure and bounds scheduling only;
+  ;; a later in-flight request may cross the deadline and still succeed.
+  (let [clock*             (atom 0)
+        attempts*          (atom 0)
+        observed-deadline* (atom nil)
+        ctx0               (session/create-context
+                            (test-support/safe-context-opts
+                             {:persist? false
+                              :config {:auto-retry-total-timeout-ms 5000}
+                              :now-fn #(java.time.Instant/ofEpochMilli @clock*)}))
+        session-id         (:session-id (session/new-session-in! ctx0 nil {}))
+        ctx                (assoc ctx0 :provider-retry-sleep-fn
+                                  (fn [delay-ms]
+                                    (reset! observed-deadline*
+                                            (:retry-deadline-ms
+                                             (ss/get-session-data-in ctx0 session-id)))
+                                    (swap! clock* + (long delay-ms))))
+        prepared           (prepared-request ctx session-id)]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (case (swap! attempts* inc)
+                                                       1 (do
+                                                           (swap! clock* + 10000)
+                                                           (provider-result
+                                                            {:role "assistant"
+                                                             :content [{:type :error
+                                                                        :text "Connection reset by peer"}]
+                                                             :stop-reason :error
+                                                             :error-message "Connection reset by peer"
+                                                             :timestamp (java.time.Instant/now)}))
+                                                       2 (do
+                                                           (swap! clock* + 4000)
+                                                           (provider-result
+                                                            {:role "assistant"
+                                                             :content [{:type :text :text "done"}]
+                                                             :stop-reason :stop
+                                                             :timestamp (java.time.Instant/now)}))))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       ai-ctx ctx session-id prepared nil)
+            scheduled (filterv #(= "provider_retry_scheduled" (:type %))
+                               (provider-events ctx session-id))
+            session    (ss/get-session-data-in ctx session-id)]
+        (is (= 2 @attempts*))
+        (is (= 16000 @clock*))
+        (is (= 15000 @observed-deadline*))
+        (is (= [{:delay-ms 2000 :resume-at 12000}]
+               (mapv #(select-keys % [:delay-ms :resume-at]) scheduled)))
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (nil? (:execution-result/retry-outcome result)))
+        (is (= {:retry-attempt 0 :retry nil}
+               (select-keys session [:retry-attempt :retry :retry-deadline-ms])))))))
+
 (deftest successful-request-ignores-invalid-retry-delay-config-test
   ;; Retry delay config is inactive when the initial provider request succeeds.
   (let [[ctx session-id] (create-session-context)

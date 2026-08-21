@@ -1229,7 +1229,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (test review, latest turn)
 
-- [ ] Add deterministic runtime coverage for the retry-window execution-time
+- [x] Add deterministic runtime coverage for the retry-window execution-time
       boundary: drive the real nullable provider with an injected clock that
       advances substantially during the initial failing request and assert the
       deadline opens only when that failure reaches the first retry decision;
@@ -1238,3 +1238,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       Acceptance contract that initial-attempt execution time is outside the
       retry window and the deadline governs only inter-attempt scheduling, not
       an already-running provider request.
+      → Done: `retry-window-excludes-provider-execution-time-test` advances the
+      nullable provider clock 10 seconds during the initial failure, observes a
+      15-second deadline at the first retry decision, then advances the retrying
+      request past that deadline and asserts its success is returned and the
+      retry window is cleared.
