@@ -1,3 +1,4 @@
+- documentation review 2026-08-21 (latest turn): added 2 steps to be addressed.
 - addressed 2 final documentation review steps.
 - addressed 1 latest implementation review step.
 - addressed 1 implementation review step.

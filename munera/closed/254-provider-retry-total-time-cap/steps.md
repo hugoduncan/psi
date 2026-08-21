@@ -1262,3 +1262,21 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       configured exponential delays no longer overflow retry metadata or the
       production sleep deadline. Existing entries cover timeout-deadline and
       provider-header overflow, but not these operator-config paths.
+
+## Review follow-up (documentation review, latest turn)
+
+- [ ] Correct the documented disable semantics for
+      `:auto-retry-total-timeout-ms` in `doc/configuration.md` and the
+      `CHANGELOG.md` Changed entry. Both currently say an absent setting disables
+      the time budget, but `configured-policy-value` falls back to
+      `session-state/default-config` when the key is absent, so omission selects
+      the default `600000` ms window. Only an explicit `nil`, zero, or negative
+      value disables the budget.
+- [ ] Define the retry window's elapsed-time boundary in the user-facing policy
+      documentation and align the `CHANGELOG.md` Changed wording. The current
+      “bounded by total elapsed time” / “up to 10 minutes total” language omits
+      that the deadline opens at the first retry decision (initial request
+      execution is excluded) and is checked only between attempts; an in-flight
+      provider request is allowed to finish after the deadline and can still
+      succeed. Without this qualification, the docs promise a hard 10-minute
+      end-to-end retry duration that the runtime intentionally does not enforce.
