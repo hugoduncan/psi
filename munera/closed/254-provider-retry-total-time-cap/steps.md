@@ -989,3 +989,20 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 - [x] Introduce one typed retry-policy resolution boundary instead of coercing raw operator config ad hoc in `execute-prepared-request!` / `validate-retry-config!`. `resolved-session-runtime-config` currently passes file values through unchanged, then core eagerly calls `long` on `:auto-retry-total-timeout-ms`, retry validation calls `long` on the delay values, and `give-up-decision` compares the raw `:auto-retry-max-retries`. A string/map value therefore leaks a `ClassCastException` (the timeout can block even a successful request before the provider boundary), fractional numbers are silently truncated despite the documented integer contract, and a negative explicit retry cap is accepted despite the documented non-negative contract. Parse/validate the four retry settings into one consistent data shape with informative `ex-info`, while preserving the established rule that inactive delay settings do not block successful/non-retryable requests; add boundary tests for wrong types, fractions, and negative caps.
 - [x] Make configured exponential-delay metadata overflow-safe before it is constructed. Positive base/max values currently pass `validate-retry-config!`, but `exponential-backoff-ms` uses floating-point multiplication/coercion and `retry-metadata` performs checked `(+ now-ms delay-ms)`; a near-`Long/MAX_VALUE` configured delay can therefore overflow `:resume-at` before validation is reached (metadata is built before `validate-retry-config!`), including on a non-retryable failure where delay config should be inactive. Validate an upper bound or use saturating/subtraction-safe arithmetic for the configured delay path, defer metadata construction until retry eligibility is known, and cover a near-Long delay on both retryable and non-retryable failures.
 - [x] Replace `clear-active-retry!`'s optional positional `clear-deadline?` argument with an explicit required close mode (for example `:window-close` / `:between-attempts`, or a required options map). Omitting the fourth argument currently silently means “preserve deadline”, which makes the window-lifecycle invariant unenforceable and allows a future terminal call site to leak `:retry-deadline-ms`; all current callers already choose explicitly. Shape `retry-clear-needed?` around the same mode so invalid/omitted modes fail rather than selecting lifecycle semantics by truthiness.
+
+## Review follow-up (code-shaper re-review)
+
+- [ ] Split retry-policy resolution so limiter fields needed by `give-up-decision`
+      (`:auto-retry-total-timeout-ms` / `:auto-retry-max-retries`) are resolved
+      before the decision, but delay fields are validated/resolved only when the
+      decision will actually schedule a full or truncated sleep. The new
+      `resolve-retry-policy!` call is gated only by `retry-eligible?`, so an
+      enabled retryable failure at an already-reached explicit count cap (for
+      example `:auto-retry-max-retries 0`) throws for an invalid base/max delay
+      even though the immediate `:count-cap` terminal path never uses retry
+      metadata or sleeps. This regresses the nineteenth-turn scheduling-boundary
+      rule and makes the resolver docstring inaccurate. Keep one typed policy
+      boundary/data shape while separating limiter resolution from active-delay
+      validation, and add a regression test asserting cap 0 + invalid delay
+      returns the normal `:retry-exhausted` / `:count-cap` outcome with one
+      provider attempt and no scheduled retry.
