@@ -878,7 +878,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (test-shaper re-review)
 
-- [ ] Make `retry-provider-test-support/response->events` fail fast when a
+- [x] Make `retry-provider-test-support/response->events` fail fast when a
       scripted `response-fn` is exhausted or returns a malformed response.
       It currently destructures `nil` (or a map containing neither
       `:stream-events` nor `:assistant-message`) and falls through to
@@ -888,3 +888,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       failure. Validate that each response explicitly contains one supported
       shape, throw an informative `ex-info` otherwise, and add focused helper
       coverage for exhausted/malformed scripts.
+      → Done: `response->events` now requires exactly one non-nil supported
+      response shape and throws `Invalid scripted provider response` with the
+      response and supported shapes in ex-data for exhausted, malformed, or
+      ambiguous scripts. Focused helper coverage exercises each invalid boundary;
+      helper and retry suites pass, and changed tests lint clean.

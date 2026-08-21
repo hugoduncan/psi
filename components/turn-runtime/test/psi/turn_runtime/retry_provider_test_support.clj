@@ -21,9 +21,26 @@
            [{:type :done :reason stop-reason}]))))
 
 (defn- response->events
-  [{:keys [stream-events assistant-message]}]
-  (or stream-events
-      (assistant-message->events assistant-message)))
+  [response]
+  (let [response-map? (map? response)
+        supported-shapes (cond-> []
+                           (and response-map?
+                                (contains? response :stream-events))
+                           (conj :stream-events)
+
+                           (and response-map?
+                                (contains? response :assistant-message))
+                           (conj :assistant-message))]
+    (when-not (and response-map?
+                   (= 1 (count supported-shapes))
+                   (some? (get response (first supported-shapes))))
+      (throw (ex-info "Invalid scripted provider response"
+                      {:response response
+                       :supported-shapes [:stream-events :assistant-message]})))
+    (case (first supported-shapes)
+      :stream-events (:stream-events response)
+      :assistant-message (assistant-message->events
+                          (:assistant-message response)))))
 
 (defn nullable-provider-context
   "Return an isolated AI context whose provider executes `response-fn` through
