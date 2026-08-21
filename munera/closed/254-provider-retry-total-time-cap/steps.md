@@ -1174,3 +1174,17 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       retry state at each injected sleep boundary and asserts both emitted and
       persisted `:resume-at` values equal the retry-window deadline for the
       truncated final sleep.
+
+## Review follow-up (implementation review, current turn)
+
+- [ ] Make the integer `Retry-After` acceptance bound safe across the full injected
+      clock range. `retry-after-delay-ms` (`session-state/model.clj`) evaluates
+      `(- Long/MAX_VALUE (long now-ms))` with checked long subtraction before it
+      can decide whether a parsed positive delay fits; with `now-ms =
+      Long/MIN_VALUE`, even `Retry-After: 1` throws `ArithmeticException: long
+      overflow` (reproduced against the public function), while the RFC-date
+      branch safely returns nil for the same clock. Compute the available epoch
+      range with arbitrary-precision arithmetic or use the shared saturating
+      epoch helper, then add model-level coverage for a positive integer header at
+      `Long/MIN_VALUE` and a runtime regression proving an extreme injected clock
+      cannot abort an otherwise valid retry decision.
