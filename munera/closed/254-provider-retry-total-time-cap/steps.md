@@ -820,7 +820,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, twenty-first turn)
 
-- [ ] Clear canonical retry-window state when retry-delay validation rejects a
+- [x] Clear canonical retry-window state when retry-delay validation rejects a
       retryable failure. The new validation-error catch in
       `execute-prepared-request!` emits a terminal `provider_request_finished`
       event and immediately rethrows, but unlike every other terminal path it
@@ -831,3 +831,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       next turn. Clear the terminal retry state before rethrowing, and extend
       `retryable-failure-validates-before-scheduling-test` with seeded active
       retry/deadline state that is absent/reset after the exception.
+      → Done: the validation-error catch now clears active retry state with
+      deadline clearing enabled before rethrowing. The regression test seeds a
+      future active retry window and asserts `:retry-attempt` resets to zero,
+      `:retry` becomes nil, and `:retry-deadline-ms` is absent.

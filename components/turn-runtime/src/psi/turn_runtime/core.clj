@@ -587,6 +587,7 @@
                    (failed-attempt-finished-event
                     session-id turn-id attempt-data* attempt-result retry-attempt
                     error-fields true {}))
+                  (retry/clear-active-retry! ctx session-id progress-queue true)
                   (throw error))))
             (retry/dispatch-provider-event!
              ctx

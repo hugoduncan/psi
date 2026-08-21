@@ -99,6 +99,18 @@
                   {:auto-retry-base-delay-ms 2000
                    :auto-retry-max-delay-ms 0}]]
     (let [[ctx session-id] (create-session-context config)
+          _                (ss/apply-root-state-update-in!
+                            ctx
+                            (ss/session-update session-id
+                                               #(assoc %
+                                                       :retry-attempt 2
+                                                       :retry {:active? true
+                                                               :attempt 2
+                                                               :delay-ms 4000
+                                                               :delay-source :exponential-backoff
+                                                               :resume-at 5000}
+                                                       :retry-deadline-ms (+ (System/currentTimeMillis)
+                                                                             600000))))
           prepared         (prepared-request ctx session-id)
           attempts*        (atom 0)]
       (with-redefs [psi.turn-runtime.core/execute-live-turn!
@@ -121,7 +133,7 @@
                  (mapv :type events)))
           (is (= {:type "provider_request_finished"
                   :provider-request-id "turn-1"
-                  :retry-attempt 0
+                  :retry-attempt 2
                   :status :failed
                   :final? true
                   :retryable? true
@@ -132,4 +144,7 @@
                               [:type :provider-request-id :retry-attempt :status
                                :final? :retryable? :error-kind :stop-reason
                                :error-message]))))
-        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
+        (is (= {:retry-attempt 0
+                :retry nil}
+               (select-keys (ss/get-session-data-in ctx session-id)
+                            [:retry-attempt :retry :retry-deadline-ms])))))))
