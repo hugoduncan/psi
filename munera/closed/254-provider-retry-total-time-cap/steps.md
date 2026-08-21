@@ -943,3 +943,20 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       Table-driven cases cover malformed content, events before start, duplicate /
       misplaced starts, and early / duplicate terminals. Helper plus consuming
       retry suites pass (28 tests, 193 assertions); changed files lint clean.
+
+## Review follow-up (documentation review)
+
+- [ ] Make the retry policy's operator configuration surface real and document it.
+      `CHANGELOG.md` presents `:auto-retry-total-timeout-ms` and
+      `:auto-retry-max-retries` as configurable controls, but
+      `doc/configuration.md` omits all `:auto-retry-*` settings and the documented
+      user/project `:agent-session` config path does not currently reach the retry
+      runtime: `shared-config/resolution.clj` resolves no retry keys,
+      `app-runtime/create-runtime-session-context` passes only its separate
+      `session-config`, and `main/session-runtime-config-from-args` supplies only
+      `:llm-stream-idle-timeout-ms`. Either plumb the retry keys through the
+      documented config precedence and add their types/defaults/disable semantics
+      to `doc/configuration.md`, or identify the actually supported operator surface
+      and correct the changelog to name it. Include the existing base/max-delay
+      controls and their positive-value validation so the settings form one
+      coherent reference.
