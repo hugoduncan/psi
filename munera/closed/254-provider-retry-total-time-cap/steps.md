@@ -760,3 +760,17 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       → Done: `retry/deadline-ms` performs subtraction-guarded saturating addition;
       overflow yields `Long/MAX_VALUE`. A focused runtime test opens the boundary
       window and verifies normal count-cap termination without an exception.
+
+## Review follow-up (implementation review, eighteenth turn)
+
+- [ ] Gate `retry/validate-retry-config!` on `retry-enabled?` (or defer it until a
+      retry is actually eligible). `execute-prepared-request!` currently validates
+      `:auto-retry-base-delay-ms` / `:auto-retry-max-delay-ms` unconditionally before
+      the initial provider attempt, so a session with `:auto-retry-enabled false`
+      and an otherwise irrelevant legacy/non-positive retry delay now throws
+      `Invalid retry configuration` and issues zero provider requests instead of
+      executing once and returning `:failure-reason :retry-disabled` on a retryable
+      failure. This violates design Approach 1's contract that
+      `:auto-retry-enabled` is the master on/off for retries as a whole. Add a
+      regression test combining disabled auto-retry with a non-positive delay and
+      assert one provider attempt plus the normal retry-disabled outcome.
