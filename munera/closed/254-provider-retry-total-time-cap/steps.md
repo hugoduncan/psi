@@ -893,3 +893,16 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       response and supported shapes in ex-data for exhausted, malformed, or
       ambiguous scripts. Focused helper coverage exercises each invalid boundary;
       helper and retry suites pass, and changed tests lint clean.
+
+## Review follow-up (test-shaper second re-review)
+
+- [ ] Validate the selected scripted response payload, not only the outer shape
+      discriminator, in `retry-provider-test-support/response->events`. A non-nil
+      `{:assistant-message {}}` currently passes the new guard and is converted
+      into synthetic `:start` / `:done` events with a nil stop reason; malformed
+      `:stream-events` values likewise escape the helper's boundary validation.
+      Such scripts can still produce misleading downstream failures instead of
+      the promised `Invalid scripted provider response`. Define the minimal valid
+      contract for each supported payload (including a non-nil assistant-message
+      `:stop-reason`) and add focused malformed-payload cases that assert the
+      informative boundary error.
