@@ -470,3 +470,4 @@
 - test-shaper review 2026-08-21 (post-boundary tests): added 0 steps to be addressed.
 - documentation review 2026-08-21 (final turn): added 2 steps to be addressed.
 - documentation review 2026-08-21 (current turn): added 1 step to be addressed.
+- documentation review 2026-08-21 (post-capability-boundary): added 0 steps to be addressed.
