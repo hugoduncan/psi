@@ -5,6 +5,7 @@
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
+   [psi.turn-runtime.retry-provider-test-support :as retry-provider]
    [psi.turn-runtime.core :as turn-runtime]))
 
 (defn- create-session-context
@@ -90,18 +91,17 @@
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (assoc (error-turn "invalid api key")
-                           :assistant-message {:role "assistant"
-                                               :content [{:type :error :text "invalid api key"}]
-                                               :stop-reason :error
-                                               :error-message "invalid api key"
-                                               :http-status 401
-                                               :timestamp (java.time.Instant/now)}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (assoc (error-turn "invalid api key")
+                                                            :assistant-message {:role "assistant"
+                                                                                :content [{:type :error :text "invalid api key"}]
+                                                                                :stop-reason :error
+                                                                                :error-message "invalid api key"
+                                                                                :http-status 401
+                                                                                :timestamp (java.time.Instant/now)}))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= 1 @attempts*))
         (is (= :non-retryable (:failure-reason outcome)))
@@ -119,12 +119,11 @@
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "mysterious provider failure"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "mysterious provider failure"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= 1 @attempts*))
         (is (= :non-retryable (:failure-reason outcome)))
@@ -142,20 +141,19 @@
                                                            :auto-retry-max-retries 1}})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (if (= 1 (swap! attempts* inc))
-                      (error-turn "The usage limit has been reached [request-id req_123]")
-                      {:turn-id "turn-1"
-                       :model {:provider "openai" :id "gpt-test"}
-                       :ai-options {}
-                       :turn-ctx nil
-                       :assistant-message {:role "assistant"
-                                           :content [{:type :text :text "recovered"}]
-                                           :stop-reason :stop
-                                           :timestamp (java.time.Instant/now)}}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (if (= 1 (swap! attempts* inc))
+                                                       (error-turn "The usage limit has been reached [request-id req_123]")
+                                                       {:turn-id "turn-1"
+                                                        :model {:provider "openai" :id "gpt-test"}
+                                                        :ai-options {}
+                                                        :turn-ctx nil
+                                                        :assistant-message {:role "assistant"
+                                                                            :content [{:type :text :text "recovered"}]
+                                                                            :stop-reason :stop
+                                                                            :timestamp (java.time.Instant/now)}}))]
       (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
+                       ai-ctx ctx session-id prepared nil)
             scheduled (first (filter #(= "provider_retry_scheduled" (:type %))
                                      (provider-events ctx session-id)))]
         (is (= 2 @attempts*))
@@ -176,12 +174,11 @@
                                       :auto-retry-enabled false))
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= 1 @attempts*))
         (is (= :retry-disabled (:failure-reason outcome)))
@@ -208,12 +205,11 @@
                                                                              (swap! clock + (long delay-ms)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)
             events  (provider-events ctx session-id)
             scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
@@ -243,12 +239,11 @@
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)
             events  (provider-events ctx session-id)]
         (is (= 2 @attempts*))
@@ -267,12 +262,11 @@
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= 4 @attempts*))
         (is (= :retry-exhausted (:failure-reason outcome)))
@@ -305,12 +299,11 @@
                                              :delay-source :exponential-backoff}))
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)
             sd      (ss/get-session-data-in ctx session-id)]
         ;; count-only fallback 3 bounds the loop: 1 initial + 3 retries (the
@@ -336,19 +329,18 @@
                                                                              (swap! clock + (long delay-ms)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (assoc (error-turn "rate limit exceeded")
-                           :assistant-message {:role "assistant"
-                                               :content [{:type :error :text "rate limit exceeded"}]
-                                               :stop-reason :error
-                                               :error-message "rate limit exceeded"
-                                               :http-status 429
-                                               :provider-error/headers {"Retry-After" "10"}
-                                               :timestamp (java.time.Instant/now)}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (assoc (error-turn "rate limit exceeded")
+                                                            :assistant-message {:role "assistant"
+                                                                                :content [{:type :error :text "rate limit exceeded"}]
+                                                                                :stop-reason :error
+                                                                                :error-message "rate limit exceeded"
+                                                                                :http-status 429
+                                                                                :provider-error/headers {"Retry-After" "10"}
+                                                                                :timestamp (java.time.Instant/now)}))]
       (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
+                       ai-ctx ctx session-id prepared nil)
             outcome   (:execution-result/retry-outcome result)
             events    (provider-events ctx session-id)
             scheduled (first (filter #(= "provider_retry_scheduled" (:type %)) events))]
@@ -375,12 +367,11 @@
                                                     (reset! cancelled? true))})
         prepared        (prepared-request ctx session-id)
         attempts*       (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= :retry-cancelled (:failure-reason outcome)))
         (is (true? (:cancelled? outcome)))
@@ -403,20 +394,19 @@
                                          (:retry-deadline-ms (ss/get-session-data-in ctx0 session-id)))))
         prepared        (prepared-request ctx session-id)
         attempts*       (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (if (= 1 (swap! attempts* inc))
-                      (error-turn "Connection reset by peer")
-                      {:turn-id "turn-1"
-                       :model {:provider "openai" :id "gpt-test"}
-                       :ai-options {}
-                       :turn-ctx nil
-                       :assistant-message {:role "assistant"
-                                           :content [{:type :text :text "recovered"}]
-                                           :stop-reason :stop
-                                           :timestamp (java.time.Instant/now)}}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (if (= 1 (swap! attempts* inc))
+                                                       (error-turn "Connection reset by peer")
+                                                       {:turn-id "turn-1"
+                                                        :model {:provider "openai" :id "gpt-test"}
+                                                        :ai-options {}
+                                                        :turn-ctx nil
+                                                        :assistant-message {:role "assistant"
+                                                                            :content [{:type :text :text "recovered"}]
+                                                                            :stop-reason :stop
+                                                                            :timestamp (java.time.Instant/now)}}))]
       (let [result (turn-runtime/execute-prepared-request!
-                    {:provider-registry (atom {})} ctx session-id prepared nil)]
+                    ai-ctx ctx session-id prepared nil)]
         (is (= 600000 @deadline-in-sleep*))
         (is (= :stop (:execution-result/stop-reason result)))
         (is (nil? (:retry-deadline-ms (ss/get-session-data-in ctx session-id))))))))
@@ -447,12 +437,11 @@
                                               :resume-at 20000}))
         prepared        (prepared-request ctx session-id)
         attempts*       (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
+                       ai-ctx ctx session-id prepared nil)
             outcome   (:execution-result/retry-outcome result)
             events    (provider-events ctx session-id)
             scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
@@ -483,19 +472,18 @@
                                                                              (swap! clock + (long delay-ms)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (assoc (error-turn "rate limit exceeded")
-                           :assistant-message {:role "assistant"
-                                               :content [{:type :error :text "rate limit exceeded"}]
-                                               :stop-reason :error
-                                               :error-message "rate limit exceeded"
-                                               :http-status 429
-                                               :provider-error/headers {"Retry-After" "0"}
-                                               :timestamp (java.time.Instant/now)}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (assoc (error-turn "rate limit exceeded")
+                                                            :assistant-message {:role "assistant"
+                                                                                :content [{:type :error :text "rate limit exceeded"}]
+                                                                                :stop-reason :error
+                                                                                :error-message "rate limit exceeded"
+                                                                                :http-status 429
+                                                                                :provider-error/headers {"Retry-After" "0"}
+                                                                                :timestamp (java.time.Instant/now)}))]
       (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
+                       ai-ctx ctx session-id prepared nil)
             outcome   (:execution-result/retry-outcome result)
             events    (provider-events ctx session-id)
             scheduled (first (filter #(= "provider_retry_scheduled" (:type %)) events))]
@@ -521,19 +509,18 @@
                                                                              (swap! clock + (long delay-ms)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (assoc (error-turn "rate limit exceeded")
-                           :assistant-message {:role "assistant"
-                                               :content [{:type :error :text "rate limit exceeded"}]
-                                               :stop-reason :error
-                                               :error-message "rate limit exceeded"
-                                               :http-status 429
-                                               :provider-error/headers {"Retry-After" "99999999999999999999"}
-                                               :timestamp (java.time.Instant/now)}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (assoc (error-turn "rate limit exceeded")
+                                                            :assistant-message {:role "assistant"
+                                                                                :content [{:type :error :text "rate limit exceeded"}]
+                                                                                :stop-reason :error
+                                                                                :error-message "rate limit exceeded"
+                                                                                :http-status 429
+                                                                                :provider-error/headers {"Retry-After" "99999999999999999999"}
+                                                                                :timestamp (java.time.Instant/now)}))]
       (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
+                       ai-ctx ctx session-id prepared nil)
             outcome   (:execution-result/retry-outcome result)
             events    (provider-events ctx session-id)
             scheduled (first (filter #(= "provider_retry_scheduled" (:type %)) events))]
@@ -563,19 +550,18 @@
                                                                                (swap! clock + (long delay-ms)))})
           prepared       (prepared-request ctx session-id)
           attempts*      (atom 0)]
-      (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                    (fn [& _]
-                      (swap! attempts* inc)
-                      (assoc (error-turn "rate limit exceeded")
-                             :assistant-message {:role "assistant"
-                                                 :content [{:type :error :text "rate limit exceeded"}]
-                                                 :stop-reason :error
-                                                 :error-message "rate limit exceeded"
-                                                 :http-status 429
-                                                 :provider-error/headers {"Retry-After" retry-after}
-                                                 :timestamp (java.time.Instant/now)}))]
+      (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                       (swap! attempts* inc)
+                                                       (assoc (error-turn "rate limit exceeded")
+                                                              :assistant-message {:role "assistant"
+                                                                                  :content [{:type :error :text "rate limit exceeded"}]
+                                                                                  :stop-reason :error
+                                                                                  :error-message "rate limit exceeded"
+                                                                                  :http-status 429
+                                                                                  :provider-error/headers {"Retry-After" retry-after}
+                                                                                  :timestamp (java.time.Instant/now)}))]
         (let [result    (turn-runtime/execute-prepared-request!
-                         {:provider-registry (atom {})} ctx session-id prepared nil)
+                         ai-ctx ctx session-id prepared nil)
               outcome   (:execution-result/retry-outcome result)
               events    (provider-events ctx session-id)
               scheduled (first (filter #(= "provider_retry_scheduled" (:type %)) events))]
@@ -596,10 +582,9 @@
                                                            :auto-retry-max-retries 0}
                                                   :now-fn #(java.time.Instant/ofEpochMilli 1)})
         prepared         (prepared-request ctx session-id)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _] (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _] (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= :retry-exhausted (:failure-reason outcome)))
         (is (= :count-cap (:exhausted-reason outcome)))
@@ -627,12 +612,11 @@
                                                       (reset! cancelled? true)))})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result    (turn-runtime/execute-prepared-request!
-                       {:provider-registry (atom {})} ctx session-id prepared nil)
+                       ai-ctx ctx session-id prepared nil)
             outcome   (:execution-result/retry-outcome result)
             events    (provider-events ctx session-id)
             scheduled (filter #(= "provider_retry_scheduled" (:type %)) events)]
@@ -658,15 +642,14 @@
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
            #"Test-seam misconfiguration"
            (turn-runtime/execute-prepared-request!
-            {:provider-registry (atom {})} ctx session-id prepared nil)))
+            ai-ctx ctx session-id prepared nil)))
       ;; the guard needs two consecutive clock reads to detect the
       ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
       ;; not a 10-minute spin
@@ -681,15 +664,14 @@
                                                   :provider-retry-sleep-fn (fn [_delay-ms])})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
            #"Test-seam misconfiguration"
            (turn-runtime/execute-prepared-request!
-            {:provider-registry (atom {})} ctx session-id prepared nil)))
+            ai-ctx ctx session-id prepared nil)))
       ;; the guard needs two consecutive clock reads to detect the
       ;; non-advancing clock, so it fires at the 2nd scheduled retry — fast,
       ;; not a 10-minute spin
@@ -708,14 +690,13 @@
                                                   :now-fn #(java.time.Instant/ofEpochMilli @clock)})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
                     ;; advance the injected clock past the next backoff each attempt
-                    (swap! clock + 2000)
-                    (error-turn "Connection reset by peer"))]
+                                                     (swap! clock + 2000)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= 2 @attempts*))
         (is (= :retry-exhausted (:failure-reason outcome)))
@@ -736,14 +717,13 @@
                                                   :now-fn #(java.time.Instant/ofEpochMilli @clock)})
         prepared       (prepared-request ctx session-id)
         attempts*      (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
                     ;; advance the injected clock past the next backoff each attempt
-                    (swap! clock + 10)
-                    (error-turn "Connection reset by peer"))]
+                                                     (swap! clock + 10)
+                                                     (error-turn "Connection reset by peer"))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         ;; no throw: the derived threshold (10) is not exceeded by the
         ;; delay-driven 10 ms advance; the window runs to the :deadline
@@ -763,13 +743,12 @@
                                                   :retry-min-clock-advance-ms 12345})
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (error-turn "Connection reset by peer"))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (error-turn "Connection reset by peer"))]
       (try
         (turn-runtime/execute-prepared-request!
-         {:provider-registry (atom {})} ctx session-id prepared nil)
+         ai-ctx ctx session-id prepared nil)
         (is false "expected Test-seam misconfiguration")
         (catch clojure.lang.ExceptionInfo e
           (is (re-find #"Test-seam misconfiguration" (ex-message e)))

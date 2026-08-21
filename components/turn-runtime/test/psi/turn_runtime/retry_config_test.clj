@@ -5,6 +5,7 @@
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
    [psi.session-state.state :as ss]
+   [psi.turn-runtime.retry-provider-test-support :as retry-provider]
    [psi.turn-runtime.core :as turn-runtime]))
 
 (defn- create-session-context
@@ -55,15 +56,14 @@
   (let [[ctx session-id] (create-session-context)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (provider-result {:role "assistant"
-                                      :content [{:type :text :text "done"}]
-                                      :stop-reason :stop
-                                      :timestamp (java.time.Instant/now)}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (provider-result {:role "assistant"
+                                                                       :content [{:type :text :text "done"}]
+                                                                       :stop-reason :stop
+                                                                       :timestamp (java.time.Instant/now)}))]
       (let [result (turn-runtime/execute-prepared-request!
-                    {:provider-registry (atom {})} ctx session-id prepared nil)]
+                    ai-ctx ctx session-id prepared nil)]
         (is (= 1 @attempts*))
         (is (= :stop (:execution-result/stop-reason result)))
         (is (= ["provider_request_started" "provider_request_finished"]
@@ -74,17 +74,16 @@
   (let [[ctx session-id] (create-session-context)
         prepared         (prepared-request ctx session-id)
         attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                  (fn [& _]
-                    (swap! attempts* inc)
-                    (provider-result {:role "assistant"
-                                      :content [{:type :error :text "invalid api key"}]
-                                      :stop-reason :error
-                                      :error-message "invalid api key"
-                                      :http-status 401
-                                      :timestamp (java.time.Instant/now)}))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (provider-result {:role "assistant"
+                                                                       :content [{:type :error :text "invalid api key"}]
+                                                                       :stop-reason :error
+                                                                       :error-message "invalid api key"
+                                                                       :http-status 401
+                                                                       :timestamp (java.time.Instant/now)}))]
       (let [result  (turn-runtime/execute-prepared-request!
-                     {:provider-registry (atom {})} ctx session-id prepared nil)
+                     ai-ctx ctx session-id prepared nil)
             outcome (:execution-result/retry-outcome result)]
         (is (= 1 @attempts*))
         (is (= :non-retryable (:failure-reason outcome)))
@@ -113,19 +112,18 @@
                                                                              600000))))
           prepared         (prepared-request ctx session-id)
           attempts*        (atom 0)]
-      (with-redefs [psi.turn-runtime.core/execute-live-turn!
-                    (fn [& _]
-                      (swap! attempts* inc)
-                      (provider-result {:role "assistant"
-                                        :content [{:type :error :text "Connection reset by peer"}]
-                                        :stop-reason :error
-                                        :error-message "Connection reset by peer"
-                                        :timestamp (java.time.Instant/now)}))]
+      (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                       (swap! attempts* inc)
+                                                       (provider-result {:role "assistant"
+                                                                         :content [{:type :error :text "Connection reset by peer"}]
+                                                                         :stop-reason :error
+                                                                         :error-message "Connection reset by peer"
+                                                                         :timestamp (java.time.Instant/now)}))]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
              #"Invalid retry configuration"
              (turn-runtime/execute-prepared-request!
-              {:provider-registry (atom {})} ctx session-id prepared nil)))
+              ai-ctx ctx session-id prepared nil)))
         (is (= 1 @attempts*))
         (let [events         (provider-events ctx session-id)
               terminal-event (last events)]

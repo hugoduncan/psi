@@ -838,7 +838,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (test review)
 
-- [ ] Replace the task-added retry tests' `with-redefs` of
+- [x] Replace the task-added retry tests' `with-redefs` of
       `psi.turn-runtime.core/execute-live-turn!` with an injected nullable
       provider that returns the same response sequences through the real
       provider execution boundary. The current tests inject behavior by
@@ -849,3 +849,10 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       constraint to drive retries through the provider seam. Keep injected
       state-only clock/sleep/cancellation seams and preserve the existing
       outcome, event, retry-state, and attempt-count assertions.
+      → Done: added shared `retry-provider-test-support` with a scripted
+      nullable streaming provider and migrated all 25 direct
+      `execute-live-turn!` replacements in `retry_config_test.clj` and
+      `response_mode_retry_test.clj` through the real provider execution
+      boundary. Clock/sleep/cancellation seams and state-based assertions are
+      unchanged. Focused suites: 26 tests, 151 assertions, all green; changed
+      files lint clean and commit checks pass.

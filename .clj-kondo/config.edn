@@ -11,6 +11,9 @@
   com.wsscode.promesa.macros/clet                   clojure.core/let
   com.wsscode.promesa.macros/ctry                   clojure.core/try
 
+  ;; Test support
+  psi.turn-runtime.retry-provider-test-support/with-nullable-provider clojure.core/let
+
   ;; Promesa
   promesa.core/->          clojure.core/->
   promesa.core/->>         clojure.core/->>
