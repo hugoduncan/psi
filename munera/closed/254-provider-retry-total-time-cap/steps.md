@@ -875,3 +875,16 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       final-content isolation and provider-event lifecycle assertions preserved.
       Focused retry suite: 23 tests, 135 assertions, all green; changed tests lint
       clean.
+
+## Review follow-up (test-shaper re-review)
+
+- [ ] Make `retry-provider-test-support/response->events` fail fast when a
+      scripted `response-fn` is exhausted or returns a malformed response.
+      It currently destructures `nil` (or a map containing neither
+      `:stream-events` nor `:assistant-message`) and falls through to
+      `assistant-message->events nil`, fabricating `:start` plus `:done` events
+      with a nil reason. An unexpected extra provider attempt therefore produces
+      a misleading downstream outcome instead of a meaningful script-boundary
+      failure. Validate that each response explicitly contains one supported
+      shape, throw an informative `ex-info` otherwise, and add focused helper
+      coverage for exhausted/malformed scripts.
