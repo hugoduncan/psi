@@ -53,6 +53,19 @@
                            :reset-at 42000}}
              (:retry s))))))
 
+(deftest retry-deadline-schema-test
+  (testing "agent-session-schema accepts populated top-level :retry-deadline-ms (int)"
+    (is (session/valid-session?
+         (assoc (session/initial-session) :retry-deadline-ms 600000))))
+
+  (testing "agent-session-schema accepts nil :retry-deadline-ms (count-only mode value)"
+    (is (session/valid-session?
+         (assoc (session/initial-session) :retry-deadline-ms nil))))
+
+  (testing "agent-session-schema rejects non-int :retry-deadline-ms"
+    (is (not (session/valid-session?
+              (assoc (session/initial-session) :retry-deadline-ms "600000"))))))
+
 (deftest agent-session-schema-temperature-test
   (testing "agent-session-schema accepts optional :temperature"
     (is (session/valid-session?
@@ -280,3 +293,112 @@
           e (session/make-entry :thinking-level {:thinking-level :off})
           s' (session/append-entry s e)]
       (is (= [e] (:session-entries s'))))))
+
+(deftest retry-after-non-positive-integer-floors-to-exponential-test
+  ;; A non-positive integer Retry-After (0 or negative) has no positive floor and
+  ;; must not yield an immediate 0/negative delay under the budget-active default
+  ;; (where the count-cap is nil and the loop would otherwise retry back-to-back
+  ;; until the deadline): it floors to the exponential backoff, exactly like the
+  ;; RFC-date branch already does for <= 0.
+  (testing "retry-after-delay-ms returns nil for non-positive integers"
+    (is (nil? (session/retry-after-delay-ms "0" 0)))
+    (is (nil? (session/retry-after-delay-ms "-5" 0)))
+    (is (= 5000 (session/retry-after-delay-ms "5" 0))))
+
+  (testing "retry-metadata falls back to exponential backoff for Retry-After 0"
+    (let [meta (session/retry-metadata {:retry-after "0"} 0 2000 0)]
+      (is (= 2000 (:delay-ms meta)))
+      (is (= :exponential-backoff (:delay-source meta)))
+      (is (= 2000 (:resume-at meta))))))
+
+(deftest retry-after-oversized-integer-floors-to-exponential-test
+  ;; A numeric Retry-After outside Long range (e.g. a 20-digit value) is
+  ;; unparsable by Long/parseLong and must not throw: it yields nil and
+  ;; retry-metadata floors to the exponential backoff, exactly like the RFC-date
+  ;; branch does for unparsable values.
+  (testing "retry-after-delay-ms returns nil for an oversized integer"
+    (is (nil? (session/retry-after-delay-ms "99999999999999999999" 0))))
+
+  (testing "retry-metadata falls back to exponential backoff for an oversized Retry-After"
+    (let [meta (session/retry-metadata {:retry-after "99999999999999999999"} 0 2000 0)]
+      (is (= 2000 (:delay-ms meta)))
+      (is (= :exponential-backoff (:delay-source meta)))
+      (is (= 2000 (:resume-at meta))))))
+
+(deftest retry-after-near-long-integer-floors-to-exponential-test
+  ;; A PARSEABLE near-Long/MAX integer Retry-After (16 digits, seconds >=
+  ;; 9223372036854775) previously crashed with an uncaught
+  ;; ArithmeticException: the integer branch's `(* 1000 seconds)` overflowed
+  ;; for seconds >= 9223372036854776, and even the largest seconds whose
+  ;; product fits (9223372036854775) overflowed retry-metadata's
+  ;; `:resume-at` `(+ now-ms delay-ms)`. Both caps live in
+  ;; retry-after-delay-ms, so such values yield nil and retry-metadata floors
+  ;; to the exponential backoff — no throw.
+  (testing "retry-after-delay-ms returns nil for a parseable near-Long/MAX integer"
+    (is (nil? (session/retry-after-delay-ms "9223372036854775" 0)))
+    (is (nil? (session/retry-after-delay-ms "9223372036854776" 0))))
+
+  (testing "retry-metadata falls back to exponential backoff for a near-Long Retry-After"
+    (doseq [retry-after ["9223372036854775" "9223372036854776"]]
+      (let [meta (session/retry-metadata {:retry-after retry-after} 0 2000 0)]
+        (is (= 2000 (:delay-ms meta)))
+        (is (= :exponential-backoff (:delay-source meta)))
+        (is (= 2000 (:resume-at meta))))))
+
+  (testing "a fitting large integer is kept and its :resume-at does not overflow"
+    ;; 9223372036854774 is the largest seconds value whose `* 1000` product
+    ;; fits in Long; with now-ms 0 the product also fits the :resume-at
+    ;; addition, so it is honored (not floored) and nothing throws.
+    (is (= 9223372036854774000 (session/retry-after-delay-ms "9223372036854774" 0)))
+    (let [meta (session/retry-metadata {:retry-after "9223372036854774"} 0 2000 0)]
+      (is (= 9223372036854774000 (:delay-ms meta)))
+      (is (= :retry-after (:delay-source meta)))
+      (is (= 9223372036854774000 (:resume-at meta)))))
+
+  (testing "a positive integer is accepted at the minimum injected clock"
+    (is (= 1000 (session/retry-after-delay-ms "1" Long/MIN_VALUE)))
+    (let [meta (session/retry-metadata {:retry-after "1"}
+                                       0
+                                       2000
+                                       Long/MIN_VALUE)]
+      (is (= 1000 (:delay-ms meta)))
+      (is (= :retry-after (:delay-source meta)))
+      (is (= (+ Long/MIN_VALUE 1000) (:resume-at meta))))))
+
+(deftest rate-limit-reset-invalid-and-boundary-timing-test
+  ;; Malformed RateLimit-Reset telemetry must be omitted rather than aborting
+  ;; retry metadata construction or exposing nonsensical negative timing.
+  (testing "non-positive and extreme negative values have no timing metadata"
+    (doseq [reset ["0" "-1" (str Long/MIN_VALUE)]]
+      (is (nil? (session/rate-limit-reset->timing reset 1000)))
+      (is (nil? (get-in (session/retry-metadata {"RateLimit-Reset" reset}
+                                                0
+                                                2000
+                                                1000)
+                        [:rate-limit])))))
+
+  (testing "relative reset epoch addition saturates near Long/MAX_VALUE"
+    (is (= {:reset-after-ms 2000
+            :reset-at Long/MAX_VALUE}
+           (session/rate-limit-reset->timing "2" (dec Long/MAX_VALUE)))))
+
+  (testing "relative reset epoch addition remains exact near Long/MIN_VALUE"
+    (is (= {:reset-after-ms 2000
+            :reset-at (+ Long/MIN_VALUE 2000)}
+           (session/rate-limit-reset->timing "2" Long/MIN_VALUE)))))
+
+(deftest retry-metadata-preserves-zero-exponential-delay-test
+  ;; Retry metadata remains a faithful model of its inputs. The turn runtime
+  ;; rejects non-positive base/max config only when an enabled retryable failure
+  ;; reaches retry scheduling.
+  (testing "retry-metadata preserves a zero exponential delay"
+    (let [meta (session/retry-metadata {} 0 0 0)]
+      (is (zero? (:delay-ms meta)))
+      (is (= :exponential-backoff (:delay-source meta)))
+      (is (zero? (:resume-at meta)))))
+
+  (testing "a positive Retry-After still wins over the zero exponential"
+    (let [meta (session/retry-metadata {:retry-after "5"} 0 0 0)]
+      (is (= 5000 (:delay-ms meta)))
+      (is (= :retry-after (:delay-source meta)))
+      (is (= 5000 (:resume-at meta))))))

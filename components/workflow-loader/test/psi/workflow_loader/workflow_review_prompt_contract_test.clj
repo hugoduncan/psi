@@ -1,13 +1,18 @@
 (ns psi.workflow-loader.workflow-review-prompt-contract-test
   "Prompt-body contract tests for the merged design/plan review workflows.
 
-   Locks the shared-session loader/reuser framing of the review prompts and the
-   batch-follow-up evidence rules of the design/plan follow-up profiles. Split
-   from workflow-definitions-test to keep each test file within the file-length
-   gate; the shared loader seam (slurp-workflow-file) is single-sourced in
+   Locks the shared-session loader/reuser framing of the review prompts, the
+   batch-follow-up evidence rules of the design/plan follow-up profiles, the
+   create-plan procedure (including its plan/steps ambiguity and design
+   inconsistency checks), and the task-design skill content the design/plan
+   workflow family depends on. Split from workflow-definitions-test to keep each
+   test file within the file-length gate; the shared loader seam
+   (slurp-workflow-file) is single-sourced in
    psi.workflow-loader.workflow-test-support."
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
+   [psi.prompt-assets.skills :as skills]
    [psi.workflow-loader.workflow-test-support
     :refer [slurp-workflow-file]]))
 
@@ -148,3 +153,54 @@
                       "leave the item unchecked"
                       "record the blocking reason tersely in implementation.md rather than guessing"]]
         (is (.contains content needle) needle)))))
+
+(deftest create-task-plan-create-plan-prompt-contract-test
+  ;; Locks the create-plan procedure contract: before committing, the planner
+  ;; must check the produced plan/steps for ambiguities (steps.md as read-only
+  ;; task context) and the task design for inconsistencies, using the same
+  ;; internal/referenced-artifact framing as the design inconsistency review.
+  (let [content (slurp-workflow-file "create-task-plan-create-plan.md")]
+    (testing "declares the planning skills used to run the checks"
+      (doseq [needle ["skills:"
+                      "work-independently"
+                      "task-design"]]
+        (is (.contains content needle) needle)))
+    (testing "checks the plan and steps for ambiguities with steps.md read-only"
+      (doseq [needle ["Check the task plan and steps for ambiguities"
+                      "treating steps.md as read-only task context"]]
+        (is (.contains content needle) needle)))
+    (testing "checks the task design for inconsistencies mirroring the design inconsistency review"
+      (doseq [needle ["Check the task design for inconsistencies"
+                      "internal inconsistency within design.md and"
+                      "between design.md and referenced artifacts"]]
+        (is (.contains content needle) needle)))
+    (testing "runs both checks before committing and summarizing"
+      (let [ambiguity-index (.indexOf content "Check the task plan and steps for ambiguities")
+            inconsistency-index (.indexOf content "Check the task design for inconsistencies")
+            commit-index (.indexOf content "Commit the created/updated plan.md and steps.md")
+            summary-index (.indexOf content "Summarize what was created and any open questions")]
+        (is (pos? ambiguity-index))
+        (is (pos? inconsistency-index))
+        (is (< inconsistency-index commit-index)
+            "design inconsistency check precedes the commit step")
+        (is (< commit-index summary-index)
+            "commit precedes the final summary step")))))
+
+(deftest task-design-skill-content-lock-test
+  ;; Locks the task-design skill's design-quality requirements. The
+  ;; `self_consistent` requirement is what the create-plan and design-review
+  ;; workflows rely on when they check design.md against referenced artifacts.
+  (let [skills-dir (str (io/file (System/getProperty "user.dir") ".psi/skills"))
+        {:keys [skills]}
+        (skills/load-skills-from-dir skills-dir :project true)
+        skill (first (filter #(= "task-design" (:name %)) skills))
+        body (some-> skill :file-path io/file slurp)]
+    (is (some? skill) "task-design skill is discovered")
+    (is (seq body) "task-design SKILL.md body is non-empty")
+    (when body
+      (testing "requires the design to be self-consistent"
+        (is (.contains body "self_consistent(x)")
+            "task design must be internally self-consistent"))
+      (testing "keeps the sibling unambiguous requirement"
+        (is (.contains body "unambiguous(x)")
+            "task design must be unambiguous")))))

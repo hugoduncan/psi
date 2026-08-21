@@ -21,6 +21,13 @@
    :prompt-mode :lambda
    :nucleus-prelude-override nil})
 
+(def ^:private session-runtime-config-keys
+  [:auto-retry-max-retries
+   :auto-retry-base-delay-ms
+   :auto-retry-max-delay-ms
+   :auto-retry-total-timeout-ms
+   :llm-stream-idle-timeout-ms])
+
 (defn agent-session-map
   "Extract the :agent-session sub-map, nil-safe."
   [cfg]
@@ -40,6 +47,19 @@
   (let [user    (agent-session-map (user-cfg/read-config))
         project (agent-session-map (project-prefs/read-preferences cwd))]
     (merge system-defaults user project)))
+
+(defn resolved-session-runtime-config
+  "Return operator-configurable runtime settings from resolved agent-session config."
+  [cfg]
+  (select-keys cfg session-runtime-config-keys))
+
+(defn resolved-auto-retry-enabled
+  "Return a presence-aware configured auto-retry preference."
+  [cfg]
+  (when (contains? cfg :auto-retry-enabled)
+    (let [enabled? (:auto-retry-enabled cfg)]
+      (when (boolean? enabled?)
+        {:present? true :value enabled?}))))
 
 (defn resolved-model
   "Return {:provider p :id id} when both fields are present, else nil."

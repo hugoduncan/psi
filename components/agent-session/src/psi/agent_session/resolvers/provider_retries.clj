@@ -31,13 +31,24 @@
         schedules     (filter #(= "provider_retry_scheduled" (:type %)) events*)
         finals        (filter :final? events*)
         final         (last finals)
-        final-attempt (:retry-attempt final)]
+        ;; A schedule is the final retry of the provider request when it is the
+        ;; LAST schedule (max retry-attempt), not when its attempt number
+        ;; matches the terminal event's. The terminal event does not always
+        ;; report the superseded schedule's attempt: the truncated-final
+        ;; deadline give-up reports the pre-sleep FAILED attempt N (the actual
+        ;; executed attempt, matching its :attempt-id) while the superseded
+        ;; truncated schedule — the retry that runs out the window to the
+        ;; deadline — carries N+1. Keying on the last schedule keeps the marker
+        ;; correct for every terminal path (success, count-cap, deadline,
+        ;; cancel: the cancel event reports the scheduled attempt N+1).
+        final-attempt (some-> (last schedules) :retry-attempt)]
     {:psi.provider-request/id             provider-request-id
      :psi.provider-request/turn-id        (:turn-id (first events*))
      :psi.provider-request/retry-count    (count schedules)
      :psi.provider-request/retry-attempts (mapv #(retry-schedule->eql % (= (:retry-attempt %) final-attempt)) schedules)
      :psi.provider-request/final-status   (or (:failure-reason final)
                                               (:status final))
+     :psi.provider-request/exhausted-reason (:exhausted-reason final)
      :psi.provider-request/error-kind     (:error-kind final)}))
 
 (defn- provider-retry-summaries
@@ -63,6 +74,7 @@
    ::pco/output [:psi.provider-request/turn-id
                  :psi.provider-request/retry-count
                  :psi.provider-request/final-status
+                 :psi.provider-request/exhausted-reason
                  :psi.provider-request/error-kind
                  {:psi.provider-request/retry-attempts
                   [:psi.provider-retry/attempt
@@ -90,6 +102,7 @@
    ::pco/output [:psi.provider-request/id
                  :psi.provider-request/retry-count
                  :psi.provider-request/final-status
+                 :psi.provider-request/exhausted-reason
                  :psi.provider-request/error-kind
                  {:psi.provider-request/retry-attempts
                   [:psi.provider-retry/attempt
@@ -117,6 +130,7 @@
                    :psi.provider-request/turn-id
                    :psi.provider-request/retry-count
                    :psi.provider-request/final-status
+                   :psi.provider-request/exhausted-reason
                    :psi.provider-request/error-kind
                    {:psi.provider-request/retry-attempts
                     [:psi.provider-retry/attempt

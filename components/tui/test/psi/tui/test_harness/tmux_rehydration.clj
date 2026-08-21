@@ -4,6 +4,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [psi.session-journal.codec :as codec]
+   [psi.test-support.fs :as test-fs]
    [psi.tui.test-harness.tmux :as tmux])
   (:import
    [java.nio.file Files]
@@ -54,15 +55,6 @@
                        (codec/entry->line user-entry) "\n"
                        (codec/entry->line asst-entry) "\n"))
     (.getAbsolutePath fixture)))
-
-(defn- delete-recursively!
-  [f]
-  (when (and f (.exists (io/file f)))
-    (let [file (io/file f)]
-      (when (.isDirectory file)
-        (doseq [child (.listFiles file)]
-          (delete-recursively! child)))
-      (.delete file))))
 
 (defn- failure
   [target reason]
@@ -155,5 +147,5 @@
                 (tmux/kill-session-if-exists! session-name*))
               result))
           (finally
-            (delete-recursively! (io/file session-root))
-            (delete-recursively! (io/file worktree-dir))))))))
+            (test-fs/delete-recursively! (io/file session-root))
+            (test-fs/delete-recursively! (io/file worktree-dir))))))))

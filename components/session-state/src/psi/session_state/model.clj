@@ -175,6 +175,7 @@
    [:steering-messages [:vector :string]]
    [:follow-up-messages [:vector :string]]
    [:retry-attempt :int]
+   [:retry-deadline-ms {:optional true} [:maybe :int]]
    [:retry {:optional true}
     [:maybe
      [:map
@@ -243,9 +244,10 @@
    :auto-compaction-keep-recent-tokens 20000
    :branch-summary-reserve-tokens  16384
    :auto-retry-enabled             true
-   :auto-retry-max-retries         3
+   :auto-retry-max-retries         nil
    :auto-retry-base-delay-ms       2000
    :auto-retry-max-delay-ms        60000
+   :auto-retry-total-timeout-ms    600000
    :llm-stream-idle-timeout-ms     1200000
    :tool-batch-max-parallelism     4
    :default-active-tools           #{"read" "bash" "edit" "write"}})
@@ -494,8 +496,23 @@
           #"(?i)too.many.tokens"])))
 
 (defn exponential-backoff-ms
+  "Returns base-ms doubled per attempt and capped at max-ms without numeric
+   overflow or floating-point coercion."
   [attempt base-ms max-ms]
-  (min max-ms (long (* base-ms (Math/pow 2 attempt)))))
+  (loop [remaining (max 0 (long attempt))
+         delay     (min (long base-ms) (long max-ms))]
+    (cond
+      (zero? remaining) delay
+      (>= delay max-ms) (long max-ms)
+      (> delay (quot (long max-ms) 2)) (long max-ms)
+      :else (recur (dec remaining) (* 2 delay)))))
+
+(defn saturating-epoch-add
+  "Adds a non-negative delay to epoch millis, saturating at Long/MAX_VALUE."
+  [epoch-ms delay-ms]
+  (if (> epoch-ms (- Long/MAX_VALUE delay-ms))
+    Long/MAX_VALUE
+    (+ epoch-ms delay-ms)))
 
 (defn- parse-long-safe
   [s]
@@ -538,7 +555,24 @@
       nil
 
       (integer-string? raw)
-      (* 1000 (Long/parseLong raw))
+      (let [seconds (some-> raw parse-long-safe)
+            ;; Cap the accepted seconds: strictly below Long/MAX_VALUE / 1000
+            ;; (the `* 1000` overflow boundary) and below the value whose
+            ;; delay-ms would overflow retry-metadata's `:resume-at`
+            ;; `(+ now-ms delay-ms)`. A PARSEABLE near-Long/MAX integer
+            ;; (16 digits, seconds >= 9223372036854775) previously slipped
+            ;; through both and crashed the turn with an uncaught
+            ;; ArithmeticException; it now yields nil, flooring to the
+            ;; exponential backoff like the RFC-date branch does for <= 0 /
+            ;; unparsable values, so retry-metadata's
+            ;; `(or retry-after-ms exponential-delay-ms)` falls back.
+            delay-ms (when (and seconds
+                                (< seconds (quot Long/MAX_VALUE 1000))
+                                (<= (* 1000 seconds)
+                                    (-' Long/MAX_VALUE (long now-ms))))
+                       (* 1000 seconds))]
+        (when (and delay-ms (pos? delay-ms))
+          delay-ms))
 
       :else
       (try
@@ -552,22 +586,27 @@
 (defn rate-limit-reset->timing
   [header-value now-ms]
   (when-let [n (some-> header-value str str/trim parse-long-safe)]
-    (cond
-      (>= n 1000000000000)
-      {:reset-at n}
+    (when (pos? n)
+      (cond
+        (>= n 1000000000000)
+        {:reset-at n}
 
-      (>= n 1000000000)
-      {:reset-at (* 1000 n)}
+        (>= n 1000000000)
+        {:reset-at (* 1000 n)}
 
-      :else
-      (let [reset-after-ms (* 1000 n)]
-        {:reset-after-ms reset-after-ms
-         :reset-at (+ (long now-ms) reset-after-ms)}))))
+        :else
+        (let [reset-after-ms (* 1000 n)]
+          {:reset-after-ms reset-after-ms
+           :reset-at (saturating-epoch-add (long now-ms) reset-after-ms)})))))
 
 (defn retry-metadata
   [headers attempt exponential-delay-ms now-ms]
   (let [retry-after-ms (retry-after-delay-ms (header-value headers "retry-after" "x-retry-after") now-ms)
-        delay-ms       (or retry-after-ms exponential-delay-ms)
+        ;; Runtime config validation rejects non-positive base/max delays only
+        ;; when an enabled retryable failure reaches retry scheduling. Keep
+        ;; metadata shaping faithful to its inputs; callers outside the turn
+        ;; runtime can still observe an invalid zero.
+        delay-ms       (long (or retry-after-ms exponential-delay-ms))
         rate-limit     (merge
                         (when-some [limit (some-> (header-value headers "ratelimit-limit" "x-ratelimit-limit") str str/trim parse-long-safe)]
                           {:limit limit})
@@ -578,5 +617,5 @@
      :attempt (int attempt)
      :delay-ms delay-ms
      :delay-source (if retry-after-ms :retry-after :exponential-backoff)
-     :resume-at (+ (long now-ms) delay-ms)
+     :resume-at (saturating-epoch-add (long now-ms) delay-ms)
      :rate-limit (when (seq rate-limit) rate-limit)}))

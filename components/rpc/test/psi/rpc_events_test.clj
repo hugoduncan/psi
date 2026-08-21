@@ -186,7 +186,7 @@
          (case event
            "session/updated" {:phase :idle :is-streaming false
                               :is-compacting false :pending-message-count 0
-                              :retry-attempt 0 :retry nil :interrupt-pending false}
+                              :retry-attempt 0 :retry nil :retry-deadline-ms nil :interrupt-pending false}
            "tool/start" {:tool-id "t1" :tool-name "read" :call-summary "read"}
            "session/resumed" {:session-file "f" :message-count 0}
            "session/rehydrated" {:messages [] :tool-calls {} :tool-order []}
@@ -390,6 +390,7 @@
           _         (ss/apply-root-state-update-in! ctx
                                                     (ss/session-update sid #(assoc %
                                                                                    :retry-attempt 2
+                                                                                   :retry-deadline-ms (+ now-ms 600000)
                                                                                    :retry {:active? true
                                                                                            :attempt 2
                                                                                            :delay-ms 8000
@@ -402,7 +403,7 @@
                                                                                    :follow-up-messages [{:content "b"}])))
           payload   (rpc.events/session-updated-payload ctx sid)
           status    (:status-session-line payload)]
-      (is (= #{:session-id :session-file :session-name :session-display-name :phase :is-streaming :is-compacting :pending-message-count :retry-attempt :retry :interrupt-pending :model-provider :model-id :model-reasoning :thinking-level :effective-reasoning-effort :header-model-label :status-session-line :extension-command-names :prompt-templates}
+      (is (= #{:session-id :session-file :session-name :session-display-name :phase :is-streaming :is-compacting :pending-message-count :retry-attempt :retry :retry-deadline-ms :interrupt-pending :model-provider :model-id :model-reasoning :thinking-level :effective-reasoning-effort :header-model-label :status-session-line :extension-command-names :prompt-templates}
              (set (keys payload))))
       (is (= {:active? true
               :attempt 2
@@ -413,6 +414,7 @@
                            :limit 5000
                            :reset-at (+ now-ms 32000)}}
              (:retry payload)))
+      (is (= (+ now-ms 600000) (:retry-deadline-ms payload)))
       (is (= 2 (:pending-message-count payload)))
       (is (= 2 (:retry-attempt payload)))
       (is (re-find (re-pattern (str "^session: " sid " phase:retrying streaming:no compacting:no pending:2 retry:2"))

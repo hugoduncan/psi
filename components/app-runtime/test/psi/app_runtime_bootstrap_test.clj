@@ -9,6 +9,38 @@
    [psi.session-state.state :as ss]
    [psi.shared-config.project :as project-prefs]))
 
+(deftest create-runtime-session-context-resolves-operator-retry-config-test
+  ;; File-resolved retry policy reaches the runtime, with session overrides last.
+  (let [cwd (test-support/temp-cwd)]
+    (project-prefs/update-agent-session!
+     cwd
+     {:auto-retry-enabled false
+      :auto-retry-max-retries 7
+      :auto-retry-base-delay-ms 3000
+      :auto-retry-max-delay-ms 45000
+      :auto-retry-total-timeout-ms 900000
+      :llm-stream-idle-timeout-ms 80000})
+    (with-redefs-fn (app-test-support/bootstrap-stub-bindings)
+      (fn []
+        (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
+                             app-test-support/test-ai-model
+                             {:cwd cwd
+                              :persist? false
+                              :session-config {:auto-retry-max-retries 2}})
+              session-id (:session-id (session/new-session-in! ctx nil {}))]
+          (is (false? (:auto-retry-enabled (ss/get-session-data-in ctx session-id))))
+          (is (= {:auto-retry-max-retries 2
+                  :auto-retry-base-delay-ms 3000
+                  :auto-retry-max-delay-ms 45000
+                  :auto-retry-total-timeout-ms 900000
+                  :llm-stream-idle-timeout-ms 80000}
+                 (select-keys (:config ctx)
+                              [:auto-retry-max-retries
+                               :auto-retry-base-delay-ms
+                               :auto-retry-max-delay-ms
+                               :auto-retry-total-timeout-ms
+                               :llm-stream-idle-timeout-ms]))))))))
+
 (deftest bootstrap-runtime-session-applies-project-preferences-test
   (let [cwd (test-support/temp-cwd)]
     (project-prefs/update-agent-session!

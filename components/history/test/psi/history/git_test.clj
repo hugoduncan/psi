@@ -11,7 +11,8 @@
    [babashka.fs :as fs]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [psi.history.git :as git])
+   [psi.history.git :as git]
+   [psi.test-support.fs :as test-fs])
   (:import
    (java.io File)))
 
@@ -37,13 +38,6 @@
       (finally
         (fs/delete-tree (:repo-dir @shared-ro-ctx))))))
 
-(defn- delete-recursively!
-  [path]
-  (let [f (File. (str path))]
-    (when (.exists f)
-      (doseq [child (reverse (file-seq f))]
-        (.delete ^java.io.File child)))))
-
 ;;; git/log
 
 (deftest create-context-defaults-to-cwd
@@ -65,7 +59,7 @@
         (testing "seeds the default commit set"
           (is (= 3 (count commits))))
         (finally
-          (delete-recursively! (:repo-dir ctx)))))))
+          (test-fs/delete-recursively! (:repo-dir ctx)))))))
 
 (deftest log-returns-commits
   ;; Tests log for default arity, required fields, and path filtering.
@@ -157,7 +151,7 @@
                 "untracked\n")
           (is (= :modified (git/status ctx)))
           (finally
-            (delete-recursively! (:repo-dir ctx))))))
+            (test-fs/delete-recursively! (:repo-dir ctx))))))
     (testing "reports index changes as staged from the porcelain index slot"
       (let [ctx (git/create-null-context seed-commits)]
         (try
@@ -166,7 +160,7 @@
           (#'psi.history.git/run-git ctx ["add" "staged.txt"])
           (is (= :staged (git/status ctx)))
           (finally
-            (delete-recursively! (:repo-dir ctx))))))
+            (test-fs/delete-recursively! (:repo-dir ctx))))))
     (testing "reports worktree-only tracked-file changes as modified from the worktree slot"
       (let [ctx (git/create-null-context seed-commits)]
         (try
@@ -174,7 +168,7 @@
                 "# psi\nchanged\n")
           (is (= :modified (git/status ctx)))
           (finally
-            (delete-recursively! (:repo-dir ctx))))))))
+            (test-fs/delete-recursively! (:repo-dir ctx))))))))
 
 ;;; git/current-commit
 

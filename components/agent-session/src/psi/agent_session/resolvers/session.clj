@@ -268,12 +268,14 @@
   [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
    ::pco/output [:psi.agent-session/retry-attempt
+                 :psi.agent-session/retry-deadline-ms
                  :psi.agent-session/retry
                  :psi.agent-session/auto-retry-enabled
                  :psi.agent-session/auto-compaction-enabled
                  :psi.agent-session/scoped-models]}
   (let [sd (support/session-data agent-session-ctx session-id)]
     {:psi.agent-session/retry-attempt           (:retry-attempt sd)
+     :psi.agent-session/retry-deadline-ms       (:retry-deadline-ms sd)
      :psi.agent-session/retry                   (:retry sd)
      :psi.agent-session/auto-retry-enabled      (:auto-retry-enabled sd)
      :psi.agent-session/auto-compaction-enabled (:auto-compaction-enabled sd)

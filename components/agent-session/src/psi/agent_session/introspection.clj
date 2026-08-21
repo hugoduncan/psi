@@ -43,6 +43,7 @@
      :thinking-level          (:thinking-level sd)
      :pending-messages        (session/pending-message-count sd)
      :retry-attempt           (:retry-attempt sd)
+     :retry-deadline-ms       (:retry-deadline-ms sd)
      :auto-retry-enabled      (:auto-retry-enabled sd)
      :auto-compaction-enabled (:auto-compaction-enabled sd)
      :context-fraction        (session/context-fraction-used sd)

@@ -283,6 +283,8 @@ Available: " (str/join ", " (map name (keys all))))
                                    :project-models-path (str cwd "/.psi/models.edn")})
         oauth-ctx                (oauth/create-context)
         cfg                      (config-res/resolve-config cwd)
+        runtime-config           (merge (config-res/resolved-session-runtime-config cfg)
+                                        session-config)
         effective-model          (if-let [{:keys [provider id]} (config-res/resolved-model cfg)]
                                    ;; oauth-ctx not yet created here; config-time resolution stays catalog-based
                                    (or (model-registry/resolve-runtime-model nil provider id) ai-model)
@@ -294,6 +296,7 @@ Available: " (str/join ", " (map name (keys all))))
         effective-prompt-mode    (config-res/resolved-prompt-mode cfg)
         resolved-speed-mode      (config-res/resolved-speed-mode cfg)
         resolved-effort-override (config-res/resolved-effort-override cfg)
+        resolved-auto-retry      (config-res/resolved-auto-retry-enabled cfg)
         nucleus-prelude-override (config-res/resolved-nucleus-prelude-override cfg)
         session-defaults         (cond-> {:model {:provider  (name (:provider effective-model))
                                                   :id        (:id effective-model)
@@ -304,11 +307,13 @@ Available: " (str/join ", " (map name (keys all))))
                                           :ui-type                  (or ui-type :console)}
                                    (:present? resolved-speed-mode)
                                    (assoc :speed-mode (:value resolved-speed-mode))
+                                   (:present? resolved-auto-retry)
+                                   (assoc :auto-retry-enabled (:value resolved-auto-retry))
                                    (:present? resolved-effort-override)
                                    (assoc :effort-override (:value resolved-effort-override)))
         ctx                      (session/create-context
                                   {:session-defaults session-defaults
-                                   :config session-config
+                                   :config runtime-config
                                    :event-queue event-queue
                                    :oauth-ctx oauth-ctx
                                    :nrepl-runtime-atom nrepl-runtime

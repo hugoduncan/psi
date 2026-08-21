@@ -6,7 +6,8 @@
    [extensions.work-on-test-support :as support]
    [psi.agent-session.commands :as commands]
    [psi.extension-test-helpers.nullable-api :as nullable]
-   [psi.history.git :as git]))
+   [psi.history.git :as git]
+   [psi.test-support.fs :as test-fs]))
 
 (defn run-git!
   [repo-dir & args]
@@ -24,18 +25,6 @@
     (when (pos? exit)
       (throw (ex-info "git helper failed" {:args args :err err :exit exit})))
     out))
-
-(defn delete-recursively!
-  "Recursively delete `path` (file or directory tree). No-op if it does not
-  exist. Local to this namespace: `psi.agent-session.test-support`'s
-  equivalent helper lives on agent-session's `test` classpath, which is not
-  on this namespace's classpath (only agent-session's `src` path is a
-  declared dep here)."
-  [path]
-  (let [f (java.io.File. (str path))]
-    (when (.exists f)
-      (doseq [child (reverse (file-seq f))]
-        (.delete ^java.io.File child)))))
 
 (deftest mechanical-slug-test
   (testing "slug is mechanical and limited to four significant words"
@@ -587,7 +576,7 @@
                        (-> e ex-data :err str/trim))))
                 "new branch should not auto-track the base ref when created from origin/master")))
         (finally
-          (delete-recursively! base-dir)))
+          (test-fs/delete-recursively! base-dir)))
       (testing "cleanup wiring: base-dir is removed once the try/finally above completes"
         ;; Guards the try/finally cleanup wiring itself, not the work-on
         ;; behaviour above: a regression that dropped this try/finally's

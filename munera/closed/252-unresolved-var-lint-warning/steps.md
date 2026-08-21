@@ -1,0 +1,2790 @@
+# Implementation steps — 252-unresolved-var-lint-warning
+
+Concrete checklist for the implementation slice. Read design.md + plan.md first.
+Treat this file as the active surface; tick items as they complete, noting shas/decisions.
+
+## Slice 0 — Baseline & facility ground truth
+
+- [x] Reproduce the baseline: `bb lint` from repo root → expect exactly
+      `extensions/dev-http/test/extensions/dev_http_test.clj:572:5` (`http-client/get`)
+      and `:737:5` (`http-client/post`), `errors: 0, warnings: 2`
+- [x] Record pre-change root config state: `.clj-kondo/config.edn`
+      `:linters :unresolved-symbol :exclude` is exactly `[(malli.core/=>)]`
+- [x] Re-confirm facility in scratch (temp project, http-kit 2.8.0 + clj-kondo
+      2025.09.19 + imports-dir config `{:lint-as {org.httpkit.client/defreq clojure.core/def}}`):
+      jar analysis + cache-driven lint resolves `get`/`post`; a bogus
+      `http-client/definitely-not-a-var` still warns (negative control). If lint-as
+      misbehaves, fall back to the `:macroexpand` hook for `org.httpkit.client/defreq`
+      and record the choice in implementation.md
+
+## Slice 1 — Registration in the http-kit import
+
+- [x] In `.gitignore`, replace `**/.clj-kondo/imports/` with:
+      ```
+      **/.clj-kondo/imports/*
+      !.clj-kondo/imports/http-kit/
+      !.clj-kondo/imports/http-kit/**
+      ```
+- [x] Verify ignore semantics: `git check-ignore -v .clj-kondo/imports/http-kit/http-kit/config.edn`
+      → matches the negation rule (not ignored); `git check-ignore -v .clj-kondo/imports/metosin/malli/config.edn`
+      → still ignored; `git status` shows the http-kit import files as untracked
+- [x] Extend `.clj-kondo/imports/http-kit/http-kit/config.edn` with
+      `:lint-as {org.httpkit.client/defreq clojure.core/def}`, keeping the existing
+      `:hooks {:analyze-call {org.httpkit.server/with-channel …}}` entry
+- [x] Confirm `httpkit/with_channel.clj` is present under
+      `.clj-kondo/imports/http-kit/http-kit/` (the config.edn hook reference requires it)
+
+## Slice 2 — Cache rebuild
+
+- [x] Regenerate the http-kit ns analysis cache with the registration (from repo root).
+      The rebuild is **not idempotently re-runnable**: clj-kondo's jar skip marker
+      (`.clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*`, written after any 2.8.0 jar
+      analysis) makes a re-run print "http-kit-2.8.0.jar was already linted, skipping"
+      and silently keep the existing ns cache — so clear the skip marker AND the ns
+      transit file first:
+      `rm -f .clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.* .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`
+      then
+      `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar --dependencies`
+      (findings suppressed by `--dependencies`; cache is written)
+- [x] Confirm the cache now registers the verbs: assert the transit file exists
+      (`test -f .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json` — grep on the
+      absent file fails loudly, the effective guard), then
+      `grep -o '~\$\(get\|post\|request\)' .clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`
+      → contains `~$get` and `~$post`
+
+## Slice 3 — AC1 verification
+
+- [x] `bb lint` → zero Unresolved var warnings for the dev-http test file (covers both
+      line 572 `http-client/get` and line 737 `http-client/post`), `errors: 0`,
+      `warnings: 0`, and no new warnings anywhere in the repo
+- [x] Negative control (proves analysis-level resolution, not suppression): temporarily
+      add `(defn- bogus [] @(http-client/definitely-not-a-var))` to the test ns →
+      `bb lint` flags it as unresolved; remove the probe → `bb lint` clean again.
+      **Precondition (executes the plan-review note, explicit 2026-08-15):** must run
+      AFTER a successful slice-2 rebuild — with no/absent http-kit ns cache the jar is
+      never analyzed, the probe is silently unflagged (`errors: 0, warnings: 0`
+      trivially), and the control proves nothing
+- [x] Cross-check with the dev-loop command: `clojure -M:lint` reports the same clean
+      result as `bb lint`
+
+## Slice 4 — AC2, hygiene, commit
+
+- [x] AC2 localization: `git diff .clj-kondo/config.edn` → no changes; root
+      `:unresolved-symbol :exclude` remains exactly `[(malli.core/=>)]`
+- [x] `git status` shows only intended files: `.gitignore`,
+      `.clj-kondo/imports/http-kit/http-kit/config.edn`,
+      `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`
+      (nothing else, no root-config edits, no CHANGELOG entry — not user-facing per
+      AGENTS.md)
+- [x] Commit with symbol prefix, e.g. `⚒ 252: register http-kit defreq vars for clj-kondo (lint-as)`
+
+## Slice 5 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Close design-step 8's provenance-grep requirement with the cache-format
+      finding: a clj-kondo 2025.09.19 `--dependencies`-built cache (rebuilt
+      in-repo and fresh `--cache-dir` scratch, both verified) records only the
+      internal path `org/httpkit/client.clj` — no jar path/version — so the
+      mandated `grep ~:filename` for the 2.8.0 jar cannot succeed and was never
+      added to slice 2. Record the adopted guard in design.md/design-steps.md
+      (explicit pinned-jar rebuild command + slice-2 verb-set grep as functional
+      proxy) and amend design-steps.md item 8, which is ticked [x] although its
+      required steps.md amendment is absent
+      — done: adopted guard recorded in design.md Context (provenance bullet)
+      and design-steps.md item 8 closure note; guard = pinned-jar rebuild
+      command + verb-set grep (`~$get`/`~$post` present since 2026-08-15 rebuild;
+      absent pre-fix)
+- [x] Restore byte-fidelity of the tracked import dir: re-copy
+      `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj` verbatim
+      from the 2.8.0 jar's `clj-kondo.exports` (committed copy differs in
+      indentation only), so plan.md decision 2's "identical, verified" holds and
+      R5's "--copy-configs at pinned 2.8.0 yields no diff" is true; or record the
+      drift as intentional in implementation.md
+      — done (drift recorded as **intentional**, the item's explicit "or"
+      branch): re-copied verbatim from
+      `clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj` in the
+      2.8.0 jar → byte-identical at copy time (`cmp` verified); the
+      `cljfmt-fix` pre-commit hook then reformatted it back to repo style
+      (2-space continuation vs the jar's 3-space — indentation only), so the
+      committed copy cannot be byte-identical through the repo's own commit
+      path (same as the original slice-4 commit). Drift recorded as intentional
+      in implementation.md; plan.md decision 2's "identical, verified" holds
+      for the local pre-commit copy; R5's pinned-2.8.0 `--copy-configs`
+      stability holds (same jar → same export → same indentation-only diff)
+- [x] Extend AC1's exercise-capability inventory (design-step 9) with the
+      pre-commit surface: `.pre-commit-hooks/clj-kondo-lint.sh` lints individual
+      staged files with the native (unpinned) clj-kondo binary, `--cache false`,
+      no `--dependencies` → the http-kit jar is never analyzed there (verified:
+      dev-http test file clean with and without the lint-as config), so
+      pre-commit can neither exercise the fix nor regress it; add it to design.md
+      AC1/Context alongside the CI note
+      — done: added to design.md AC1 (exercise-capability inventory) alongside
+      the CI note; verified locally: pre-commit hook on the dev-http test file →
+      `errors: 0, warnings: 0` with and without the `:lint-as` config
+
+## Slice 6 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Harden the slice-2 provenance rebuild against clj-kondo's jar skip marker:
+      `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar
+      --dependencies` prints "http-kit-2.8.0.jar was already linted, skipping" and
+      does NOT re-analyze when `.clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*`
+      exists — verified 2026-08-15: after a no-lint-as run rewrote the ns cache
+      without verbs, re-running the documented rebuild with the correct config
+      skipped and the wrong cache persisted (`bb lint` still showed the two
+      warnings); the cache only recovered after clearing the skip marker + ns
+      transit file and rebuilding. The design.md "provenance anchor" claim
+      overstates the command's re-runnability. Fix: `rm -f
+      .clj-kondo/.cache/v1/skip/http-kit-2.8.0.jar.*` (and the ns transit file)
+      before the rebuild; assert `.clj-kondo/.cache/v1/clj/org.httpkit.client.transit.json`
+      exists before the verb-set grep (grep on the absent file fails loudly —
+      the effective guard); record in design.md Context that the rebuild command
+      is not idempotently re-runnable without clearing the skip marker
+      — done: slice-2 hardened above (rm skip+transit → rebuild → assert transit
+      exists → verb-set grep), design.md Context records non-idempotency, hardened
+      recipe validated end-to-end 2026-08-15: rm → rebuild → transit regenerated
+      with `~$get`/`~$post`/`~$request` → `bb lint` `errors: 0, warnings: 0`
+- [x] Make slice-3's negative-control precondition explicit (executes the
+      plan-review note recorded in implementation.md, still unexecuted in
+      steps.md): the bogus-var probe must run AFTER a successful slice-2 rebuild
+      — with no/absent cache the http-kit ns is never analyzed and the probe is
+      silently unflagged, proving nothing (verified 2026-08-15: deleting the ns
+      cache → `bb lint` trivially `errors: 0, warnings: 0`)
+      — done: slice-3 negative-control step now states the AFTER-slice-2-rebuild
+      precondition explicitly
+
+## Slice 7 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Add a committed, CI-runnable regression test guarding the registration —
+      the task currently has no committed tests: AC1's lint proof, the negative
+      control, and the AC2 root-config check are all manual/local/cache-dependent,
+      so a removed or typo'd `:lint-as` entry and an AC2 root-config drift are
+      undetectable by `bb test`/CI (the exact regressions design-step 9 option (b)
+      accepted as undetectable for the lint surface). Read the two config.edn
+      files as EDN (no jar analysis, no cache — runs anywhere) and assert:
+      - `.clj-kondo/imports/http-kit/http-kit/config.edn` retains
+        `:lint-as {org.httpkit.client/defreq clojure.core/def}`
+      - root `.clj-kondo/config.edn` `:linters :unresolved-symbol :exclude`
+        remains exactly `[(malli.core/=>)]` (AC2 invariant, currently only a
+        manual `git diff` gate in slice 4)
+      Placement is a decision (no component owns lint config): an existing
+      tests.edn component test dir or a `spec/`-adjacent test; keep the assertion
+      code out of the import dir itself (AC2 confinement)
+      — done (placement decision: `components/shared-config` — no component owns
+      lint config; shared-config is the closest semantic home and its test dir is
+      already in the `:unit` suite, so no tests.edn change; assertion code lives
+      in `components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+      outside the import dir — AC2 confinement holds): `http-kit-import-registration-test`
+      + `root-config-ac2-invariant-test` read both config.edn files as EDN and
+      assert the lint-as registration and the exact `[(malli.core/=>)]` exclude;
+      verified `bb test --focus psi.shared-config.lint-config-test` → 2 tests /
+      3 assertions pass; `bb lint` still errors: 0, warnings: 0
+- [x] Decide and record whether to commit the analysis-level proof (negative
+      control) as a test: a test that runs
+      `clojure -M:lint --lint ~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar
+      --dependencies --cache-dir <tmp>` then lints a probe ns (get/post resolve,
+      bogus var still warns) makes the slice-3 negative control CI-runnable and
+      enforces "analysis-level, not suppression" — realizing design-step 9's
+      option (a) via a test rather than a CI workflow change (the (a)/(b) decision
+      framed the gap only as lint-surface exercise and never considered a test
+      vehicle). Depends on the 2.8.0 jar at the standard m2 path (present in CI
+      per design-step 9's m2-cache fact; skip when absent) and seconds of jar
+      analysis — mark `^:integration` or accept the runtime if filed. Accept or
+      decline explicitly; do not leave the proof as an uncommitted manual probe
+      only
+      — done (decision: ACCEPT, as `^:integration`): committed
+      `http-kit-defreq-analysis-level-resolution-test` — runs the pinned JVM
+      clj-kondo 2025.09.19 via `clojure -Sdeps` (same analyzer as the lint gate)
+      twice: jar `--dependencies --cache-dir <tmp>` populates a hermetic temp
+      cache, then a probe ns lint against that cache resolves get/post and flags
+      `definitely-not-a-var`; skips (passing) when the 2.8.0 jar is absent from
+      m2; `^:integration` meta keeps it out of `bb test` (unit/extensions
+      `:skip-meta [:integration]`) and runs in `bb clojure:test:integration` (CI
+      runs both); verified integration run → test passes (hermetic, never touches
+      repo `.clj-kondo/.cache`)
+
+## Slice 8 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Strengthen `http-kit-import-registration-test`'s hook assertion: the
+      server-side with-channel preservation check is only
+      `(is (contains? (:hooks cfg) :analyze-call))` — a removed or changed
+      `:analyze-call` mapping passes. The design's mechanism explicitly requires
+      the existing server-side hook to be kept alongside the lint-as entry.
+      Assert exact match:
+      `(= {:analyze-call {org.httpkit.server/with-channel httpkit.with-channel/with-channel}} (:hooks cfg))`
+      (current config.edn matches this shape exactly)
+      — done: hook assertion is now an exact match on `(:hooks cfg)`
+      (quoted map literal — unquoted would ClassNotFound on the class-resolving
+      compiler), verified by the unit suite (6 assertions pass)
+- [x] Extend the AC2 guard to root `:lint-as`: `root-config-ac2-invariant-test`
+      asserts only `:unresolved-symbol :exclude` stays exactly
+      `[(malli.core/=>)]` — plan.md decision 1's no-root-mirror choice (unlike
+      the malli/promesa convention the root config's own comment documents)
+      would be silently violated if `org.httpkit.client/defreq` were added to
+      root `:lint-as`; that drift is undetectable today. Assert
+      `org.httpkit.client/defreq` ∉ (keys (:lint-as root-config))
+      — done: `root-config-ac2-invariant-test` now asserts
+      `(not (contains? (:lint-as cfg) 'org.httpkit.client/defreq))` alongside
+      the exclude invariant
+- [x] Harden the `clj-kondo-main` subprocess (skill infra-dep criterion —
+      injectable/nullable, no hang): (a) the `clojure` CLI binary is neither
+      injectable nor nullable — a missing binary errors the `^:integration`
+      test, unlike the jar-absent path which skips; skip (passing) when
+      `clojure` is not on PATH (e.g. `shell/sh "which" "clojure"`), mirroring
+      the jar check; (b) `clojure.java.shell/sh` has NO `:timeout` support
+      (verified in the 1.12 source — unknown opts silently ignored), so a hung
+      subprocess (e.g. cold `-Sdeps` dep download stall) blocks the suite
+      indefinitely — switch to a timeout-capable runner (e.g.
+      `clojure.java.process` or `Process/waitFor` with a timeout) or record the
+      accepted hang risk explicitly
+      — done (both): (a) `clojure-bin` (via `shell/sh "which" "clojure"`) is
+      checked first in the skip guard — `clojure` absent on PATH skips passing,
+      mirroring the jar-absent skip; (b) `clj-kondo-main` now uses
+      ProcessBuilder + `waitFor(120s)` with concurrent stream draining
+      (non-daemon future threads terminated via destroyForcibly + stream drain
+      in a finally); a hung subprocess kills the process and throws loudly
+      instead of blocking the suite
+- [x] Guard clj-kondo version-pin drift: `clj-kondo-deps` hardcodes
+      "2025.09.19" while deps.edn `:lint` `:extra-deps` pins it; on a clj-kondo
+      bump the integration test silently keeps proving the OLD analyzer (R4's
+      manual re-verification gives no failure signal). Assert the test's pinned
+      version equals deps.edn's `:lint :extra-deps` clj-kondo version (or
+      derive it), so the drift fails loudly instead of re-proving a stale pin
+      — done (derived): `clj-kondo-version` is read from deps.edn
+      `[:aliases :lint :extra-deps 'clj-kondo/clj-kondo :mvn/version]` (the
+      aliases live under `:aliases` at the top level) and `clj-kondo-deps` is
+      formatted from it — no separate hardcoded version; `clj-kondo-pin-sourced-from-deps-edn-test`
+      asserts the pin exists, so a removed/bumped entry fails loudly in `:unit`
+
+## Slice 9 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Derive the http-kit jar path from deps.edn (mirror of the slice-8 clj-kondo
+      pin derivation, same silent-stale-pin failure mode left open for http-kit):
+      `http-kit-jar` hardcodes the 2.8.0 path
+      (`~/.m2/repository/http-kit/http-kit/2.8.0/http-kit-2.8.0.jar`), so R4's
+      http-kit bump re-verification gets no failure signal — on a bump the 2.8.0
+      jar either stays in m2 (the proof silently re-proves the OLD jar) or is
+      absent (the proof silently skips). Read
+      `[:deps 'http-kit/http-kit :mvn/version]` from root deps.edn (the pin
+      source; currently 2.8.0) and format `http-kit-jar` from it; add a unit
+      assertion (like `clj-kondo-pin-sourced-from-deps-edn-test`) that the pin
+      exists, so a removed/bumped entry fails loudly in `:unit`
+      — done: `http-kit-version` derived from deps.edn `[:deps
+      'http-kit/http-kit :mvn/version]`, `http-kit-jar` formatted from it
+      (verified: nested-CWD load resolves version 2.8.0 and the standard m2
+      path); `http-kit-pin-sourced-from-deps-edn-test` added — 4 unit tests /
+      9 assertions pass
+- [x] Widen the AC2 root-config guard to AC2's general clause ("root
+      `.clj-kondo/config.edn` gains no http-client entries"): today
+      `root-config-ac2-invariant-test` asserts only `:unresolved-symbol :exclude`
+      exactness and `org.httpkit.client/defreq` ∉ root `:lint-as` — so e.g.
+      `org.httpkit.client/get` added to root `:lint-as`, or a root
+      `:hooks :analyze-call` entry for an http-kit var, passes while violating
+      AC2. Assert no `org.httpkit.client`-prefixed symbol occurs anywhere in the
+      parsed root config (walk the EDN for symbols whose namespace is
+      `org.httpkit.client`, covering `:lint-as`, `:hooks`, `:namespaces`, …), or
+      scope the guard explicitly to AC2's exact wording and record why the
+      narrower guard is the intended invariant
+      — done (wider branch — the EDN walk): `http-client-entries` returns every
+      symbol/keyword in the parsed root config whose namespace is
+      `org.httpkit.client`; `root-config-ac2-invariant-test` asserts it is
+      empty, covering `:lint-as`, `:hooks`, `:namespaces`, and any other
+      symbol/keyword-bearing spot
+- [x] Make the `^:integration` skip visible: `(is (str "skipped: " reason))` is
+      always-truthy — clojure.test prints nothing for a passing truthy `is`, so a
+      skip (jar absent, or clojure not on PATH) is indistinguishable from a real
+      pass and the m2-cache-dependent CI guarantee vanishes with zero signal.
+      Print the reason to *out* (e.g. `(println "SKIP task-252 analysis-level
+      proof:" reason)`) before the truthy assert so runner output records why the
+      proof did not run
+      — done: `(println "SKIP task-252 analysis-level proof:" reason)` precedes
+      the truthy assert; integration run (jar present + clojure on PATH)
+      produces no SKIP line, confirming the proof ran
+- [x] Make `repo-root` injectable/nullable (skill infra-dep criterion): it is
+      `(.getCanonicalPath (io/file "."))` — an ambient CWD dependency, neither
+      injectable nor nullable; a run from a non-root CWD (editor/nrepl runner,
+      component dir) fails with confusing file-not-found on the config reads.
+      Derive repo root by walking up from the test file's own source path (or
+      from `user.dir`) until `deps.edn` is found, or make it overridable via a
+      system property, failing with a clear message when no root is found
+      — done (walk up + property override): `find-repo-root` walks up from
+      user.dir until a dir containing BOTH `deps.edn` and `bb.edn` (components/
+      extensions carry their own deps.edn, so plain deps.edn presence stops at
+      the component — verified failing case; bb.edn lives only at the repo
+      root); overridable via `psi.lint-config-test.repo-root`; clear ex-info
+      when no root found. Verified: nested CWD (`components/shared-config`)
+      resolves the repo root + 2.8.0 jar; property override from /tmp resolves
+      the root
+
+## Slice 10 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Cover AC1's literal acceptance surface (the ACTUAL dev-http test file, lines 572/737) in the `^:integration` proof — today `http-kit-defreq-analysis-level-resolution-test` proves the mechanism on a synthetic probe only; a regression in the real file (a changed alias, a removed require, a call to a var OUTSIDE the registered defreq verb set — NOT an added `http-client/delete` call, which is itself registered and resolves; see the slice-13 correction) is undetectable by any test. Validated recipe (hermetic, CI-runnable, /tmp, 2026-08-15): after the existing jar `--dependencies --cache-dir <tmp>` step, lint `extensions/dev-http/test/extensions/dev_http_test.clj` against the same cache and assert the output contains neither `Unresolved var: http-client/get` nor `Unresolved var: http-client/post` (verified: clean with the registration). A discriminating control is required — an empty cache is trivially clean (design-step 9) and `--config '{:lint-as {}}'` does NOT disable the imports-dir config (auto-merges regardless; verified — verbs still registered), so build a second hermetic cache from the same jar with `--config-dir <empty-tmp-dir>` (clj-kondo 2025.09.19 NPEs `config_dir is null` without it) and assert the real-file lint against THAT cache DOES report the two warnings at 572/737 (`errors: 0, warnings: 2`; the no-reg transit carries `~$request` but not `~$get`/`~$post` — the slice-2 verb-set proxy, which may substitute for the second arm)
+      — done: `http-kit-defreq-analysis-level-resolution-test` extended with both arms — (1) real-file lint against the registration cache: exit 0, no get/post unresolved; (2) no-reg cache via `--config-dir <empty-tmp-dir>` (mkdir'd empty dir; NPE avoided): transit carries `~$request` but not `~$get`/`~$post` (verb-set proxy), real-file lint against it reports both warnings + `errors: 0, warnings: 2` (exact baseline shape). Verified: focused integration run → 1 test / 17 assertions pass; unit suite skips it (`^:integration`)
+
+- [x] Guard the `.gitignore` negation that keeps the http-kit import dir TRACKED (plan.md decision 2 / slice 1 / slice-4 change set) — nothing tests it: `http-kit-import-registration-test` reads config.edn from disk, so if the negation lines are removed (restoring `**/.clj-kondo/imports/`) the file still exists locally, the unit test passes, and the registration silently drops out of future commits. Add a unit assertion (same `lint_config_test.clj` ns; read `.gitignore` as text — no subprocess, runs anywhere) that `.gitignore` contains the negation set `**/.clj-kondo/imports/*`, `!.clj-kondo/imports/http-kit/`, `!.clj-kondo/imports/http-kit/**` (verified present, lines 4-6, 2026-08-15)
+      — done: `gitignore-http-kit-import-tracking-test` added — splits `.gitignore` into lines and asserts each of the three negation lines is present verbatim (no subprocess; runs anywhere); unit suite → 5 tests / 12 assertions pass
+
+## Slice 11 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Guard the with-channel hook implementation file — the committed change set
+      (slice-4 list) and the design mechanism ("keep the existing server-side
+      hook") include `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`,
+      and `http-kit-import-registration-test` asserts config.edn's `:hooks
+      :analyze-call` reference exactly, but NO test asserts the impl file exists
+      or that its ns/var match the config reference. The repo has zero
+      `with-channel` call sites (rg: only lint_config_test.clj and the
+      .clj-kondo config mention the symbol), so neither `bb lint` nor the
+      `^:integration` proof (jar arm never fires analyze-call — no calls
+      analyzed; probe/real-file have no with-channel calls) ever loads the
+      `httpkit.with-channel` namespace — a deleted or renamed hook impl is
+      undetectable by `bb test`/CI. Add a unit assertion (same
+      `lint_config_test.clj` ns) that the file exists and its `(ns
+      httpkit.with-channel)` + `(defn with-channel …)` match the config.edn
+      `:hooks :analyze-call` reference (read as text/EDN — no subprocess, runs
+      anywhere; do not put assertion code in the import dir itself — AC2)
+      — done: `with-channel-hook-impl-guard-test` — asserts the config.edn
+      `:analyze-call` value is exactly `httpkit.with-channel/with-channel`,
+      the impl file exists, and the file's parsed forms contain `(ns
+      httpkit.with-channel …)` and `(defn with-channel …)` (read-string of the
+      impl wrapped in a vector — no subprocess); unit suite → 6 tests / 18
+      assertions pass
+- [x] Guard the `extensions/dev-http/deps.edn` http-kit pin: design.md Context
+      cites "http-kit 2.8.0 (root `deps.edn` + `extensions/dev-http/deps.edn`)"
+      as the R4 re-verification set, but `http-kit-pin-sourced-from-deps-edn-test`
+      derives the version from ROOT deps.edn only — a drift in the extension pin
+      (the classpath the dev-http extension actually runs against, e.g. a bump
+      to 2.9.0 while root stays 2.8.0) yields zero signal from any test. Extend
+      the pin test to read `extensions/dev-http/deps.edn` and assert its
+      `http-kit/http-kit :mvn/version` equals the root-derived `http-kit-version`
+      — done: `http-kit-pin-sourced-from-deps-edn-test` gained a second
+      testing block — reads `extensions/dev-http/deps.edn` `[:deps
+      'http-kit/http-kit]`, asserts the pin exists and equals the
+      root-derived `http-kit-version` (2.8.0)
+- [x] Make the clojure CLI infra dep injectable (slice-8 residue — skill
+      infra-dep criterion `injectable(d) ∧ nullable(d)`): slice-8 made the
+      subprocess NULLABLE (skip when `clojure` absent via the `clojure-bin`
+      `which` guard) but `clj-kondo-main` still hardcodes `"clojure"` in the
+      ProcessBuilder vector, so (a) the binary is not injectable/overridable
+      (unlike repo-root, which gained a property override) and (b) the guard and
+      the executed binary can disagree — `clojure-bin` is resolved at ns-load
+      via `which`, the exec resolves `"clojure"` from PATH at run time, so a
+      PATH mutation between load and run (or a shell function shadowing) makes
+      the guard prove a binary other than the one executed. Use the derived
+      `clojure-bin` in the ProcessBuilder command vector (nil-safe given the
+      skip guard), or mirror the `psi.lint-config-test.repo-root` property
+      override pattern for the binary
+      — done (both branches): `clojure-bin` is now overridable via the
+      `psi.lint-config-test.clojure-bin` system property (injectable, mirror of
+      the repo-root override) and otherwise derived from PATH via `which`
+      (nullable); `clj-kondo-main`'s ProcessBuilder vector uses the SAME
+      resolved `clojure-bin` value that feeds the skip guard, so the guard can
+      never prove a binary other than the one executed; a defensive nil guard
+      throws a clear ex-info instead of a ProcessBuilder NPE (verified via
+      alter-var-root → clear ex-info; `ns-unmap`+`intern` creates a NEW var so
+      the compiled fn still sees the old value — the alter-var-root check is
+      the valid one). Verified: default `which`-derived
+      `/opt/homebrew/bin/clojure`; property override `/nonexistent/clojure`
+      observed at ns-load; override with the real binary → integration suite
+      31 tests / 168 assertions pass (no SKIP line — proof ran)
+
+## Slice 12 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Make the http-kit jar path injectable (skill infra-dep criterion — `injectable(d) ∧ nullable(d)`): `http-kit-jar` is derived from `user.home` + `http-kit-version` with no override, unlike `repo-root` (`psi.lint-config-test.repo-root`) and `clojure-bin` (`psi.lint-config-test.clojure-bin`), which both gained property overrides — a non-standard m2 repo (e.g. `-Dmaven.repo.local`, a CI with a different home layout) makes the `^:integration` proof silently skip (jar "absent" at the derived path) with no way to point the test at the real jar. Add a `psi.lint-config-test.http-kit-jar` property override (or derive from an m2-repo property), mirroring the clojure-bin pattern; keep the skip guard (nullable) unchanged.
+      — done: `http-kit-jar` is now `(or (not-empty (System/getProperty "psi.lint-config-test.http-kit-jar")) (str user.home "/.m2/repository/http-kit/http-kit/" http-kit-version "/http-kit-" http-kit-version ".jar"))` — property override (injectable, mirror of the repo-root/clojure-bin props) + derived default (nullable, skip guard unchanged). Verified: override to a nonexistent path → proof skips (1 assertion, skip reason = overridden path); override to the real 2.8.0 jar → full 17-assertion proof runs, no SKIP; default derivation unchanged (integration suite 31 tests / 168 assertions, no SKIP)
+- [x] Assert the .gitignore negation ORDER, not just presence: `gitignore-http-kit-import-tracking-test` verifies the three lines exist verbatim, but gitignore is last-match-wins — if the ignore-all `**/.clj-kondo/imports/*` were moved BELOW the negation lines, git would re-ignore the http-kit import dir (the registration silently drops out of future commits) while all three lines still exist and the test passes. Assert the ignore-all pattern's line index precedes both negation lines (line reads only — no subprocess, runs anywhere).
+      — done: `gitignore-http-kit-import-tracking-test` now also asserts, per negation line, that the ignore-all line index (line 4) precedes it (lines 5-6) — `(is (< ignore-idx neg-idx))` for both `!.clj-kondo/imports/http-kit/` and `!.clj-kondo/imports/http-kit/**`, with clear line-number messages; presence doseq retained. Unit suite → 6 tests / 23 assertions pass (was 18)
+- [x] Clean up the integration test's temp dir: `http-kit-defreq-analysis-level-resolution-test` creates `tmp` (createTempFile → delete → mkdirs) holding `cache-dir`, `no-reg-dir`, `empty-config`, and `probe.clj`, but never removes it — every local and CI integration run leaks a cache directory under /tmp. Delete the tree in a `finally` (recursive delete — `.deleteOnExit` only removes empty dirs), or at minimum delete the probe file and record the accepted leak.
+      — done (recursive delete): added `delete-recursively!` (`.exists`/`.isDirectory`/`.listFiles` walk + `.delete`) and wrapped the proof body in `try … (finally (delete-recursively! tmp))` — the hermetic cache tree (`cache-dir`, `no-reg-dir`, `empty-config`, `probe.clj`) is removed after every run, passing or failing. Verified: integration run creates no `/tmp/ck252*` dir (9 pre-existing leaked dirs from prior runs untouched — they predate the fix)
+
+## Slice 13 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Guard AC1's acceptance-surface wiring: no test asserts the `:lint` alias still lints `extensions` — `http-kit-defreq-analysis-level-resolution-test` invokes `clj-kondo.main` directly with explicit `--lint` args (bypassing deps.edn `[:aliases :lint :main-opts]`), and `bb.edn` `lint` is a trivial `clojure -M:lint` wrapper, so a narrowing change that drops `extensions` (or renames the dev-http path) from the alias's path set silently removes the two warnings from the acceptance surface while every test still passes. Add a unit test (same `lint_config_test.clj` ns; read deps.edn as EDN — runs anywhere, no subprocess) asserting `[:aliases :lint :main-opts]` contains `"extensions"` (and `"bb.edn"`), mirroring the pin-derivation tests
+      — done: `lint-alias-lints-extensions-test` added — reads deps.edn `[:aliases :lint :main-opts]` as EDN (no subprocess, runs anywhere), asserts it contains both `"extensions"` (the dev-http test file lives under it) and `"bb.edn"`, mirroring the pin-derivation tests; a narrowing change that drops `extensions` from the alias's path set now fails loudly in `:unit`. Unit suite → 7 tests / 26 assertions pass
+- [x] Add a `git check-ignore` ground-truth guard for the tracking negation: `gitignore-http-kit-import-tracking-test` proves the three lines exist verbatim in the right order but never runs git, so git interpreting the patterns differently (a shadowing re-ignore elsewhere, a pattern-semantics drift, a typo git reads differently than the text test) passes while the import dir silently drops out of commits. Git is available in CI; add a `^:integration` assertion (or extend the existing proof) running `git check-ignore` on `.clj-kondo/imports/http-kit/http-kit/config.edn` (must NOT be ignored — exit 1) and the sibling `.clj-kondo/imports/metosin/malli/config.edn` (must be ignored — exit 0), matching slice-1's manual verification (verified locally 2026-08-15: http-kit exit 1 / not ignored; malli exit 0, matched by `.gitignore:4`)
+      — done: `^:integration` `gitignore-http-kit-tracking-ground-truth-test` added — runs `git check-ignore -v` from the repo root (via `shell/sh` `:dir`; git-absent → visible SKIP, mirroring the clojure-bin nullable pattern): http-kit config.edn exits non-zero (NOT ignored — the negation works), malli sibling exits zero and its `-v` output carries `.gitignore:` (the ignore-all rule still applies); verifies git's own interpretation matches the text test, so a pattern-semantics drift or shadowing re-ignore fails loudly. Verified: integration run → both assertions pass (no SKIP)
+- [x] Correct the overstated real-file-arm claim in `http-kit-defreq-analysis-level-resolution-test`'s docstring ("an added http-client/delete call … fails here") and the identical slice-10 steps.md note: `delete` is part of the defreq-registered full verb set (`:lint-as org.httpkit.client/defreq clojure.core/def` registers get/delete/head/post/put/options/patch/propfind/proppatch/lock/unlock/report/acl/copy/move; verified: local cache transit carries `~$delete` alongside `~$get`/`~$post`/`~$request`), so an added `http-client/delete` call RESOLVES and the arm does NOT fail — the arm actually guards require/alias changes and calls to vars OUTSIDE the registered set (e.g. `definitely-not-a-var`). Restate the claim so future readers don't trust a false safety property
+      — done: the real-file testing string now states the arm guards require/alias changes and calls to vars OUTSIDE the registered defreq set (e.g. `definitely-not-a-var`), and explicitly notes an added `http-client/delete` call does NOT fail here (delete is registered; `~$delete` present in the local cache transit alongside `~$get`/`~$post`/`~$request`); the identical slice-10 steps.md note was corrected in place (same restated claim)
+
+## Slice 14 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Make the git binary infra dep injectable + guard/exec-agreed (skill
+      infra-dep criterion — `injectable(d) ∧ nullable(d)`; mirror of the
+      slice-11 clojure-bin fix): `^:integration
+      gitignore-http-kit-tracking-ground-truth-test` skips when `which git`
+      fails (nullable ✓) but has no `psi.lint-config-test.git-bin` property
+      override (injectable ✗ — clojure-bin/repo-root/http-kit-jar all gained
+      overrides), and the exec re-resolves the literal `"git"` from PATH at run
+      time while the guard resolved `which git` at test time — a PATH mutation
+      or shell-function shadowing between guard and exec makes the guard prove
+      a binary other than the one executed (the exact disagreement slice 11
+      eliminated for clojure-bin). Derive `git-bin` once (property override +
+      `which`), use the SAME value in the skip guard and the `check-ignore`
+      invocation; optionally bound the subprocess (shell/sh has no :timeout,
+      the same gap slice 8 closed for clj-kondo-main)
+      — done: `git-bin` derived once (`psi.lint-config-test.git-bin` property
+      override, mirror of the clojure-bin override; else `which git`); the same
+      resolved `git-bin` feeds the skip guard and the `check-ignore` invocation;
+      the subprocess is bounded via a shared `run-bounded` helper (ProcessBuilder
+      + waitFor(120s) — refactored out of clj-kondo-main, so clj-kondo and git
+      both use the timeout-capable runner; shell/sh has no :timeout). Verified:
+      default `which`-derived git → ground-truth test passes (no SKIP);
+      `psi.lint-config-test.git-bin` override with the real binary → 171
+      assertions, both proofs ran
+- [x] Make the pinned clj-kondo jar infra dep nullable + injectable (skill
+      infra-dep criterion — `injectable(d) ∧ nullable(d)`; mirror of the
+      slice-9/12 http-kit jar pattern): `http-kit-defreq-analysis-level-resolution-test`
+      skips when `clojure` is off PATH or the http-kit jar is absent, but the
+      clj-kondo jar resolved via `-Sdeps` (`clj-kondo-deps`, version derived
+      from deps.edn) is never checked — if `clj-kondo-<version>.jar` is absent
+      from m2 (fresh machine, offline run, non-standard `:mvn/local-repo`),
+      the subprocess attempts a network download and fails loudly (or hangs up
+      to the 120s timeout) instead of a visible SKIP, and no property points
+      the proof at an alternative jar/coordinates. Derive the jar path from
+      `clj-kondo-version` + user.home (mirror of `http-kit-jar`), add a
+      `psi.lint-config-test.clj-kondo-jar` property override, and add an
+      existence check to the skip guard (visible SKIP, mirroring the http-kit
+      jar arm)
+      — done: `clj-kondo-jar` derived from user.home + `clj-kondo-version`
+      (mirror of `http-kit-jar`), overridable via
+      `psi.lint-config-test.clj-kondo-jar`, and an existence check added to the
+      proof's skip guard (visible SKIP, mirroring the http-kit jar arm).
+      Verified: default derivation resolves
+      `~/.m2/repository/clj-kondo/clj-kondo/2025.09.19/clj-kondo-2025.09.19.jar`
+      (present); override to a nonexistent path → proof skips (integration
+      suite 171 → 155 assertions — the 17-assertion proof collapsed to the
+      1-assertion skip); no override → 171 assertions, no SKIP
+- [x] Guard the bb.edn `lint` task wrapper (AC1's local proof surface): AC1
+      verification is `bb lint` ≡ `clojure -M:lint`, and
+      `lint-alias-lints-extensions-test` guards only deps.edn's `:lint
+      :main-opts` — nothing guards bb.edn's `lint` task (`:task (shell
+      "clojure -M:lint")`, bb.edn:242-244). If the wrapper drifts — e.g. adds
+      `--cache false` (with no cache the two warnings vanish — exactly
+      design-step 9's masking), adds `--config` overrides, or switches to the
+      native clj-kondo binary — the local AC1 gate becomes trivially clean
+      while every test still passes. Add a unit test (same `lint_config_test.clj`
+      ns; read bb.edn as EDN — no subprocess, runs anywhere) asserting the
+      `lint` task's shell command invokes `clojure -M:lint` without
+      `--cache false`/`--config` overrides
+      — done: `bb-edn-lint-task-wrapper-test` added — reads bb.edn as EDN and
+      asserts the `lint` task (keyed by the symbol `lint`, bb.edn task names
+      are symbols) is EXACTLY `(shell "clojure -M:lint")`, so any drift (cache
+      disabling, config override, native-binary switch) fails loudly in `:unit`
+- [x] Guard the tests.edn suite wiring that makes the `^:integration` tests
+      RUN (the entire CI-detectable regression surface for this task): the two
+      proofs (analysis-level + git ground truth) execute only because
+      tests.edn's `:integration` suite lists `components/shared-config/test`
+      with `:focus-meta [:integration]`, and the 7 unit invariants run only
+      because the `:unit` suite lists it too — nothing tests tests.edn, so
+      dropping the path (or changing `:focus-meta`/`:skip-meta`) silently
+      disables every guard with zero signal, the same silent-drift class the
+      task already guards for `.gitignore`/lint-alias/pins. Add a unit test
+      reading tests.edn as EDN asserting `components/shared-config/test` ∈
+      `:unit` `:test-paths` ∧ `:integration` `:test-paths`, and `:integration`
+      `:focus-meta` retains `[:integration]`
+      — done: `tests-edn-suite-wiring-test` added — reads tests.edn as EDN via
+      the `#kaocha/v1` tag reader (extended `read-edn` with opts), asserts
+      `components/shared-config/test` ∈ `:unit` `:test-paths` ∧ `:integration`
+      `:test-paths`, `:integration` `:focus-meta` = `[:integration]`, and
+      `:unit` `:skip-meta` = `[:integration]` (named in the follow-up's
+      rationale — the ^:integration proofs stay out of `bb test`)
+
+## Slice 15 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Make the `^:integration` skip visible through kaocha's output capture:
+      slice-9's "make the skip visible" mechanism is DEFEATED — tests.edn sets
+      `:capture-output? true`, and kaocha 1.91.1392's capture-output plugin
+      (kaocha/plugin/capture_output.cljc: init-capture rebinds System/out+err to
+      a per-test buffer; kaocha/report.clj shows the buffer only in the FAILURE
+      report) swallows the `(println "SKIP task-252 …")` lines on the passing
+      (skipped) test. Verified 2026-08-15: forced-skip run
+      (`-J-Dpsi.lint-config-test.http-kit-jar=/nonexistent/http-kit.jar` +
+      `--focus integration --focus psi.shared-config.lint-config-test`) →
+      proof collapsed 171→155 assertions with ZERO signal — grep for "SKIP"
+      finds nothing, so a jar/clojure/git-absent skip is indistinguishable from
+      a real pass in runner output (the exact gap slice 9 set out to close; the
+      scry/bb.kaocha-runner path prints kaocha's process stdout, but the
+      println never reaches it under capture). Fix: set `:capture-output? false`
+      at tests.edn TOP level — kaocha 1.91.1392 honors it top-level only
+      (kaocha/config.clj normalize destructures `capture-output?` from the
+      root config; per-suite `:capture-output?` is dropped, verified in the jar
+      source), or pass `--no-capture-output` in the bb.edn suite tasks. Verify:
+      (a) forced-skip integration run now prints
+      `SKIP task-252 analysis-level proof: …` and `SKIP task-252 git
+      check-ignore ground truth: …` (verified with the `--no-capture-output`
+      CLI flag: the SKIP line appears mid-dots); (b) `bb test` (unit) and
+      `bb clojure:test:integration` still pass and their output volume is
+      acceptable with capture off; (c) scry's structured runner still records
+      results. Then guard the invariant: extend `tests-edn-suite-wiring-test`
+      (or add a unit test) asserting the chosen capture setting
+      (`:capture-output? false` at top level, or the task-level flag), so the
+      visible-skip invariant itself is guarded like the other tests.edn wiring
+      — done (tests.edn top-level `:capture-output? false` chosen — single
+      source of truth, honored by every kaocha invocation incl. scry's
+      in-process runner via config/load-config; comment added in tests.edn).
+      TWO additional discoveries required for (a) to actually hold on the
+      primary runner path: (1) scry's in-process kaocha adapter binds *out*/*
+      err* to a discarding writer around api/run (scry/kaocha.clj), so a plain
+      `(println …)` NEVER reaches runner output even with capture off — the
+      two skip sites now write the reason to System/out directly via a shared
+      `report-skip!` helper (untouched while capture is off; reaches the
+      runner's captured process stdout on both the scry and fallback paths);
+      (2) the git ground-truth skip guard gained a nonexistent-binary arm
+      (mirror of the http-kit/clj-kondo jar arms) so a stale override/which
+      result is a visible SKIP, not a loud subprocess error. Verified: (a)
+      forced-skip scry-path run prints `SKIP task-252 analysis-level proof:
+      /nonexistent/http-kit.jar not present` (JAVA_OPTS property override —
+      `-J-D` after `-m` lands in kaocha argv, not the JVM) and `SKIP task-252
+      git check-ignore ground truth: /nonexistent/git not present`; (b) full
+      `bb clojure:test:integration` 32 tests / 171 assertions exit 0 (no SKIP
+      — both proofs ran), unit suite 2693 passed / 1 failed — pre-existing
+      environmental `workflow-delegate-review-step-live-test` (unknown model
+      deepseek/deepseek-v4-flash; fails identically with capture on), output
+      volume acceptable (unit 56 lines, integration 2 lines, extensions 5
+      lines); (c) scry still records .scry-results EDN on failure (verified
+      via the unit failure). Guard: `tests-edn-suite-wiring-test` now asserts
+      top-level `:capture-output?` is false (root config only — suites carry
+      no capture setting). `bb lint` errors: 0 warnings: 0; `bb fmt:check`
+      clean; unit suite 9 tests / 39 assertions pass
+- [x] Guard the deps.edn `:lint` alias `:main-opts` against cache-disabling /
+      config-override flags: `lint-alias-lints-extensions-test` (slice 13)
+      asserts only path presence ("extensions", "bb.edn") — adding `--cache
+      false` (the exact design-step-9 masking class: with no cache the two
+      warnings vanish), `--config`/`--config-dir` overrides, or
+      `--dependencies` to the alias's `:main-opts` silently makes AC1
+      trivially clean while every test passes. `bb-edn-lint-task-wrapper-test`
+      (slice 14) closes this for the bb.edn WRAPPER only (`(shell "clojure
+      -M:lint")` exact), not for the alias itself. Fix: extend
+      `lint-alias-lints-extensions-test` (or add a test, same ns — read
+      deps.edn as EDN, no subprocess, runs anywhere) asserting `:main-opts`
+      contains NONE of `"--cache"`, `"--config"`, `"--config-dir"`,
+      `"--dependencies"` (verified 2026-08-15: current `:main-opts` is
+      `["-m" "clj-kondo.main" "--lint" "bb.edn" "deps.edn" ".lsp/config.edn"
+      ".psi/startup-prompts.edn" "bases" "components" "extensions" "spec"
+      "tests.edn" "extensions/tests.edn"]` — no such flags)
+      — done: `lint-alias-lints-extensions-test` gained a testing block
+      asserting none of the four flags appears in `:main-opts` (doseq over
+      `["--cache" "--config" "--config-dir" "--dependencies"]`; exact element
+      membership — the flags are clj-kondo CLI tokens, never legitimate path
+      values); unit suite 9 tests / 39 assertions pass
+
+## Slice 16 — Task-test-review follow-ups (2026-08-15)
+
+- [x] Close the clj-kondo jar guard/exec disagreement (skill infra-dep
+      criterion — the clj-kondo artifact is only guard-injectable, not
+      exec-injectable): `clj-kondo-main` executes
+      `clojure -Sdeps '{:deps {clj-kondo/clj-kondo {:mvn/version …}}} -M -m
+      clj-kondo.main` — the subprocess resolves the artifact via mvn
+      coordinates from the Clojure CLI's own local repo (default
+      `~/.m2/repository`, or `:mvn/local-repo` from deps.edn/CLJ_CONFIG),
+      while the `^:integration` skip guard checks `clj-kondo-jar`, a path
+      derived from `user.home` (+ the `psi.lint-config-test.clj-kondo-jar`
+      override) that is NEVER passed to the subprocess. So the override
+      cannot redirect execution (a valid jar at a custom path passes the
+      guard but the subprocess still resolves/downloads from the default m2;
+      a jar present only under a different local repo the CLI uses skips
+      needlessly) — unlike `http-kit-jar`, which IS the `--lint` argument
+      and therefore truly exec-effective. Fix: derive `:mvn/local-repo` for
+      the `-Sdeps` map from the guarded `clj-kondo-jar` path (strip the
+      `clj-kondo/clj-kondo/{version}/clj-kondo-{version}.jar` suffix → repo
+      root), so guard and exec agree on the exact artifact; verify the
+      override-to-custom-path case and the default case both resolve the
+      guarded jar (e.g. assert the subprocess `-Spath` output contains the
+      guarded jar path)
+      — done: `clj-kondo-deps` (now a fn) emits `:mvn/local-repo` derived by
+      `clj-kondo-local-repo` from the guarded `clj-kondo-jar` (strip the
+      standard-m2 suffix; `psi.lint-config-test.clj-kondo-local-repo` property
+      escape hatch for layouts the strip can't handle; a non-m2-layout jar
+      path with no override throws a clear ex-info naming the property —
+      verified: `/tmp/ck252-nonm2-layout.jar` → loud ExceptionInfo, no silent
+      wrong-artifact/download). The `^:integration` proof gained a `-Spath`
+      arm asserting the resolved classpath contains the guarded `clj-kondo-jar`
+      (guard/exec agreement on the EXACT artifact). Verified: default case →
+      integration 32 tests / 174 assertions, no SKIP; override to a custom
+      m2-layout path (`/tmp/ck252-localrepo/...jar`) → 174 assertions, no SKIP
+      (the -Spath arm would fail if the subprocess still resolved from default
+      m2); consistent local-repo property + jar override → 174 assertions;
+      non-m2-layout jar → 1 error, the clear ex-info
+- [x] Assert the http-kit import files are TRACKED in the git index, not just
+      not-ignored: `gitignore-http-kit-import-tracking-test` (text lines) and
+      `^:integration gitignore-http-kit-tracking-ground-truth-test`
+      (`git check-ignore` exit 1 = not ignored) prove the negation rules
+      work, but "not ignored" ≠ "tracked" — a `git rm --cached` of
+      `.clj-kondo/imports/http-kit/http-kit/config.edn` (+ the hook impl)
+      keeps every existing guard green (all read from disk; check-ignore
+      still exits 1) while silently dropping the registration from future
+      commits. Add an `^:integration` assertion (same ground-truth test, or
+      extend it) running `git ls-files --error-unmatch
+      .clj-kondo/imports/http-kit/http-kit/config.edn
+      .clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj` from
+      repo root → exit 0 (tracked); git-absent → visible SKIP via
+      `report-skip!`, mirroring the existing skip arms
+      — done: `gitignore-http-kit-tracking-ground-truth-test` gained a third
+      arm — `git ls-files --error-unmatch` on config.edn + with_channel.clj
+      from repo root (run-bounded, git-bin-resolved, existing skip arms
+      unchanged) → exit 0 only when BOTH are in the index, so a
+      `git rm --cached` fails loudly in `:integration` instead of silently
+      dropping the registration from future commits. Verified: both files
+      tracked (exit 0); integration 32 tests / 174 assertions, no SKIP
+
+## Slice 17 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Amend design.md AC1/Context's CI-scope framing (design-step 9 doc drift,
+      found 2026-08-15): AC1 still documents option (b) — "AC1 verification is
+      **local-only**", "the negative-control probe (analysis-level proof) is
+      inherently a temporary local source edit, **never run in CI**", "CI …
+      cannot exercise the registration" — but slices 7-16 committed the
+      analysis-level proof (negative control + real-file AC1 arm) as
+      `^:integration` tests (`http-kit-defreq-analysis-level-resolution-test`,
+      `gitignore-http-kit-tracking-ground-truth-test` in
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`)
+      that CI runs via `bb clojure:test:integration` (ci.yml:166) — design-step
+      9 option (a) realized via a test vehicle (implementation.md slice-7
+      note). Retain the still-true lint-surface nuance (CI `bb lint` itself has
+      no cache → the http-kit jar is never analyzed → trivially clean), but
+      correct the blanket local-only / never-in-CI / cannot-exercise statements
+      and reference the committed integration proof as the CI-enforceable
+      regression surface
+      — done: design.md AC1 rewritten — header drops "local-only"; the
+      cache-dependent lint-surface nuance is retained and scoped to the `bb
+      lint`/pre-commit surfaces only; the "temporary local source edit, never
+      run in CI" and blanket "cannot exercise the registration" claims are
+      corrected with the committed `^:integration` test vehicle
+      (`http-kit-defreq-analysis-level-resolution-test` +
+      `gitignore-http-kit-tracking-ground-truth-test`, run via
+      `bb clojure:test:integration` in CI) named as the CI-enforceable
+      regression surface
+- [x] Reconcile plan.md decision 3 / R3's CI-scope note with the amended
+      design.md: R3 currently says "AC1 is local-only — CI `bb lint` has no
+      cache and never analyzes the jar, so it is trivially clean … (option (b)
+      chosen; committed config + local verification, no CI workflow change)" —
+      the same drift as design.md AC1. Update to record the test-vehicle option
+      (a) (CI runs the analysis-level proof via `bb clojure:test:integration`)
+      while keeping the `bb lint`-surface claim intact
+      — done: plan.md decision 3 + R3 amended — both now scope the
+      local/cache-dependent claim to the `bb lint` surface itself and record
+      the committed `^:integration` test vehicle (option (a) via tests, slices
+      7-16, run via `bb clojure:test:integration`) as the CI-enforceable
+      regression surface; the "option (b) chosen" / "no CI workflow change
+      … local verification" framing is replaced
+
+## Slice 18 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Reconcile design.md Context's "used in exactly one repo file (rg over
+      components/ + extensions/)" claim (Context, "used in exactly one repo
+      file" bullet) with the committed test file: slices 7-16 committed
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+      which references `org.httpkit.client` symbols (`:lint-as` registration
+      assertion, the `http-client-entries` EDN-walk predicate, the probe ns) —
+      within the claim's own stated rg scope there are now TWO files
+      referencing the ns (verified 2026-08-15: rg over components/ +
+      extensions/ matches dev-http test + lint_config_test). The claim's
+      intent (the dev-http test file is the only *usage* of the http-kit
+      client) still holds, but the literal "exactly one repo file" wording is
+      stale doc drift introduced by the test additions, never reconciled.
+      Amend to scope the claim to call sites / runtime usage, noting the
+      committed test file references the symbols as config-assertion data,
+      not usage
+      — done: design.md Context bullet amended — the claim now reads "used at
+      exactly one runtime call site in the repo" (require @16, get/post @572/
+      @737), and explicitly notes the committed regression test references
+      `org.httpkit.client` symbols only as config-assertion data (the `:lint-as`
+      registration assertion, the `http-client-entries` EDN-walk predicate, the
+      probe ns), never as runtime usage
+- [x] Guard the with-channel hook's transformation SEMANTICS, not just its
+      existence/signature: `with-channel-hook-impl-guard-test` (slice 11)
+      asserts the impl file exists and carries `(ns httpkit.with-channel)` +
+      `(defn with-channel …)`, but a semantically-changed transformation body
+      (still a valid ns/defn — e.g. a no-op rewrite returning the node
+      unchanged) passes every guard while silently mis-analyzing with-channel
+      calls; the repo has zero with-channel call sites (slice-11 fact), so
+      nothing exercises the hook and the drift is undetectable. Add a
+      whitespace/indentation-normalized compare of the tracked impl against
+      the pinned 2.8.0 jar's `clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj`
+      — the `^:integration` analysis-level proof already has the jar path +
+      read machinery (strip whitespace/indentation so the documented cljfmt
+      indentation drift, slice 5, stays green; jar-absent → visible SKIP via
+      `report-skip!`, mirroring the existing skip arms). Verified 2026-08-15:
+      the current tracked impl is semantically identical to the jar export
+      modulo whitespace (whitespace-stripped diff clean), so the guard passes
+      today
+      — done: new `^:integration` `with-channel-hook-semantics-guard-test` —
+      reads `clj-kondo.exports/http-kit/http-kit/httpkit/with_channel.clj`
+      from the pinned http-kit jar (ZipFile in-process, entry absent → fails
+      loudly) and compares it against the tracked impl with
+      `normalize-whitespace` (collapse runs to a single space — preserves token
+      boundaries, unlike full whitespace removal, while tolerating the
+      slice-5 cljfmt indentation drift; jar-absent → visible SKIP via
+      `report-skip!`, mirroring the existing skip arms; jar path already
+      injectable/nullable via `psi.lint-config-test.http-kit-jar` / the
+      derived m2 path). Verified: integration suite 33 tests / 177 assertions
+      pass (was 32/174; +1 test +3 assertions); negative check — a simulated
+      no-op rewrite (`{:node node}` early return) produces different
+      normalized content, so semantic drift fails loudly while the documented
+      indentation drift stays green; `bb lint` errors: 0, warnings: 0;
+      `bb fmt:check` clean
+
+## Slice 19 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Reconcile implementation.md's stale AC1 CI-framing with the realized
+      option (a)-via-test-vehicle (slices 7-17): (1) the "Design review context
+      (re-pass — architectural fit)" note still claims "AC1 proof surface is
+      CI-enforced" — self-flagged as superseded ("correct or strike it") in the
+      design-step-9 amendment note and confirmed overstated there, but never
+      corrected/struck: CI's `bb lint` is trivially clean (no cache, no
+      `--dependencies` → the http-kit jar is never analyzed), so the claim
+      misleads about what CI exercises. (2) the "Implementation slice —
+      executed (slices 0-4 complete)" entry still records "AC1 scoped
+      local-only (option b — no CI workflow change; committed config + local
+      verification accepted)" — the opposite of the committed `^:integration`
+      test vehicle (http-kit-defreq-analysis-level-resolution-test +
+      gitignore-http-kit-tracking-ground-truth-test, run via
+      `bb clojure:test:integration` in CI). Slice 17 reconciled design.md and
+      plan.md only; implementation.md's own two records were never touched.
+      — done: both implementation.md records corrected in place — (1) the
+      architectural-fit note's "AC1 proof surface is CI-enforced" claim
+      struck/corrected: CI `bb lint` is trivially clean (no cache, no
+      `--dependencies` → the http-kit jar is never analyzed), so the lint
+      surface itself is NOT CI-enforced; the CI-enforceable regression surface
+      is the committed `^:integration` test vehicle (slices 7-18, three tests);
+      the retained true part (CI clj-kondo binary only `--version`-checked;
+      pinned JVM clj-kondo is the effective lint-gate analyzer) kept; (2) the
+      "Implementation slice — executed" record's "AC1 scoped local-only (option
+      b — no CI workflow change; committed config + local verification
+      accepted)" corrected to the realized option (a)-via-test-vehicle (three
+      named `^:integration` tests, run via `bb clojure:test:integration` in
+      CI), local-only scope retained only for the cache-dependent `bb lint`
+      surface itself; the AC1 bullet header's "(local-only, design-step 9)"
+      reframed to match. Doc-only reconciliation — no code/test changes
+- [x] Amend design.md AC1's "slices 7-16" range / two-test enumeration:
+      "design-step 9 option (a) realized in slices 7-16: [the two named
+      `^:integration` tests] … are `^:integration`" is now a non-exhaustive
+      enumeration — slice 18 added a third `^:integration` test
+      (`with-channel-hook-semantics-guard-test`) to the same
+      `lint_config_test.clj` file, so the range (7-16) and the "are
+      `^:integration`" framing predate the file's current shape. Extend the
+      range or re-scope the enumeration as non-exhaustive (mirrored in
+      plan.md decision 3 / R3's "slices 7-16" references).
+      — done: design.md AC1's enumeration re-scoped — "slices 7-18;
+      non-exhaustive (the file's `^:integration` set may grow with later
+      review slices)" with `with-channel-hook-semantics-guard-test` added to
+      the named list; design.md Context's "slices 7-16" reference and plan.md
+      decision 3 / R3's "slices 7-16" references mirrored (slices 7-18, with
+      the third test named in decision 3). Doc-only reconciliation
+
+## Slice 20 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Narrow the semantics guard's whitespace blind spot: `normalize-whitespace`
+      in `with-channel-hook-semantics-guard-test` collapses runs of whitespace
+      in the RAW TEXT — including whitespace INSIDE string literals — so a
+      semantic change confined to literal spacing (e.g. the error message
+      `"No request or channel provided"` → `"No  request or channel provided"`;
+      verified 2026-08-15: `normalize-whitespace` returns equal strings for the
+      two forms) passes while the guard's stated property is "any semantic
+      change fails loudly". Fix: compare parsed forms structurally (read-string
+      both sides and compare, ignoring top-level whitespace by construction), or
+      strip only indentation/line-structure whitespace (per-line trim preserves
+      intra-literal spacing), or record the accepted gap explicitly in the
+      testing string
+      — done (first branch — parsed-form structural compare): `normalize-whitespace`
+      removed and replaced by `parse-forms` (read-string both sides wrapped in a
+      vector — top-level whitespace/indentation vanishes by construction, so the
+      documented slice-5 cljfmt drift stays green; string-literal contents
+      survive exactly, so a literal-spacing change is a different parsed value).
+      Verified 2026-08-15: parsed-form compare is indentation-insensitive,
+      string-literal-spacing-sensitive (`"No request"` vs `"No  request"` →
+      different), and token-change-sensitive. `normalize-whitespace` deleted
+      (unused after the switch). Integration suite 33 tests / 176 assertions,
+      no SKIP (was 177 — the redundant inner `(is (some? jar-export))` dropped
+      with the nil-guard restructure below); `bb lint` errors: 0, warnings: 0;
+      `bb fmt:check` clean
+- [x] Make `with-channel-hook-semantics-guard-test` fail cleanly when the jar
+      export entry is missing: when `.getEntry` returns nil, `jar-export` is
+      nil — the `(is (some? jar-export))` fails but the subsequent
+      `(normalize-whitespace jar-export)` throws an NPE (verified 2026-08-15:
+      "Cannot invoke Object.toString() because s is null"), so the missing-entry
+      case reports a clojure.test ERROR instead of the clean assertion failure
+      it deserves. Wrap the equality in a `when-let`/nil guard (or assert
+      `some?` and return early) so the missing-entry and mismatch cases both
+      fail as plain assertion failures
+      — done (nil guard): the parsed-form equality is wrapped in
+      `(when (some? jar-export) …)` after the outer `(is (some? jar-export)
+      …)` — a missing entry fails as the single plain assertion failure and
+      skips the equality, never reaching the nil-deref. Verified 2026-08-15
+      with a fabricated jar lacking the export entry (`psi.lint-config-test.http-kit-jar`
+      override → `jar cf` with only a dummy.txt): the focused test reports
+      `FAIL … expected: (some? jar-export), actual: (not (some? nil))` — no
+      ERROR, no NPE (the fake jar also broke the sibling analysis-level proof
+      in the same focused run, expected — the full suite with the real jar is
+      green below)
+- [x] Include out/err in `run-bounded`'s timeout ex-info: the 120s-bound path
+      throws `{:cmd cmd}` only, discarding the partial stdout/stderr drained in
+      the finally — a hung subprocess (cold `-Sdeps` stall, network fetch) that
+      hits the bound surfaces with zero context about where it stalled, and the
+      drained streams are only reachable by re-running with debugging. Capture
+      the drained `@out-f`/`@err-f` (or a bounded prefix) into the ex-info data
+      before throwing so the timeout diagnostic carries the partial output
+      — done: the timeout branch now destroys the process FIRST (killing it
+      closes the pipe streams so the draining futures complete — derefing
+      before the kill would block, the streams stay open while the process
+      lives), then captures the drained `@out-f`/`@err-f` via a 500 ms bounded
+      deref (3-arg `deref`, `::unavailable` fallback, InterruptedException →
+      `<stdout/stderr interrupted>`) into the ex-info `{:cmd … :out … :err …}`;
+      the finally drain is unchanged (idempotent — the process is already dead
+      on the timeout path). Verified 2026-08-15 (process-timeout-ms
+      alter-var-root'd to 2 s): `sh -c "echo partial-output-here; sleep 30"` →
+      timeout ex-info carries `:out "partial-output-here\n"` and `:err ""`
+
+## Slice 21 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Bound the success-path stream drain in `run-bounded`
+      (`components/shared-config/test/psi/shared_config/lint_config_test.clj`):
+      the 120s bound covers `(.waitFor proc process-timeout-ms …)` ONLY — the
+      success branch returns `{:exit … :out @out-f :err @err-f}` with unbounded
+      derefs, so a subprocess that exits while a descendant still holds the
+      stdout/stderr pipe open (classic grandchild scenario — e.g. the `clojure`
+      CLI spawning a JVM that spawns a helper) never EOFs the slurp and the
+      suite hangs indefinitely despite the documented bound (the exact hang
+      class slice 8 set out to eliminate; slices 14/16/20 hardened the timeout
+      path only — kill-then-bounded-drain — and the docstring's "a hung
+      subprocess … blocks the suite indefinitely" is only partially true).
+      Fix: bound the drain on the success path too (e.g. bounded 3-arg deref
+      with a loud failure, or drain via `onExit`/a watchdog), so the whole
+      subprocess interaction — not just the process lifetime — is bounded.
+      Verify: simulate a pipe-holding grandchild (e.g.
+      `sh -c "echo out; (sleep 300) & wait"` with a reduced
+      process-timeout-ms) → suite fails loudly instead of hanging.
+      — done: the success path now uses the same bounded 3-arg deref
+      (`drain`, 500 ms) and throws a loud ex-info — distinct message
+      "subprocess exited but its stdout/stderr did not close within the drain
+      bound — a descendant process is holding the pipe open" — with the
+      undrained `:out`/`:err` marked `:unavailable`, when the streams do not
+      close past the bound; the `finally` drain is bounded too (previously
+      unbounded `@out-f`/`@err-f` guarded by `.isAlive` — a completed future
+      returns instantly, so the bound only bites on the pathological path).
+      Verified 2026-08-15 via scratch (process-timeout-ms alter-var-root'd to
+      5 s): `sh -c "sleep 300 & echo done"` (parent exits, descendant holds
+      the pipe — the success-path case the unbounded deref hung on) → loud
+      ex-info in ~2 s (`:out :unavailable`), NO hang; `sh -c "echo
+      partial-out; sleep 30"` → timeout path still fails loudly at the bound
+      with `:out "partial-out\n"` captured (slice-20 behavior intact); normal
+      `echo hello` → `{:exit 0 :out "hello\n"}` in 7 ms. Stray `sleep 300`
+      cleaned up after verification.
+- [x] Bind `*read-eval*` false in the read-string-based compares
+      (`parse-forms` in `with-channel-hook-semantics-guard-test` and the
+      `read-string` in `with-channel-hook-impl-guard-test`): verified
+      2026-08-15 that `*read-eval*` defaults to `true` and
+      `(read-string "#=(+ 1 2)")` → `3` — the guards whose purpose is to
+      detect semantic drift in the tracked hook impl vs the pinned jar export
+      would themselves EXECUTE a `#=` reader-eval form on either side (a
+      drifted/malicious export or impl silently runs code during the
+      integration run instead of being compared); `#?` reader conditionals
+      additionally throw "Conditional read not allowed", a confusing failure
+      for a structural-compare guard. Fix: `(binding [*read-eval* false]
+      (read-string …))` — makes `#=` throw loudly instead of evaluating — and
+      pass `:read-cond :allow` if conditionals should compare rather than
+      error. Verify: `(binding [*read-eval* false] (read-string "#=(+ 1 2)"))`
+      throws; a fabricated `#=`-bearing jar export (via the
+      `psi.lint-config-test.http-kit-jar` override) fails loudly with no
+      evaluation side effect.
+      — done (both sites): `parse-forms` and the impl-guard read both wrap
+      `(binding [*read-eval* false] (read-string {:read-cond :preserve} …))`.
+      `:read-cond :preserve` chosen over the follow-up's suggested `:allow`:
+      `:allow` reads only the current platform's branch, silently dropping the
+      others from the compare — a blind spot of the exact class this guard
+      exists to close — while `:preserve` keeps the full conditional as a
+      reader-conditional form, so all branches compare structurally and a
+      conditional introduction reads instead of erroring. Verified 2026-08-15:
+      `(binding [*read-eval* false] (read-string "#=(+ 1 2)"))` throws
+      "EvalReader not allowed when *read-eval* is false" (no evaluation);
+      `(parse-forms "#?(:clj 1 :cljs 2)")` → `[#?(:clj 1 :cljs 2)]` (parsed
+      structurally).
+
+## Slice 22 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Reconcile the committed test file with the repo's own file-length gate:
+      resolved by splitting (slice 23) — `lint_config_test.clj` (804 lines, over
+      the 800 gate) split into three files: `lint_config_test.clj` (unit
+      invariants, 244), `lint_config_test_support.clj` (shared fixtures, 375;
+      ns ends in -support so kaocha's .*-test$ pattern never runs it) and
+      `lint_config_integration_test.clj` (^:integration proofs, 246). No
+      forwarding vars — fixtures are defined once in the support ns and :refer'd.
+      `bb commit-check:file-lengths` passes at the committed state; the sibling
+      251 split was NOT double-implemented (251 remains design-only — its
+      limit-raise proposal is a separate human-reviewed policy question, and the
+      delegation explicitly directed splitting)
+- [x] Reuse the shared `psi.test-support.repo-root` instead of the
+      component-local `find-repo-root`/`repo-root` copy (skill
+      reusable-existing-pattern flag): `bases/main/test/psi/test_support/repo_root.clj`
+      exists precisely to "replace component-local copies so future fixes land
+      in one place" (its docstring), and bases/main/test is on BOTH the :unit
+      and :integration suite classpaths (tests.edn) — verified requirable from
+      the shared-config test ns. The committed `lint_config_test.clj`
+      re-implements it with a different root marker (deps.edn+bb.edn vs the
+      shared doc/custom-providers.md) plus the `psi.lint-config-test.repo-root`
+      property override (slice-9 made the LOCAL copy injectable/nullable but
+      never checked for the shared existing pattern). Actionable: either
+      require `psi.test-support.repo-root` from the test ns — extending the
+      shared ns with the property override and the deps.edn+bb.edn marker (or
+      a marker option) so the override/root logic lands in one place for all
+      consumers — or record the deliberate divergence (why the shared helper's
+      marker + no-override contract is insufficient here) in implementation.md.
+      Note: the concurrent 251 split carries the SAME local copy into
+      `lint_config_test_support.clj`, so the reuse decision must apply to the
+      support ns too, not just the current file
+      — done (REUSE branch — supersedes the slice-23 divergence note): the
+      shared helper `bases/main/test/psi/test_support/repo_root.clj` gained
+      three backward-compatible opts — `:markers` (coll of repo-relative
+      marker paths, default `[["doc" "custom-providers.md"]]` — the no-arg
+      call is byte-for-byte the old behavior), `:prop` (system property that
+      overrides the walk entirely, injectability per the skill infra-dep
+      criterion), and `:required?` (fail-loud ex-info when the walk exhausts
+      without finding all markers, instead of silently returning the fs root);
+      the local `find-repo-root`/`repo-root` copy in
+      `lint_config_test_support.clj` is DELETED — `repo-root` is now
+      `(str (test-repo-root/repo-root {:markers [["deps.edn"] ["bb.edn"]]
+      :prop "psi.lint-config-test.repo-root" :required? true}))`, so the
+      deps.edn+bb.edn marker set and the property override land in the SHARED
+      helper (one definition site, applying to the support ns AND the current
+      file per the note). Also fixed a latent walk bug the extension surfaced:
+      the old loop's terminal `(= dir (.getParentFile dir))` never triggers on
+      macOS (parent of `/` is nil), so a never-found walk recurred into nil —
+      the new loop returns the fs root at the nil-parent boundary and lets
+      `:required?` throw there. Verified: unit 9/39, integration 33/176 (both
+      proofs ran, no SKIP), ai user-models-test 20/139 + agent-session
+      workflow-async-path-test 9/53 (the two existing shared-helper consumers,
+      unchanged contract), nested-CWD + property-override + fail-loud all
+      exercised via clojure -e; `bb lint` errors: 0 warnings: 0; `bb fmt:check`
+      clean
+
+## Slice 23 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Reconcile the committed test file with the repo's own file-length gate
+      (commit-check fix): `bb commit-check:file-lengths` failed at the
+      slice-21 committed state — `lint_config_test.clj` was 804 lines, over
+      the gate's 800-line default for src/test files under components/ (the
+      pre-commit hooks and ci.yml never run the length check, so the failure
+      surfaced only at the committed state). Fixed by splitting into three
+      logically consistent files, per the explicit "break into multiple
+      logically consistent files; no forwarding vars" instruction:
+      `lint_config_test.clj` (9 unit invariants, 244 lines), the new
+      `lint_config_test_support.clj` (shared fixtures — repo-root, read-edn,
+      pins, jar paths, run-bounded, clj-kondo-main, report-skip!, parse-forms,
+      delete-recursively! — 375 lines; ns ends in -support, so kaocha's
+      .*-test$ ns-pattern never runs it), and the new
+      `lint_config_integration_test.clj` (3 ^:integration proofs, 246 lines).
+      No forwarding vars: every shared fixture is DEFINED once in the support
+      ns and :refer'd from the two test namespaces; the eight cross-ns
+      fixtures changed defn- → defn (they were private only because they were
+      file-local). tests.edn comment updated to name the new integration ns.
+      All 12 tests preserved and green (unit 9/39 + integration 3/25, 64
+      assertions); `bb lint` errors: 0 warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0. Sibling 251 not
+      double-implemented (remains design-only — its limit-raise proposal is a
+      separate human-reviewed policy question, and the delegation explicitly
+      directed splitting)
+- [x] Reuse the shared `psi.test-support.repo-root` (slice-22 item 2 — REUSE
+      branch, supersedes the slice-23 deliberate-divergence note): the shared
+      helper `bases/main/test/psi/test_support/repo_root.clj` gained three
+      backward-compatible opts — `:markers` (coll of repo-relative marker
+      paths, default `[["doc" "custom-providers.md"]]` — the no-arg call is
+      byte-for-byte the old behavior), `:prop` (system property that overrides
+      the walk entirely, injectability per the skill infra-dep criterion), and
+      `:required?` (fail-loud ex-info when the walk exhausts without finding
+      all markers, instead of silently returning the fs root). The
+      component-local `find-repo-root`/`repo-root` copy in
+      `lint_config_test_support.clj` is DELETED — `repo-root` now delegates to
+      the shared helper with the deps.edn+bb.edn marker set, the
+      `psi.lint-config-test.repo-root` override, and `:required?` — the
+      override/root logic lands in one place for all consumers (applies to
+      the support ns AND the current file per the follow-up note). Also fixed
+      a latent walk bug the extension surfaced: the old terminal
+      `(= dir (.getParentFile dir))` never triggers on macOS (parent of `/` is
+      nil), so a never-found walk recursed into nil — the new loop returns the
+      fs root at the nil-parent boundary and lets `:required?` throw there.
+      Verified: unit 9/39, integration 33/176 (both proofs ran, no SKIP), ai
+      user-models-test 20/139 + agent-session workflow-async-path-test 9/53
+      (the two existing shared-helper consumers, unchanged contract),
+      nested-CWD + property-override + fail-loud exercised via clojure -e;
+      `bb lint` errors: 0 warnings: 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0 (slice-23 split still under the
+      gate)
+
+## Slice 24 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Make `with-channel-hook-impl-guard-test` fail cleanly on a deleted impl
+      file: the guard's stated purpose is detecting "a deleted or renamed hook
+      impl", but `(slurp impl-file)` runs in the let binding BEFORE any
+      assertion — including `(is (.exists impl-file) …)` — so the deletion case
+      throws FileNotFoundException and clojure.test reports an ERROR with the
+      exists assertion unreachable (verified 2026-08-15: moved
+      with_channel.clj aside → focused unit run "8 passed, 0 failed, 1
+      errored", no exists-assertion message). This is the same class of defect
+      slice 20 fixed in the integration test (jar-entry nil → NPE → ERROR,
+      nil-guarded to a plain assertion failure): read the impl only when it
+      exists (nil-guard / `when` the exists check, then parse) so a deleted or
+      renamed impl fails as a clean assertion FAIL with its message, never an
+      ERROR. Same parallel shape (mention, lower priority — covered by the
+      ls-files index arm): `http-kit-import-registration-test`'s `read-edn`
+      slurp on config.edn would likewise ERROR on whole-file deletion before
+      any assertion; entry-removal (file present) already fails cleanly
+      — done: the slurp/parse moved OUT of the let binding into a
+      `(when (.exists impl-file) …)` guard placed AFTER the exists assertion
+      (mirror of slice 20's `when (some? jar-export)` — the exists check fails
+      cleanly first, the dependent ns/defn assertions run only when the file
+      is present). Verified 2026-08-15 with the impl moved aside: focused run
+      → `1 passed, 1 failed, 0 errored` — the ref assertion still passes, the
+      exists assertion fails cleanly with its message, NO ERROR/FileNotFound
+      (was "0 passed, 0 failed, 1 errored" pre-fix). The read-edn parallel
+      shape was deliberately NOT hardened (reviewer's own lower-priority
+      framing): whole-file deletion of config.edn is covered by the
+      ^:integration `git ls-files --error-unmatch` index arm
+      (gitignore-http-kit-tracking-ground-truth-test) — recorded in
+      implementation.md
+- [x] Fix the `.gitignore` order assertion's first-occurrence blind spot:
+      `gitignore-http-kit-import-tracking-test`'s `index-of` uses
+      `(first (keep-indexed …))` — the FIRST matching line — so a duplicate
+      `**/.clj-kondo/imports/*` line added BELOW the negation lines (gitignore
+      is last-match-wins: git re-ignores the http-kit import dir and the
+      registration silently drops out of future commits) passes the unit guard
+      while all three lines still exist in the right first-occurrence order.
+      The `^:integration` check-ignore ground-truth arm is the backstop, but
+      the unit guard's own order property is incomplete. Use the LAST index for
+      the ignore-all pattern (or assert no occurrence after the negations) so
+      the ordering invariant is complete in `:unit`
+      — done (LAST-index branch): the let now binds both `index-of` (first,
+      used for the negations) and `last-index-of`; the ordering check uses
+      `(last-index-of ignore-all)` against each negation's first occurrence,
+      so any ignore-all line after the first negation fails the unit guard.
+      Verified 2026-08-15: duplicate `**/.clj-kondo/imports/*` appended below
+      the negations → focused run `6 passed, 2 failed, 0 errored` with
+      "**/.clj-kondo/imports/* (last occurrence, line N) precedes …" messages
+      (was 8 passed pre-fix — the blind spot); safe duplicate above the
+      negations still passes (last occurrence precedes the negations); clean
+      .gitignore → 8 passed
+
+## Slice 25 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Reconcile design.md/plan.md test-file references with the slice-23 split:
+      design.md Context ("The committed regression test
+      (`components/shared-config/test/psi/shared_config/lint_config_test.clj`,
+      slices 7-18)"), design.md AC1 ("… in
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`
+      are `^:integration` and run in CI via `bb clojure:test:integration`"),
+      and plan.md decision 3 ("`^:integration` in
+      `components/shared-config/test/psi/shared_config/lint_config_test.clj`")
+      all name the single pre-split file, but slice 23 (e2deda747) split it
+      into `lint_config_test.clj` (9 unit invariants),
+      `lint_config_test_support.clj` (shared fixtures — incl. the
+      `http-client-entries` EDN-walk predicate), and
+      `lint_config_integration_test.clj` (the three `^:integration` proofs).
+      The last design.md/plan.md doc reconciliation (slice 19, d58d26d93)
+      predates the split, so the references are stale doc drift of the exact
+      class slices 17-19 existed to reconcile; they were never updated.
+      Update the three references to the actual files (the named
+      `^:integration` tests live in `lint_config_integration_test.clj`; the
+      EDN-walk predicate lives in `lint_config_test_support.clj`).
+      — done: design.md Context now names the split file set
+      (`lint_config_test.clj` — unit invariants,
+      `lint_config_test_support.clj` — shared fixtures incl. the
+      `http-client-entries` EDN-walk predicate,
+      `lint_config_integration_test.clj` — the `^:integration` proofs incl.
+      the probe ns); design.md AC1 and plan.md decision 3 now point the three
+      `^:integration` tests at
+      `lint_config_integration_test.clj`; AC1's "the file's `^:integration`
+      set" non-exhaustive note disambiguated to "the integration test file's"
+- [x] Reconcile design.md AC1's mechanism description for
+      `with-channel-hook-semantics-guard-test`: AC1 describes it as "tracked
+      hook impl vs pinned 2.8.0 jar export, whitespace-normalized", but slice
+      20 (50d37873b) replaced `normalize-whitespace` with `parse-forms`
+      (parsed-form structural compare — whitespace/indentation-insensitive by
+      construction, string-literal-spacing-sensitive; verified in
+      `lint_config_integration_test.clj`). The wording describes the REMOVED
+      mechanism and misleads about the guard's actual blind-spot profile (a
+      literal-spacing change now FAILS loudly, whereas the whitespace-
+      collapsing compare was blind to it — slice-20's rationale). Update AC1
+      to name the parsed-form compare.
+      — done: design.md AC1 now reads "parsed-form structural compare" (the
+      slice-20 `parse-forms` mechanism) instead of "whitespace-normalized";
+      the slice-5 cljfmt indentation-drift tolerance is implied by the
+      parsed-form compare (indentation-insensitive by construction)
+
+## Slice 26 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Harden `run-bounded`'s drain against an exceptionally-completed slurp
+      future: `drain` in `lint_config_test_support.clj` catches only
+      `InterruptedException`, but `(deref f 500 ::unavailable)` on a future
+      whose `slurp` THREW rethrows the wrapped `ExecutionException`
+      (deref does not distinguish an exceptional completion from a timeout).
+      The throw path is the kill paths — the timeout branch and the finally
+      both `destroyForcibly` the process before draining, and a read on a
+      forcibly-killed process's stream can throw an IOException
+      (platform/timing-dependent: macOS EOF'd cleanly in a 2026-08-15
+      scratch, but Linux/Windows paths can throw) — so the designed timeout
+      ex-info carrying `:out`/`:err` (slice 20) and the loud no-hang failure
+      (slice 21) can be bypassed by an unexpected ExecutionException with no
+      captured output. Catch the future's exception in `drain` (return a
+      marker like `::unavailable` or the message, or fold it into the
+      ex-info) so every path yields the designed failure shape
+      — done: `drain` now catches `ExecutionException` (alongside
+      `InterruptedException`) and returns a `{::drain-error "label: message"}`
+      marker carrying the exception message; the ex-info construction passes
+      the marker through in `:out`/`:err` (the diagnostic shows WHY the drain
+      failed, not just `:unavailable`); the success path's failure check uses
+      a `drain-failed?` predicate (`::unavailable` ∨ map — the only map value
+      drain returns is the error marker), so a read error on the success path
+      throws the loud no-hang ex-info (message generalized to "could not be
+      drained … a descendant process is holding the pipe open or the stream
+      read failed") instead of returning the marker as bogus content.
+      Verified: normal path `{:exit 0 :out "hello\n"}` unchanged; a throwing
+      slurp future (IOException "Stream closed") → `{::drain-error "stdout:
+      java.io.IOException: Stream closed"}` with `drain-failed?` true (no
+      escape); timeout path (bound reduced to 2s vs `sleep 300`) still kills
+      and throws the ex-info with partial `:out "partial-out\n"` captured
+- [x] Resolve the dead typo'd `.gitignore` line 3
+      (`**/.clj-konde/imports.claude/`): the pattern matches nothing
+      (`.clj-konde` ≠ `.clj-kondo`; `imports.claude` ≠ `imports`) — it is a
+      pre-existing typo (d3acaca096, 2026-04-09) sitting immediately above
+      this task's tracking rules (lines 4-6) in the exact file the slice-4
+      change set includes, and no task file or guard references it (the
+      gitignore guards cover lines 4-6 only). Likely intended as
+      `**/.clj-kondo/imports/` (the pre-task line this task replaced) or a
+      Claude-imports ignore — fix the typo or delete the dead line after
+      confirming intent
+      — done (DELETE branch — intent confirmed via git history): traced the
+      line's full history — d15150a5c added `.clj-konde/imports` (intent:
+      ignore `.clj-kondo/imports`, typo'd from the start); 0bf814fd (commit
+      message "exclude .claude/") MANGLED it into `.clj-konde/imports.claude/`
+      instead of adding a `.claude/` line; d3acaca096 made it recursive and
+      added the CORRECT `**/.clj-kondo/imports/` + `**/.clj-kondo/.cache/`
+      (the clj-kondo-imports intent realized there, and now by this task's
+      negation set lines 4-6). The `.claude` intent: `.claude/settings.local.json`
+      is excluded by the user's GLOBAL gitignore
+      (`~/.gitignore_global:1:.claude/settings.local.json`), and
+      `.claude/CLAUDE.md` is intentionally TRACKED — so a repo-level `.claude/`
+      rule would be a new policy (blanket-ignoring future shared .claude
+      content), not the original intent. Both underlying intents are realized
+      elsewhere; the line matches nothing (`find . -path "*clj-konde*"` → ∅).
+      Deleted the dead line — behavior-preserving, no new policy; the gitignore
+      unit guard (presence + LAST-ignore-all-ordering of lines 4-6) is
+      index-based, not absolute-line-number-based, so it stays green (9 unit
+      tests / 39 assertions pass)
+
+## Slice 27 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Reuse the shared `parse-forms` fixture in `with-channel-hook-impl-guard-test`
+      instead of inlining its exact implementation: `lint_config_test_support.clj`'s
+      ns contract is "each fixture is DEFINED here once and :refer'd into the test
+      namespaces — no forwarding vars", but the unit test's `when (.exists impl-file)`
+      branch re-implements `(binding [*read-eval* false] (read-string {:read-cond
+      :preserve} (str "[" (slurp impl-file) "]")))` — byte-for-byte the body of the
+      shared `parse-forms` fixture (same *read-eval* false + :read-cond :preserve
+      hardening, slice 21), which the unit ns does NOT :refer. The inline copy means
+      the unit suite never exercises the shared fixture on this path, and a future
+      `parse-forms` hardening (or a regression in it) diverges silently between the
+      two sites. Fix: add `parse-forms` to the `:refer` list in
+      `lint_config_test.clj` and replace the inline binding/read-string with
+      `(parse-forms (slurp impl-file))`; the parsed-form ns/defn assertions are
+      unchanged (verified identical semantics).
+      — done: `parse-forms` added to the `:refer` list in `lint_config_test.clj`;
+      the inline binding/read-string in `with-channel-hook-impl-guard-test` is
+      replaced with `(parse-forms (slurp impl-file))` (the shared fixture's body
+      is byte-for-byte the inline copy — *read-eval* false + :read-cond :preserve —
+      so semantics are identical, and the unit suite now exercises the SAME
+      parse-forms the ^:integration semantics guard relies on; a future hardening
+      or regression cannot diverge between the two sites); docstring updated to
+      name the shared fixture. Verified: unit suite → 9 tests / 39 assertions pass
+      (unchanged), integration 33/176 no SKIP
+- [x] Consolidate the task's `delete-recursively!` copy into shared test support,
+      or record the deliberate divergence: slice-12 added it to
+      `lint_config_test_support.clj`, making it one of SEVEN local copies of a
+      repo-wide repeated private pattern — pre-existing copies in
+      `components/tui/test/psi/tui/test_harness/tmux_rehydration.clj`,
+      `components/history/test/psi/history/git_test.clj`,
+      `components/history/test/psi/history/git_worktree_test.clj`,
+      `extensions/work-on/test/extensions/work_on_command_test.clj`,
+      `components/agent-session/test/psi/agent_session/test_support.clj` (public,
+      component-scoped), and
+      `components/agent-session/test/psi/agent_session/tool_output_integration_test.clj`
+      (private). Slice-22's repo-root consolidation set the precedent (shared
+      `psi.test-support` ns on both :unit and :integration classpaths is the natural
+      home — e.g. `psi.test-support.fs/delete-recursively!` or an extension of the
+      existing shared ns — with the seven copies migrating to it). The review skill's
+      reusable-existing-pattern flag applies: a new copy of a repeated pattern with a
+      shared home already established.
+      — done (CONSOLIDATION branch): new shared
+      `bases/main/test/psi/test_support/fs.clj` (`psi.test-support.fs/delete-recursively!`)
+      — bases/main/test is on the :unit/:extensions/:integration suite classpaths via
+      the :test-paths alias (the same reachability psi.test-support.repo-root relies
+      on). All SEVEN copies migrated: tui tmux_rehydration (private defn- deleted,
+      calls → test-fs/), history git_test + git_worktree_test (private defn- deleted,
+      4 + 5 call sites incl. the with-null-context macro template → test-fs/),
+      work-on work_on_command_test (local defn + its agent-session-classpath
+      rationale docstring deleted, call → test-fs/), agent-session test_support
+      (public fixture now delegates to the shared helper — external callers
+      query_graph_test / task_artifact_content_resolver_test unchanged via
+      test-support/delete-recursively!), agent-session tool_output_integration_test
+      (private defn- deleted, call → test-fs/), shared-config lint_config_test_support
+      (the task's copy now delegates, mirroring the slice-22 repo-root delegation).
+      The shared implementation is the behavioral superset of the seven copies:
+      nil-safe (tui's guard), String/File via io/file conversion (history/
+      agent-session/work-on's (File. (str path)) + tui's (io/file f)), an .exists
+      guard (harmless no-op for tool-output's always-exists path), and a
+      delete-children-first recursive walk returning nil (shared-config's contract).
+      Caveat recorded in implementation.md: the work-on extension's STANDALONE
+      deps.edn `:test` alias (extensions/work-on/deps.edn) does not include
+      bases/main/test — the extension test now requires psi.test-support.fs only
+      under the repo-level test commands (bb clojure:test:extensions runs
+      `-M:test-paths`, which includes bases/main/test); CI never uses the standalone
+      alias. Verified: focused unit runs — shared-config 9/39, history 57/169,
+      agent-session (tool-output/query-graph/task-artifact) 16/94, work-on
+      extensions 11/61; integration 33/176 no SKIP (both proofs ran); tui harness +
+      shared ns compile (`require` check); `bb lint` errors: 0 warnings: 0;
+      `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0
+- [x] Treat the interrupted-drain marker as a failed drain in `run-bounded` (or
+      record why not): `drain` returns `(str "<" label " interrupted>")` on
+      InterruptedException — a STRING — and `drain-failed?`
+      (`(= ::unavailable x)` ∨ `(map? x)`, support ns line 275) does not match it,
+      unlike the ExecutionException marker (`{::drain-error …}`) and `::unavailable`,
+      which both fail. So on the success path an interrupted drain silently returns
+      `{:exit 0 :out "<stdout interrupted>"}` (the marker accepted as real output),
+      and on the timeout path the marker passes through as `:out`/`:err` — the two
+      exceptional-drain paths are handled asymmetrically, inconsistent with slice-26's
+      designed invariant "every path yields the designed failure shape". Fix: return
+      a keyword/map marker for InterruptedException too (e.g. `::interrupted`, or a
+      `{::drain-error "label: interrupted"}`-shaped marker) so `drain-failed?` catches
+      it on both paths — or record the accepted gap (the main test thread is rarely
+      interrupted, so the marker-as-content path is nearly unreachable).
+      — done (fix branch — the `{::drain-error …}` map marker, consistent with the
+      slice-26 ExecutionException marker): `drain`'s InterruptedException catch now
+      returns `{::drain-error (str label ": interrupted")}` — `drain-failed?`'s
+      `(map? x)` arm catches it on the success path (loud no-hang ex-info, message
+      generalized by slice-26 already) and the timeout path passes the marker through
+      in `:out`/`:err` exactly like the ExecutionException marker, so the two
+      exceptional-drain paths are now symmetric under the designed invariant;
+      `run-bounded`'s docstring updated to state the interrupted case. Verified:
+      `drain-failed?` on the old `"<stdout interrupted>"` string → false (the gap),
+      on the new `{::drain-error "stdout: interrupted"}` map → true (closed); unit
+      suite → 9 tests / 39 assertions pass
+
+## Slice 28 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Guard the CI execution chain that makes the regression surface
+      CI-enforceable — ci.yml's steps and bb.edn's clojure:test:integration
+      task are the only unguarded links: tests-edn-suite-wiring-test (slice
+      14) guards tests.edn's :integration suite and bb-edn-lint-task-wrapper-test
+      guards bb.edn's lint task, but nothing guards ci.yml's "Lint" step
+      (`run: bb lint`, ci.yml:89) or "Run Clojure integration tests" step
+      (`run: bb clojure:test:integration`, ci.yml:166) — the outer links that
+      actually execute the lint gate and the three ^:integration proofs
+      (design.md AC1 names `bb clojure:test:integration` as the CI-enforceable
+      regression surface) — nor bb.edn's clojure:test:integration task
+      (`(System/exit (run-scry-kaocha-suite! "integration"
+      ["--focus" "integration"]))`, bb.edn:307-309), so a dropped/renamed CI
+      step or a task drift to another suite/focus silently disables the entire
+      CI regression surface while every existing guard stays green — the exact
+      silent-drift class the task already closed for .gitignore / lint-alias /
+      bb.edn lint wrapper / tests.edn. Verified 2026-08-15: zero tests read
+      ci.yml anywhere in the repo (rg over components/ + bases/ +
+      extensions/). Fix: add unit assertions (same lint_config_test.clj ns —
+      read ci.yml as text like the .gitignore test, and bb.edn as EDN — no
+      subprocess, runs anywhere) asserting ci.yml contains the `bb lint` Lint
+      step and the `bb clojure:test:integration` integration step, and that
+      bb.edn's clojure:test:integration task still invokes
+      run-scry-kaocha-suite! with suite id "integration" (a drift to a
+      different suite/focus would silently stop the proofs from running)
+      — done: new `ci-execution-chain-guard-test` + private `ci-run-steps`
+      helper in lint_config_test.clj — `ci-run-steps` parses ci.yml lines
+      into a step-name → run-command map (every `- name: X` line paired with
+      the next `run: Y`; line-based like the .gitignore test, no YAML parser,
+      no subprocess, runs anywhere); the test asserts the Lint step runs
+      `bb lint` (ci.yml:89) and the Run Clojure integration tests step runs
+      `bb clojure:test:integration` (ci.yml:166), then asserts bb.edn's
+      clojure:test:integration task structurally: `System/exit`-wrapped
+      `(run-scry-kaocha-suite! "integration" ["--focus" "integration"])`
+      (suite id "integration" + the integration focus preserved — a drift to
+      another suite/focus fails loudly in `:unit`). Unit suite → 10 tests /
+      48 assertions pass (was 9/39)
+- [x] Single-source the byte-identical `which-*` resolution in
+      lint_config_test_support.clj (reusable-existing-pattern flag — the same
+      class slice 27 closed for parse-forms): `which-clojure-bin`
+      (lines 181-186) and `which-git-bin` (lines 208-213) are structurally
+      identical `(some-> (shell/sh "which" X) (as-> r (when (zero? (:exit r))
+      (str/trim (:out r)))))` differing only in the binary name, and the ns's
+      own contract is "each fixture is DEFINED here once" — a future hardening
+      (quoting, error handling) or a regression would diverge silently between
+      the two sites. Fix: extract a single private `which-bin` helper taking
+      the binary name, with `which-clojure-bin`/`which-git-bin` delegating to
+      it; behavior unchanged (same which → trim → nil-on-nonzero contract).
+      — done: private `which-bin` extracted in lint_config_test_support.clj
+      (the which → trim → nil-on-nonzero contract defined once); both
+      `which-clojure-bin` and `which-git-bin` now delegate to it
+      (`(which-bin "clojure")` / `(which-bin "git")`) — behavior unchanged
+      (same which resolution, same nil-on-nonzero); the unit suite exercises
+      both delegation paths via clojure-bin/git-bin (integration proofs ran,
+      no SKIP — both binaries resolved through the single helper). Unit
+      suite → 10 tests / 48 assertions pass
+
+## Slice 29 — Implementation-review follow-ups (2026-08-15)
+
+- [x] Harden `ci-execution-chain-guard-test`'s task-args read against a dropped
+      focus-args drift (ERROR → clean-FAIL class, slices 20/24): the
+      clojure:test:integration guard asserts the run-scry-kaocha-suite! args via
+      `(nth call 2)` — a drift that DROPS the `["--focus" "integration"]` args
+      (e.g. `(run-scry-kaocha-suite! "integration")`, a two-element call) makes
+      `(nth call 2)` throw IndexOutOfBoundsException (verified: `(nth
+      '(run-scry-kaocha-suite! "integration") 2)` → IndexOutOfBoundsException),
+      so the guard built to catch exactly that drift surfaces as a clojure.test
+      ERROR with no assertion message instead of the plain FAIL — the exact
+      ERROR-vs-FAIL class slices 20 (jar-entry nil → NPE → ERROR, nil-guarded)
+      and 24 (slurp-before-exists → ERROR, when-guarded) closed elsewhere. Fix:
+      `(is (= ["--focus" "integration"] (nth call 2 nil)))` — an out-of-bounds
+      read yields nil and FAILs cleanly with the assertion message.
+      — done: `(nth call 2 nil)` (out-of-bounds → nil → clean FAIL; comment
+      added). Verified: bb.edn task mutated to the two-element
+      `(run-scry-kaocha-suite! "integration")` → focused unit run
+      `1 failed, 0 errored` (was ERROR pre-fix); bb.edn restored.
+- [x] Make `gitignore-http-kit-import-tracking-test`'s ordering assertion fail
+      cleanly when a negation line is MISSING (same ERROR-vs-FAIL class): the
+      presence `(is (some? neg-idx) …)` FAILs first, but the next
+      `(is (< ignore-idx neg-idx) …)` then evaluates `(< 4 nil)` →
+      NullPointerException (verified) — so the exact regression the test guards
+      (a negation line removed) reports 1 FAIL + 1 ERROR, the ERROR masking the
+      intended clean signal (slice-24 standard: "reports exactly ONE plain
+      assertion FAIL with its message, never an ERROR"). Fix:
+      `(is (and neg-idx (< ignore-idx neg-idx)) …)` so a missing negation line
+      is a single clean FAIL.
+      — done: ordering assertion is `(is (and neg-idx (< ignore-idx neg-idx))
+      …)` with a nil-guarded message (`(when neg-idx (str " (line " (inc
+      neg-idx) ")"))` — an `(inc nil)` in the failure-path message would itself
+      throw). Verified: `!.clj-kondo/imports/http-kit/` line removed →
+      focused unit run `3 failed, 0 errored` (was FAIL + NPE ERROR pre-fix);
+      .gitignore restored.
+- [x] Guard the tracked-side slurp in `with-channel-hook-semantics-guard-test`
+      against a deleted tracked impl (ERROR-vs-FAIL class; slice 24 hardened
+      only the UNIT impl-guard): the ^:integration semantics guard slurps
+      `.clj-kondo/imports/http-kit/http-kit/httpkit/with_channel.clj`
+      unconditionally in the let binding — a deleted worktree file (still in
+      the git index, so the `git ls-files --error-unmatch` arm keeps passing —
+      it checks the index, not worktree presence) throws FileNotFoundException
+      → clojure.test ERROR, while the unit impl-guard reports the same drift as
+      a clean FAIL. Mirror slice-24's shape: exists-guard the tracked slurp
+      (assert existence, then read/compare only under `when (.exists …)`) so
+      the integration suite FAILs cleanly on deletion instead of ERRORing
+      redundantly on top of the unit guard's clean signal.
+      — done: the tracked-side slurp moved out of the let binding into an
+      exists assertion (`(is (.exists tracked-file) …)` — fails cleanly first)
+      with the compare read guarded by `(when (and (some? jar-export)
+      (.exists tracked-file)) …)`, mirroring slice-24/20. Verified: tracked
+      impl moved aside (index entry intact, ls-files arm still green) →
+      focused integration run `1 failed, 0 errored` (was FileNotFoundException
+      ERROR pre-fix); impl restored. Unit 10/48, integration 33/177 no SKIP;
+      `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0.
+
+## Slice 30 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Make `with-channel-hook-semantics-guard-test` fail cleanly (or skip
+      visibly) when the http-kit jar is present but NOT a valid zip (ERROR
+      class; slices 20/24/29 standard "never an ERROR, always clean FAIL or
+      visible SKIP"): the skip guard checks only `(.exists (io/file
+      http-kit-jar))` — a truncated/corrupt jar (partial m2 download, or a
+      `psi.lint-config-test.http-kit-jar` override pointing at a non-jar file)
+      passes the guard, then `(ZipFile. (io/file http-kit-jar))` throws
+      ZipException "zip END header not found" → clojure.test ERROR with no
+      assertion message (verified 2026-08-16: `-Dpsi.lint-config-test.http-kit-jar=/tmp/corrupt.zip`
+      → `2 errored`, "zip END header not found" uncaught). Fix: validate the
+      jar opens as a zip in the skip guard (try/catch ZipException → visible
+      SKIP via `report-skip!`, mirroring the missing-jar arm), or wrap the
+      ZipFile open so a corrupt jar is a clean FAIL — never an uncaught
+      exception. (clj-kondo-jar corrupt is NOT affected the same way: the
+      subprocess fails non-zero → clean FAIL on the exit assertion.)
+      — done (skip-guard branch): private `valid-zip?` added to
+      lint_config_integration_test.clj — `(with-open [_ (ZipFile. f)] true)`
+      catching IOException (the ZipException superclass — also covers a
+      directory at the path), so a corrupt jar is a visible SKIP
+      (`report-skip!` "with-channel hook semantics: … is not a valid zip
+      archive", mirroring the missing-jar arm), never an uncaught exception.
+      Verified 2026-08-16 with a fabricated non-zip file via the
+      `psi.lint-config-test.http-kit-jar` override: focused integration run →
+      `SKIP task-252 with-channel hook semantics: /tmp/ck252-corrupt.jar is
+      not a valid zip archive`, 0 errored (was 2 errored pre-fix)
+- [x] Guard the no-reg transit slurp in
+      `http-kit-defreq-analysis-level-resolution-test` (ERROR class): the
+      discriminating-control arm reads
+      `(slurp (io/file no-reg-dir "v1/clj/org.httpkit.client.transit.json"))`
+      unconditionally — if the jar `--dependencies` analysis failed (corrupt
+      jar — verified 2026-08-16: FileNotFoundException "No such file or
+      directory" on the no-reg transit → ERROR; or any failure writing the
+      transit), the slurp throws instead of the arm reporting a clean FAIL.
+      The reg-cache arm already asserts transit existence before use
+      (`(is (.exists (io/file cache-dir ...)))`, slice-2 pattern); mirror that
+      guard for the no-reg transit (assert exists → clean FAIL) or wrap the
+      slurp, so a failed jar analysis surfaces as plain assertion FAILs, never
+      an uncaught exception.
+      — done (exists-guard branch, mirror of the reg-cache arm): the no-reg
+      arm now binds `transit-file` and asserts
+      `(is (.exists transit-file) …)` (clean FAIL) before slurping under
+      `(when (.exists transit-file) …)` — a failed jar analysis (corrupt jar)
+      surfaces as the plain assertion FAILs the exit assertion already
+      reports, never a FileNotFoundException ERROR. Verified 2026-08-16 with
+      the corrupt-jar override: focused integration run → analysis-level
+      proof 8 clean FAILs, `0 errored` (was 1 ERROR pre-fix)
+
+## Slice 31 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Harden `ci-execution-chain-guard-test`'s ci.yml read against whole-file
+      deletion (ERROR class; slices 20/24/29/30 standard — "never an ERROR,
+      always clean FAIL or visible SKIP"): the test slurps
+      `.github/workflows/ci.yml` unconditionally in the let binding
+      (`(slurp (io/file repo-root ".github/workflows/ci.yml"))`) — a deleted
+      ci.yml (the extreme of the exact drift the test guards: "a
+      dropped/renamed CI step … silently disables the entire CI regression
+      surface") throws FileNotFoundException → clojure.test ERROR with no
+      assertion message. Unlike the .gitignore slurp (^:integration
+      check-ignore malli arm backstop) and the import config.edn read-edn
+      (ls-files index arm backstop, slice-24's recorded decline), NO
+      ^:integration proof reads ci.yml — there is no backstop. Fix: assert
+      `(.exists ci-file)` first (clean FAIL with message), then
+      split/parse only under `when`, mirroring slice-24's shape.
+      — done: the slurp moved OUT of the let binding into an exists assertion
+      (`(is (.exists ci-file) ".github/workflows/ci.yml exists")` — fails
+      cleanly first) with `ci-run-steps`/split-lines/parse guarded by
+      `(when (.exists ci-file) …)` (mirror of slice-24); the bb.edn task arm
+      stays OUTSIDE the `when`, so a deleted ci.yml FAILs cleanly while the
+      bb.edn guard still runs (more signal, not less). Verified 2026-08-16:
+      ci.yml moved aside → focused unit run `9 passed, 1 failed, 0 errored`
+      (was FileNotFoundException ERROR pre-fix — the exists assertion FAILs
+      with its message, the bb.edn arm still passes); ci.yml restored.
+- [x] Harden `root-config-ac2-invariant-test`'s root config read against
+      whole-file deletion (same ERROR class): the test's
+      `(read-edn ".clj-kondo/config.edn")` slurp runs in the let binding —
+      a deleted root config throws FileNotFoundException → ERROR with no
+      assertion message. Slice-24's decline of the parallel shape applied
+      ONLY to the import config.edn (covered by the `git ls-files
+      --error-unmatch` index arm, which checks `.clj-kondo/imports/`); the
+      ROOT config has no such backstop — no ^:integration test reads it, and
+      its deletion is a SILENT drift (clj-kondo falls back to defaults: the
+      malli `=>` exclude and every AC2 invariant vanish with zero signal from
+      `bb lint`/CI), so the only guard ERRORing instead of clean-FAILing is
+      worse here, not better. Fix: exists-guard the read (assert
+      `(.exists …)` first → clean FAIL, then read/assert only under `when`),
+      mirroring slice-24's shape.
+      — done: the read-edn moved OUT of the let binding into an exists
+      assertion (`(is (.exists cfg-file) ".clj-kondo/config.edn exists")` —
+      fails cleanly first, mirror of slice-24's shape) with the EDN read and
+      all three AC2 invariant assertions guarded by
+      `(when (.exists cfg-file) …)`; the "root config keeps AC2 invariants"
+      testing block's comment records the rationale (no ^:integration
+      backstop; silent clj-kondo default fallback makes the ERROR-vs-FAIL
+      distinction worse here). Verified 2026-08-16: config.edn moved aside →
+      focused unit run `9 passed, 1 failed, 0 errored` (was
+      FileNotFoundException ERROR pre-fix — the exists assertion FAILs with
+      its message); config.edn restored. Unit 10/50 (was 10/48, +2 exists
+      assertions), integration 33/178 no SKIP, `bb lint` errors: 0 warnings:
+      0, `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0. The
+      full-suite `delegate-review-task-implementation-completes-with-nullable-local-model-test`
+      failure is pre-existing at eab8902f2 (verified via stash: fails
+      identically with this change absent — local-model env config, unrelated
+      to task 252).
+
+## Slice 32 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Harden `gitignore-http-kit-import-tracking-test`'s ordering assertion
+      against a MISSING ignore-all line (ERROR-vs-FAIL class; slice 29 closed
+      only the symmetric missing-NEGATION case): the ordering assertion
+      `(is (and neg-idx (< ignore-idx neg-idx)) …)` nil-guards neg-idx but not
+      ignore-idx — with the ignore-all line absent (`**/.clj-kondo/imports/*`
+      deleted/renamed) and the negations present, `(< ignore-idx neg-idx)`
+      evaluates `(< nil 3)` → NullPointerException → clojure.test ERROR, and
+      the failure-path message `(inc ignore-idx)` would NPE likewise. Verified
+      2026-08-16: ignore-all line commented out → focused unit run
+      `3 passed, 2 failed, 1 errored` (was clean FAILs + ERROR; restored
+      after). The drift is real: the negations become no-ops, malli and the
+      whole import dir fall back to TRACKED (untracked malli config.edn would
+      enter commits) — the presence assertions fail cleanly but the unit
+      guard's own ordering property must report clean FAILs, never an NPE
+      ERROR (slice-24 standard: "reports exactly ONE plain assertion FAIL
+      with its message, never an ERROR"; slice-29 closed the negation arm,
+      the ignore-all arm is the mirror blind spot). Fix: `(is (and
+      ignore-idx neg-idx (< ignore-idx neg-idx)) …)` with the message's
+      `(inc ignore-idx)` nil-guarded (`(when ignore-idx …)`), mirroring
+      slice-29's short-circuit shape. The ^:integration check-ignore malli
+      arm backstops the drift (malli no longer ignored → exit 0 assertion
+      fails) but the unit ERROR-vs-FAIL standard applies regardless.
+      — done: ordering assertion is `(is (and ignore-idx neg-idx
+      (< ignore-idx neg-idx)) …)` (both indices short-circuit, mirror of
+      slice-29's negation arm) and the message's `(inc ignore-idx)` is
+      nil-guarded (`(when ignore-idx …)` — renders "**/.clj-kondo/imports/*
+      precedes …" without the line when the ignore-all is missing, never an
+      NPE). Verified 2026-08-16: ignore-all line commented out → focused unit
+      run `4 passed, 4 failed, 0 errored` (was clean FAILs + NPE ERROR
+      pre-fix; the presence + ordering assertions FAIL with their messages);
+      missing-negation arm (slice-29 regression check) still `0 errored`;
+      clean .gitignore → 10 tests / 50 assertions pass
+- [x] Single-source the three verbatim skip-reporting tails in
+      lint_config_integration_test.clj: `(do (report-skip! label reason)
+      (is (str "skipped: " reason)))` is copy-pasted in all three
+      ^:integration proofs (with-channel semantics guard, git ground truth,
+      analysis-level proof), differing only in the label argument. The
+      support ns's own contract ("each fixture is DEFINED here once — no
+      forwarding vars") and the slice-27/28 consolidation standard
+      (parse-forms inline copy → :refer'd fixture; which-clojure-bin/
+      which-git-bin byte-identical copies → single which-bin) apply. Fix:
+      add a shared `skip!` helper in lint_config_test_support.clj that
+      reports and returns the reason (support ns keeps no clojure.test dep —
+      e.g. `(defn skip! [label reason] (report-skip! label reason) reason)`),
+      and change the three call sites to `(is (skip! label reason))` — or
+      make report-skip! return the reason string and assert on it; behavior
+      unchanged.
+      — done (skip! helper branch): `skip!` added to
+      lint_config_test_support.clj immediately after `report-skip!`
+      (`(defn skip! [label reason] (report-skip! label reason) reason)` — no
+      clojure.test dep; the visible SKIP line still reaches runner output via
+      report-skip!, slice-15 mechanism, and the truthy reason string drives
+      the passing `is`); all three ^:integration call sites now read
+      `(is (skip! "with-channel hook semantics" reason))`,
+      `(is (skip! "git check-ignore ground truth" reason))`,
+      `(is (skip! "analysis-level proof" reason))` — the `do`/`report-skip!`
+      tails are gone; `report-skip!` removed from the integration ns :refer
+      list (no longer used directly there — lint-clean). Verified 2026-08-16:
+      unit suite → 10 tests / 50 assertions pass; integration suite →
+      33 tests / 178 assertions pass, no SKIP (both proofs ran — assertion
+      count unchanged from slice-31's 178, behavior identical); forced-skip
+      run (`psi.lint-config-test.http-kit-jar` override to a nonexistent
+      path) still prints both http-kit-jar-dependent SKIP lines
+      (`SKIP task-252 with-channel hook semantics: …` +
+      `SKIP task-252 analysis-level proof: …`) and the git ground-truth proof
+      still runs (git-independent); `bb lint` errors: 0, warnings: 0;
+      `bb fmt:check` clean
+- [x] Correct the stale `.gitignore` absolute line reference in
+      implementation.md's "Additional non-task paths" note — "`.gitignore`
+      line 4 (`**/.clj-kondo/imports/` — the exact negation target)":
+      slice 26's deletion of the typo'd line 3 moved the tracking rules up,
+      so the ignore-all pattern is now `.gitignore` line 3 (negations 4-5).
+      Same doc-consistency class slices 17-19/25 reconciled; the note
+      describes CURRENT state (not a historical record), so the reference is
+      live drift.
+      — done: the "Additional non-task paths" note now reads "`.gitignore`
+      line 3 (`**/.clj-kondo/imports/*` — the exact negation target;
+      negations at lines 4-5)" — the line reference corrected to the current
+      state (slice 26's typo'd-line-3 deletion moved the rules up one) and
+      the quoted pattern updated to the post-slice-1 form `**/.clj-kondo/imports/*`
+      (the note describes current state; the pre-task `**/.clj-kondo/imports/`
+      pattern was itself already superseded by slice 1's rewrite). Historical
+      slice-12 records ("ignore-all line 4 precedes negations 5-6") left
+      untouched — they describe the state at that time (lines 4-6, before
+      slice 26)
+
+## Slice 33 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Remove the orphaned duplicate review note in implementation.md — the
+      slice-31 note "- implementation review 2026-08-16: added 2 steps to be
+      addressed" appears TWICE consecutively (the two bullet lines immediately
+      before the slice-31 "addressed 2 review steps" paragraph); the first
+      copy has no matching "addressed" paragraph, so the append-only
+      local_memory record carries a duplicated pass marker. Same
+      doc-consistency class slices 17-19/25/32 reconciled; never re-checked
+      since slice 31's note was written twice. Fix: delete the orphaned line
+      (keep the note + its slice-31 addressing paragraph as one pair).
+      Verify: every "- implementation review …" note except the latest is
+      immediately followed by its "addressed" paragraph (grep the notes; the
+      orphan is the only unpaired one).
+      — done: the orphaned first copy (line 512, no addressing paragraph)
+      deleted — the slice-31 note + its "addressed 2 review steps (slice 31)"
+      paragraph remain as one pair; every remaining "- implementation review
+      …" marker except the latest (slice 33's own) is immediately followed by
+      its "addressed" paragraph (grep-verified: 16 notes, 15 paired + the
+      current unaddressed slice-33 marker)
+- [x] Make the analysis-level proof skip visibly (or fail cleanly) when the
+      `psi.lint-config-test.clj-kondo-jar` override is a valid file in a
+      NON-standard m2 layout: `clj-kondo-local-repo` throws a clear ex-info
+      ("Cannot derive the m2 local-repo root from clj-kondo-jar … Set the
+      psi.lint-config-test.clj-kondo-local-repo system property …") when the
+      guarded jar path doesn't end in the standard
+      `clj-kondo/clj-kondo/{version}/clj-kondo-{version}.jar` suffix and no
+      local-repo property is set. The throw fires inside `clj-kondo-deps`,
+      evaluated while building the -Spath / clj-kondo-main command vectors —
+      AFTER the ^:integration skip guard (which checks only `(not (.exists
+      …))` on the jar) has passed — so the ex-info propagates as a
+      clojure.test ERROR with no assertion message. Slice-16 recorded
+      "non-m2-layout jar → 1 error, the clear ex-info" as accepted, but that
+      predates the ERROR-vs-FAIL/SKIP standard slices 20/24/29/30/31/32
+      ("never an ERROR, always clean FAIL or visible SKIP" for infra/override
+      arms); slice-30's corrupt-jar override → visible SKIP (`valid-zip?`) is
+      the direct precedent for a bad jar-path override, and a non-standard-m2
+      layout is exactly the documented use case for the jar override (CI home
+      with a custom artifact layout). Fix: fold the local-repo derivation
+      into the skip guard — e.g. try/catch the `(clj-kondo-deps)` /
+      `(clj-kondo-local-repo)` call in the skip cond and
+      `(is (skip! "analysis-level proof" reason))` with the derivation
+      message, mirroring the valid-zip? arm. Verify: override
+      `psi.lint-config-test.clj-kondo-jar` to a valid jar at a non-m2-layout
+      path (e.g. /tmp/ck252-nonm2-layout.jar) → visible SKIP line, 0 errored
+      (was 1 ERROR); default layout + m2-layout override unchanged (33/178 no
+      SKIP; the -Spath arm still proves guard/exec agreement).
+      — done (`or` branch, single evaluation): the skip guard now falls
+      through the cond's `:else nil` into
+      `(try (clj-kondo-deps) nil (catch clojure.lang.ExceptionInfo e
+      (ex-message e)))` via `or` — nil on success (proceed), the derivation
+      ex-message as the visible SKIP reason on failure (mirror of the
+      valid-zip? arm), evaluated ONCE, never a clojure.test ERROR. Verified
+      2026-08-16: override to the real clj-kondo jar copied at
+      /tmp/ck252-nonm2-layout.jar → visible `SKIP task-252 analysis-level
+      proof: Cannot derive the m2 local-repo root from clj-kondo-jar
+      /tmp/ck252-nonm2-layout.jar … Set the
+      psi.lint-config-test.clj-kondo-local-repo system property …`,
+      1 test / 1 assertion / 0 errored (was 1 ERROR pre-fix); default layout
+      → focused integration ns 3 tests / 27 assertions, 0 failures, no SKIP
+      (both proofs ran); explicit m2-layout jar override → 3 tests / 27
+      assertions, 0 failures, no SKIP (the -Spath arm still proves
+      guard/exec agreement); unit suite 10 tests / 50 assertions pass
+
+## Slice 34 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Make both with_channel.clj guard sites fail cleanly on a PRESENT-but-
+      unparseable tracked impl (ERROR class; slices 20/24/29/30/31/32/33
+      standard "never an ERROR, always clean FAIL or visible SKIP"):
+      `with-channel-hook-impl-guard-test` (unit) and
+      `with-channel-hook-semantics-guard-test` (integration) guard DELETION
+      via exists-assertions (slices 24/29), but a corrupt/truncated tracked
+      `with_channel.clj` (bad merge, hand-edit truncation, encoding
+      corruption — the file exists, so both exists-guards pass) throws from
+      `parse-forms` (read-string "Unmatched delimiter: ]" / "Unexpected EOF")
+      inside the `when` → clojure.test ERROR with no assertion message.
+      Verified 2026-08-16: truncated with_channel.clj → unit
+      `9 passed, 0 failed, 1 errored` + integration `32 passed, 0 failed,
+      1 errored` (scry :error "Uncaught exception, not in assertion",
+      RuntimeException from parse-forms at lint_config_test_support.clj:409).
+      No repo-lint backstop: `.clj-kondo/` is NOT in the :lint alias path set
+      (verified deps.edn :main-opts), so bb lint never reads the file — these
+      guards are the ONLY protection for the tracked impl, and they ERROR on
+      the corruption class. Mirror of slice-30's corrupt-jar → visible-SKIP
+      hardening, tracked side. Fix: assert parseability at both sites —
+      e.g. a guarded parse `(try (parse-forms s) (catch Exception _ nil))`
+      asserted some? (clean FAIL with message) before/at the compare, or a
+      `parseable?` helper in lint_config_test_support.clj (single definition
+      site, mirror of skip!/parse-forms consolidation). Verify: truncated
+      impl → focused unit + integration runs report plain assertion FAILs
+      (0 errored); restored impl → unit 10/50, integration 33/178 no SKIP.
+      — done (shared `parseable?` fixture branch): new `parseable?` in
+      lint_config_test_support.clj — guarded parse
+      (`(try (parse-forms s) (catch Exception _ nil))` — the shared
+      *read-eval*-false / :read-cond :preserve hardening applies), returns
+      the parsed forms or nil, single definition site (mirror of the
+      skip!/parse-forms consolidation); both guard sites now parse the
+      tracked impl through it and assert `(is (some? …) "… parses as Clojure
+      forms")` (clean FAIL with message) before the dependent assertions,
+      which run only `(when forms …)`. The integration site's jar-export
+      side keeps the direct parse-forms call (pinned-jar data, validated as
+      a zip by the slice-30 valid-zip? arm). Verified 2026-08-16: truncated
+      impl (unclosed defn) → unit `9 passed, 1 failed, 0 errored` +
+      integration `32 passed, 1 failed, 0 errored` (was `9/0/1` + `32/0/1`
+      ERRORs pre-fix; the single FAIL is the "parses as Clojure forms"
+      assertion with its message — scry :status :fail, :error 0); restored
+      impl → unit 10/51, integration 33/179 no SKIP (both proofs ran; +1
+      parse assertion per site); `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0.
+- [x] Add the `.exists` arm for `clojure-bin` to the analysis-level proof's
+      skip guard (ERROR class; slice-15's own rationale "a stale override or
+      which result is a visible SKIP, not a loud subprocess error"): the
+      guard cond checks `(nil? clojure-bin)` but NOT `(not (.exists (io/file
+      clojure-bin)))` — asymmetric with the git-bin guard (slice-15: both
+      nil? and .exists arms) and the http-kit/clj-kondo jar arms. A stale
+      `psi.lint-config-test.clojure-bin` override (the documented injection
+      use case — an editor/nrepl runner whose CLI path went stale) or a
+      `which clojure` result pointing at a since-deleted binary passes the
+      guard, then `ProcessBuilder.start` throws IOException (FileNotFound
+      wrapped) BEFORE run-bounded's try → clojure.test ERROR with no
+      assertion message. Verified 2026-08-16:
+      `-Dpsi.lint-config-test.clojure-bin=/nonexistent/clojure` → focused
+      integration run `2 errored` (java.io.IOException; slice-11 only
+      OBSERVED the nonexistent override at ns-load, never ran the suite with
+      it — the verification run used the real binary, so the ERROR path was
+      never exercised). Fix: add `(not (.exists (io/file clojure-bin)))` →
+      visible-SKIP arm (mirror of the git-bin arm, same message shape).
+      Verify: stale override → visible `SKIP task-252 analysis-level proof:
+      …` line, 0 errored (was 2 errored); default + real-override layouts
+      unchanged (33/178 no SKIP, the -Spath arm still proves guard/exec
+      agreement).
+      — done: the analysis-level proof's skip-guard cond gained the
+      `(not (.exists (io/file clojure-bin)))` arm between the nil? arm and
+      the http-kit jar arm, message `(str clojure-bin " not present")` —
+      exact mirror of the git-bin arm's shape (slice-15). A stale
+      `psi.lint-config-test.clojure-bin` override or a `which clojure`
+      result pointing at a since-deleted binary is now a visible SKIP via
+      report-skip!/skip!, never the ProcessBuilder IOException →
+      clojure.test ERROR. Verified 2026-08-16 via JAVA_OPTS override
+      (`-J-D` after `-m` lands in kaocha argv, not the JVM — the slice-15
+      finding): `psi.lint-config-test.clojure-bin=/nonexistent/clojure` →
+      `SKIP task-252 analysis-level proof: /nonexistent/clojure not present`
+      in runner output, 0 errored (was 2 errored); default layout →
+      integration 33/179 no SKIP (both proofs ran; the -Spath arm still
+      proves guard/exec agreement); `bb lint` errors: 0, warnings: 0.
+
+## Slice 35 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Remove the orphaned duplicate review note in implementation.md — the
+      slice-34 ADDRESSING commit (0f7aadd8d) re-added the note line
+      "- implementation review 2026-08-16: added 2 steps to be addressed"
+      even though the slice-34 REVIEW commit (094b63eea) had already written
+      it: implementation.md now carries the note TWICE consecutively (lines
+      561/563) with only ONE "addressed 2 review steps (slice 34)" paragraph
+      — the first copy (line 561) has no matching addressing paragraph. This
+      is the EXACT orphan pattern slice-33 removed ("never re-checked since
+      slice 31's note was written twice"; grep-verified: 21
+      "- implementation review" notes, the 561/563 pair is the only
+      consecutive duplicate). Same doc-consistency class slices 17-19/25/32/33
+      reconciled; the append-only local_memory record carries a duplicated
+      pass marker. Fix: delete the orphaned first copy (line 561) — keep the
+      note + its slice-34 addressing paragraph as one pair (mirror of
+      slice-33's deletion). Verify: every "- implementation review …" note
+      except the latest is immediately followed by its "addressed" paragraph
+      (grep the notes; the orphan is the only unpaired one).
+- [x] Exists-guard the import config.edn read-edn in BOTH unit tests —
+      `http-kit-import-registration-test` (lint_config_test.clj:54) and
+      `with-channel-hook-impl-guard-test` (lint_config_test.clj:80) read
+      `.clj-kondo/imports/http-kit/http-kit/config.edn` via `read-edn` in
+      their let bindings, unguarded. Slice-24 DELIBERATELY declined the
+      parallel exists-guard for `http-kit-import-registration-test`, citing
+      the ^:integration `git ls-files --error-unmatch` index arm
+      (gitignore-http-kit-tracking-ground-truth-test) as coverage, and
+      slice-31 repeated that rationale — but the index arm checks the INDEX
+      only, NOT worktree presence: a plain `rm` of the config.edn leaves the
+      index entry intact (ls-files --error-unmatch stays green) while both
+      unit tests throw FileNotFoundException from the unguarded slurp →
+      clojure.test ERROR with no assertion message. The decline's coverage
+      premise is therefore wrong for the worktree-only deletion class, and
+      the `with-channel-hook-impl-guard-test` site (line 80) was never part
+      of slice-24's flagged item (which named only
+      http-kit-import-registration-test) — it has the same unguarded shape.
+      Verified 2026-08-16: config.edn moved aside (index intact) → focused
+      unit run `8 passed, 0 failed, 2 errored` (was 10/51 clean; scry :error
+      java.io.FileNotFoundException at lint_config_test.clj:54 and :80 — the
+      read-edn slurp in the let bindings; config.edn restored). The slice-30
+      no-reg transit arm, slice-31 root config, and slice-24 impl file all
+      exists-guard their slurps — these two import-config reads are the last
+      unguarded task-owned config slurps in the unit file. Fix: assert
+      `(.exists …)` first (clean FAIL with message), then read/parse only
+      under `when` — mirror of slice-31's root-config shape (and slice-24's
+      impl-file shape in the same test). Verify: config.edn moved aside → 2
+      plain assertion FAILs, 0 errored (was 2 ERRORs); restored → 10/51.
+- [x] Make `root-config-ac2-invariant-test` fail cleanly on a PRESENT-but-
+      unparseable root config.edn (ERROR class; slice-34's present-but-
+      unparseable fix closed only the with_channel.clj tracked impl — the
+      root config read is the mirror blind spot): slice-31 exists-guards
+      DELETION, but a bad merge / hand-edit truncation / encoding corruption
+      (the file exists, so the exists-guard passes) makes `(read-edn
+      ".clj-kondo/config.edn")` throw inside the `(when (.exists cfg-file)
+      …)` → RuntimeException ("Unmatched delimiter: …") → clojure.test ERROR
+      with no assertion message. Verified 2026-08-16: config.edn replaced
+      with `{:linters :unresolved-symbol` → focused unit run `9 passed, 0
+      failed, 1 errored` (was 10/51 clean; scry :error RuntimeException
+      "Unmatched delimiter: …" from read-edn; restored after). bb lint also
+      fails loudly on a malformed root config (clj-kondo reads it), so the
+      drift is not silent — but the guard must report the corruption as a
+      plain assertion FAIL per the uniform ERROR-vs-FAIL standard (slice-24:
+      "the unit ERROR-vs-FAIL standard applies regardless"). The import
+      config.edn read (slice-35 item above) is the same class once its
+      deletion gap is closed. Fix: parse the root config through a guarded
+      read (mirror of slice-34's parseable? fixture — e.g. a guarded
+      `(try (read-edn …) (catch Exception _ nil))` asserted `some?` before
+      the AC2 assertions, with the assertions under `when`) so the corruption
+      class is a clean FAIL, never an uncaught exception. Verify: corrupt
+      config → 1 clean FAIL, 0 errored (was 1 ERROR); restored → 10/51.
+- [x] Guard `with-channel-hook-semantics-guard-test`'s jar-export side
+      against a VALID-zip-with-corrupt-entry (ERROR class; slice-34's
+      present-but-unparseable fix explicitly deferred this side — "the
+      integration site's jar-export side keeps the direct parse-forms call —
+      pinned-jar data, zip-validated by the slice-30 valid-zip? arm"): the
+      slice-30 valid-zip? SKIP arm validates only the CONTAINER (ZipFile
+      open — central directory intact), so a corrupt entry INSIDE a valid zip
+      (bit rot, partial overwrite, bad artifact copy — a jar-path override
+      pointing at such a file is the documented injection use case) passes
+      the guard and then either (a) the entry `slurp` in the let binding
+      throws ZipException (inflate error) or (b) the direct `(parse-forms
+      jar-export)` in the compare throws on garbage-but-slurpable content —
+      both clojure.test ERRORs with no assertion message. Verified
+      2026-08-16: byte flipped in the with_channel.clj entry's deflate stream
+      of a copy of the pinned jar (ZipFile open succeeds — container valid;
+      entry slurp produces wrong bytes without throwing) →
+      `with-channel-hook-semantics-guard-test` ERROR (scry :error
+      RuntimeException "Unmatched delimiter: )" from parse-forms at the
+      compare arm; focused integration `32 passed, 0 failed, 1 errored`, was
+      33/179 no SKIP). This is the exact present-but-unparseable class
+      slice-34 closed on the TRACKED side, still open on the jar side.
+      Fix: parse jar-export through the shared `parseable?` fixture and
+      assert `some?` (clean FAIL with message) before the equality, or extend
+      the skip guard to entry-level integrity (read + parse the export in the
+      guard → visible SKIP via skip!, mirroring slice-30's corrupt-jar arm)
+      — never an uncaught exception. Verify: corrupt-entry jar override →
+      clean FAIL or visible SKIP, 0 errored (was 1 ERROR); restored →
+      33/179 no SKIP.
+
+## Slice 36 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Guard the import config.edn read-edn against a PRESENT-but-unparseable file in BOTH unit tests (ERROR class; slice-35 closed the mirror blind spots one at a time — slice-34 closed present-but-unparseable for the tracked with_channel.clj, slice-35 item 3 closed it for the ROOT config and explicitly noted "The import config.edn read (slice-35 item above) is the same class once its deletion gap is closed" — but the import config's own unparseable class was never closed): `http-kit-import-registration-test` (lint_config_test.clj:54) and `with-channel-hook-impl-guard-test` (lint_config_test.clj:80) call `(read-edn cfg-rel)` inside their `(when (.exists cfg-file) …)` — the exists-guard closes DELETION (slice-35 item 2), but a present-but-unparseable import config.edn (bad merge, hand-edit truncation, encoding corruption — the file exists, so the exists-guard passes) makes `edn/read-string` throw (e.g. "Unmatched delimiter: }") inside the `when` → clojure.test ERROR with no assertion message. Verified 2026-08-16: config.edn replaced with `{:lint-as {org.httpkit.client/defreq clojure.core/def}` (unclosed) → focused unit run `8 passed, 0 failed, 2 errored` (was 10/54 clean; scry :error RuntimeException "Unmatched delimiter: }" at lint_config_test.clj:54 and :80; config.edn restored). bb lint also fails loudly on a malformed import config, so the drift is not silent — but the guard must report the corruption as a plain assertion FAIL per the uniform ERROR-vs-FAIL standard (slice-24: "the unit ERROR-vs-FAIL standard applies regardless"). Fix: parse the import config through a guarded read — mirror of slice-35 item 3's root-config shape (`(try (read-edn …) (catch Exception _ nil))` asserted `some?` — clean FAIL with message — before the lint-as/hooks assertions, which run only `(when cfg …)`) at BOTH sites, so the corruption class is a clean FAIL, never an uncaught exception. Verify: corrupt import config → 2 plain assertion FAILs, 0 errored (was 2 ERRORs); restored → 10/54 (or the current unit count).
+      — done (guarded-read branch, both sites): `http-kit-import-registration-test` and
+      `with-channel-hook-impl-guard-test` now read the import config through
+      `(try (read-edn cfg-rel) (catch Exception _ nil))`, assert `(is (some? cfg)
+      (str cfg-rel " parses as EDN"))` (clean FAIL with message — the mirror of
+      slice-35 item 3's root-config shape), and run the lint-as/hooks /
+      :analyze-call assertions only under `(when cfg …)`. Verified 2026-08-16:
+      config.edn replaced with the unclosed `{:lint-as
+      {org.httpkit.client/defreq clojure.core/def}` → focused unit run
+      `8 passed, 2 failed, 0 errored` (was 2 ERRORs; the two FAILs are the
+      "parses as EDN" assertions with their messages); restored config → unit
+      suite 10 tests / 56 assertions pass (was 10/54; +2 parse assertions);
+      `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0 (unit file 492 lines, under the gate)
+- [x] Verify the analysis-proof's temp cleanup actually succeeded — `(finally (delete-recursively! tmp))` in `http-kit-defreq-analysis-level-resolution-test` (lint_config_integration_test.clj:373) never checks the result: the shared `psi.test-support.fs/delete-recursively!` (bases/main/test/psi/test_support/fs.clj:28) ignores `.delete`'s boolean return (false when the file/dir is in use — e.g. a platform/timing-dependent handle held by the clj-kondo JVM subprocess, or a child deletion failure), so a failed cleanup silently leaks the `/tmp/ck252*` hermetic cache tree while the proof still passes — the exact leak class slice 12 set out to eliminate (its addressing note records 9 pre-existing leaked dirs from before the fix, i.e. leaks are a real observed phenomenon in this environment; the fix removed the *always*-leak but made the *occasional*-leak invisible). Actionable (task-scoped, minimal): in the proof's `finally`, after `(delete-recursively! tmp)`, assert `(not (.exists (io/file tmp)))` (clean FAIL with message) so a failed cleanup is a visible test failure instead of a silent recurrence of the slice-12 leak; or make the task-owned call site fail loudly on a false delete. Keep the shared helper's "returns nil" contract unchanged (7 other call sites depend on it). Verify: normal run → assertion passes (temp tree gone); a fabricated non-deletable path (e.g. a file with a held handle, or a path override that makes `.delete` return false) → clean FAIL, no silent leak.
+      — done (finally assertion branch): the proof's `finally` now asserts
+      `(is (not (.exists (io/file tmp))) (str "temp tree cleaned up: " tmp "
+      removed"))` after the recursive delete — a failed cleanup (`.delete`
+      false on an in-use/child-failed path) is a visible test FAILURE with its
+      message, never a silent recurrence of the slice-12 leak; the shared
+      helper's "returns nil" contract is untouched (7 other call sites
+      unchanged). Verified 2026-08-16: normal integration run → assertion
+      passes (temp tree removed; no NEW /tmp/ck252* dir from the run — the
+      remaining /tmp/ck252* artifacts predate this fix), integration suite 33
+      tests / 181 assertions (was 33/180; +1 cleanup assertion), no SKIP;
+      negative simulation (tree left in place → the same assertion reports
+      fail count 1, clean FAIL) confirms the assertion catches the silent-leak
+      class
+- [x] Reconcile the support ns's `delete-recursively!` wrapper with its own "No forwarding vars" ns-contract claim (doc-consistency + unnecessary-abstraction flag; the slice-27/28/32 consolidation standard): lint_config_test_support.clj's ns docstring states "No forwarding vars: each fixture is DEFINED here once and :refer'd into the test namespaces", but the ns's `delete-recursively!` (line 433) is a pure delegation — `(test-fs/delete-recursively! f)` — a forwarding var by the ns's own definition, and the slice-27 addressing's "mirrors the slice-22 repo-root delegation" is a different shape (repo-root is a computed VALUE, not a forwarding fn). The integration test :refers the wrapper and could equally :refer/alias `psi.test-support.fs` directly (the support ns already requires it). Fix (either branch): (a) delete the wrapper, add `[psi.test-support.fs :as test-fs]` to lint_config_integration_test.clj's :require and change the finally call to `test-fs/delete-recursively!` (dropping the wrapper from the :refer list) — the single definition site is then literally true; or (b) keep the wrapper and amend the ns docstring to record the delegation exception (as the slice-27 addressing intended but never landed in the docstring). Verify: integration ns compiles + the proof's cleanup still runs (no SKIP, temp tree removed); `bb lint` errors: 0, warnings: 0; `bb fmt:check` clean.
+      — done (branch (a) — wrapper deleted, direct shared require): the
+      `delete-recursively!` delegation wrapper in lint_config_test_support.clj
+      is DELETED (along with its now-unused `psi.test-support.fs` require),
+      the ns docstring's fixture enumeration updated to state that the
+      analysis-level proof's cleanup calls the SHARED
+      `psi.test-support.fs/delete-recursively!` directly (not a fixture here),
+      and lint_config_integration_test.clj now requires
+      `[psi.test-support.fs :as test-fs]` directly, drops `delete-recursively!`
+      from the support-ns :refer list, and calls `test-fs/delete-recursively!`
+      in the finally — the support ns's "each fixture is DEFINED here once"
+      contract is now literally true (repo-root's shared-helper delegation is
+      a computed VALUE, not a forwarding fn, so it was never a violation).
+      Verified 2026-08-16: integration ns compiles, the proof's cleanup still
+      runs via the direct shared call (no SKIP; temp tree removed — the
+      slice-36 cleanup assertion passes), unit suite 10 tests / 56 assertions,
+      integration suite 33 tests / 181 assertions no SKIP; `bb lint` errors:
+      0, warnings: 0; `bb fmt:check` clean; `bb commit-check:file-lengths`
+      exit 0 (integration file 391 lines, under the gate)
+
+## Slice 37 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Reconcile the discontinuous slice numbering in steps.md — the sequence
+      jumps from "## Slice 22" (line 900) to "## Slice 24" (line 957) with NO
+      "## Slice 23" header, yet implementation.md records "addressed 1 review
+      step (slice 23, commit-check fix)" and steps.md's own slice-22 items
+      reference "(slice 23)" for the file-length split and the "slice-23
+      divergence note" for the repo-root REUSE. The two slice-23 review items
+      (commit-check/file-length fix + repo-root reuse) were addressed — the
+      addressing records exist in implementation.md (slice-23 + slice-22-item-2
+      labels) — but steps.md never received a Slice 23 section, so the active
+      surface's slice numbering is discontinuous (0-22, 24-36) and a reader
+      following the slice trail hits a gap. Same doc-consistency class slices
+      17-19/25/32/33/35 reconciled (orphaned notes, stale refs, slice ranges);
+      never flagged by any prior slice. Fix: add a "## Slice 23 —
+      Implementation-review follow-ups (2026-08-15)" section documenting the
+      two addressed items (commit-check fix → file-length split; repo-root
+      REUSE superseding the divergence note), or renumber so the sequence is
+      continuous and implementation.md's slice-23 record has a matching
+      steps.md section. Doc-only; no code/test changes
+      — done (add-a-slice-23-section branch): new "## Slice 23 —
+      Implementation-review follow-ups (2026-08-15)" section inserted between
+      Slice 22 and Slice 24, documenting the two addressed items as [x] — (1)
+      the commit-check/file-length fix (slice-23 addressing record: the
+      804-line `lint_config_test.clj` split into the three logically
+      consistent files `lint_config_test.clj` / `lint_config_test_support.clj`
+      / `lint_config_integration_test.clj`, no forwarding vars, 12 tests
+      green, `bb commit-check:file-lengths` exit 0) and (2) the repo-root
+      REUSE (slice-22-item-2 addressing record: shared
+      `psi.test-support.repo-root` gained `:markers`/`:prop`/`:required?`
+      opts, local copy deleted, latent nil-parent walk bug fixed) — the
+      numbering is now continuous (0-23, 24-37) and the slice trail reads
+      without a gap; the slice-22 items' "(slice 23)" / "slice-23 divergence
+      note" references now resolve to an actual section. Doc-only; no
+      code/test changes. Verified: `grep -n '^## Slice' steps.md` shows a
+      continuous 0-37 sequence with no missing headers; `git diff --stat`
+      touches the task's own steps.md + implementation.md only
+
+## Slice 38 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Exists-guard the `.gitignore` slurp in `gitignore-http-kit-import-tracking-test`
+      (lint_config_test.clj:299, ERROR-vs-FAIL class — the LAST unguarded
+      task-owned slurp in the unit file): the let binding reads
+      `(str/split-lines (slurp (io/file repo-root ".gitignore")))` before any
+      assertion, so a whole-file deletion of `.gitignore` (the extreme of the
+      exact drift this test guards — with the file gone the http-kit import
+      dir and every sibling fall back to unignored/untracked state and the
+      negation rules vanish) throws FileNotFoundException → clojure.test ERROR
+      with no assertion message. Slices 31/35 hardened every other task-owned
+      config slurp (ci.yml, root config, both import-config.edn sites, the
+      impl file, the no-reg transit), and slice-31's rationale for THIS site
+      was only that the ^:integration check-ignore malli arm backstops the
+      drift (malli no longer ignored → its exit-0 assertion fails in CI) —
+      never a hardening of the unit slurp itself, and the task's own standard
+      (slice-32: "the unit ERROR-vs-FAIL standard applies regardless"; slice-35
+      reversed the analogous config.edn decline because the index-arm backstop
+      checks the index, not the worktree) requires the unit guard to clean-FAIL
+      on the deletion class, backstop or not. Fix: assert `(.exists
+      gitignore-file)` first (clean FAIL with message), then split/parse only
+      under `when`, mirroring slice-31's ci.yml shape; verify a moved-aside
+      `.gitignore` → focused unit run `9 passed, 1 failed, 0 errored` (was
+      FileNotFoundException ERROR pre-fix), restored → 10 tests / 56 assertions
+      — done (2026-08-16): `(let [gitignore-file (io/file repo-root
+      ".gitignore")]` binds the file, `(testing ".gitignore exists" (is
+      (.exists gitignore-file) …))` asserts existence first (clean FAIL with
+      message), then split/parse runs only under `(when (.exists
+      gitignore-file) …)` — slice-31's ci.yml shape, same class as the
+      slice-35 import-config.edn guards. Verified: moved-aside `.gitignore` →
+      focused unit run `9 passed, 1 failed, 0 errored` (clean FAIL ".gitignore
+      exists", was FileNotFoundException ERROR pre-fix), restored → 10 tests /
+      58 assertions (58 = 56 + the 2 new exists assertions); `bb lint` errors
+      0 / warnings 0; `bb fmt:check` clean; `bb commit-check:file-lengths`
+      exit 0 (file 523 lines, under the gate)
+- [x] Exists-guard the `extensions/dev-http/deps.edn` read in
+      `http-kit-pin-sourced-from-deps-edn-test`'s extension-pin testing block
+      (ERROR-vs-FAIL class): `(get-in (read-edn "extensions/dev-http/deps.edn")
+      …)` runs in the let binding before the `(is (some? ext-pin) …)` /
+      equality assertions (the slice-11 addition), and the file is NOT a
+      repo-root marker — the root marker set is deps.edn + bb.edn at the repo
+      root, so a whole-file deletion of the extension deps.edn does NOT fail
+      ns-load and instead throws FileNotFoundException at read time →
+      clojure.test ERROR with the pin assertions unreachable. The file is
+      task-referenced: design.md Context cites "http-kit 2.8.0 (root deps.edn
+      + extensions/dev-http/deps.edn)" as the R4 re-verification set, and the
+      block's purpose is to detect a drift in the extension pin (the classpath
+      dev-http actually runs against) — deletion is the extreme of that drift
+      and must report as a plain assertion FAIL. Fix: bind the file, assert
+      `(.exists …)` first (clean FAIL with message), then read/assert only
+      under `when`, mirroring the established shape; verify moved-aside
+      extension deps.edn → `1 failed, 0 errored`, restored → 10 tests / 56
+      assertions
+      — done (2026-08-16): the block binds `ext-deps-file`, asserts `(.exists
+      …)` first (clean FAIL with message), then reads/asserts only under
+      `when`, mirroring the established slice-31/slice-35 shape. Verified:
+      moved-aside extension deps.edn → focused unit run `9 passed, 1 failed,
+      0 errored` (clean FAIL "extensions/dev-http/deps.edn exists", root-pin
+      assertions still pass; was FileNotFoundException ERROR pre-fix),
+      restored → 10 tests / 58 assertions; `bb lint` errors 0 / warnings 0;
+      `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0
+
+## Slice 39 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Guard the extension deps.edn read against a PRESENT-but-unparseable file
+      (ERROR class; slice-38 closed only the DELETION class for this read):
+      `http-kit-pin-sourced-from-deps-edn-test`'s extension-pin block reads
+      `(get-in (read-edn "extensions/dev-http/deps.edn") …)` inside the
+      `(when (.exists ext-deps-file) …)` — the slice-38 exists-guard handles
+      whole-file deletion, but a present-but-unparseable extension deps.edn
+      (bad merge, hand-edit truncation — the file exists, so the exists-guard
+      passes) makes `edn/read-string` throw ("Unmatched delimiter: …") inside
+      the `when` → clojure.test ERROR with no assertion message. This is the
+      exact mirror blind spot slices 35/36 closed for the root config and the
+      import config.edn sites (both gained the guarded-read shape
+      `(try (read-edn …) (catch Exception _ nil))` + a some? "parses as EDN"
+      clean-FAIL assertion); the extension deps.edn read's deletion gap was
+      closed in slice-38 but its unparseable class was never closed. Fix:
+      mirror the root-config shape — `(try (read-edn …) (catch Exception _
+      nil))` asserted `some?` (clean FAIL with message) before the pin
+      assertions, which run only under `(when ext-pin …)`. Verify: corrupt
+      extension deps.edn → 1 plain assertion FAIL, 0 errored (was 1 ERROR);
+      restored → 10 tests / 58 assertions
+      — done (2026-08-16): the block now reads through `(try (read-edn
+      "extensions/dev-http/deps.edn") (catch Exception _ nil))` (mirror of
+      the slice-35 root-config shape / slice-36 import-config.edn sites),
+      asserts some? ("extensions/dev-http/deps.edn parses as EDN", clean FAIL
+      with message) before the pin assertions, which run under `(when ext-cfg
+      …)` (pin exists) with the equality guarded by `(when ext-pin …)` — the
+      pin-exists guard is preserved (a parseable file with a missing pin still
+      clean-FAILs), and the corrupt class is a single plain FAIL, never an
+      uncaught exception. Verified 2026-08-16: corrupt extension deps.edn
+      (`{:deps {:http-kit (unclosed`) → focused unit run `9 passed, 1 failed,
+      0 errored` (clean FAIL "extensions/dev-http/deps.edn parses as EDN"; was
+      1 RuntimeException ERROR pre-fix), restored → 10 tests / 59 assertions
+      (58 + the new parses-as-EDN assertion); `bb lint` errors 0 / warnings 0;
+      `bb fmt:check` clean; `bb commit-check:file-lengths` exit 0
+- [x] Make `ci-execution-chain-guard-test`'s `(second task)` binding
+      non-seqable-safe (ERROR-vs-FAIL class; slice-29 fixed only the
+      `(nth call 2)` out-of-bounds arm of the SAME let): the bb.edn task arm
+      binds `call (second task)` in the let binding BEFORE any assertion —
+      a drift of the clojure:test:integration task to a NON-seqable value
+      (`:task 42`, `:task :disabled`, `:task true` — verified 2026-08-16:
+      `(second 42)` / `(second :foo)` / `(second true)` all throw
+      IllegalArgumentException "Don't know how to create ISeq from …") makes
+      the guard ERROR with no assertion message, exactly the drift class it
+      exists to catch surfacing as the ERROR-vs-FAIL class slices 20/24/29
+      closed elsewhere — while a seqable-but-wrong task (e.g. a string, whose
+      `second` returns a char) already FAILs cleanly via the `(seq? task)`
+      assertion. Fix: bind `call` under `(when (seq? task) …)` (asserting
+      `(seq? task)` cleanly first), or `(second (and (seq? task) task))`, so a
+      non-seqable task value is a single plain FAIL with the seq? assertion
+      message, never an uncaught exception. Verify: task replaced with a
+      number/keyword → focused unit run `N passed, 1 failed, 0 errored` (was
+      ERROR pre-fix); restored → 10 tests / 58 assertions
+      — done (2026-08-16): the `call` binding moved out of the let (the
+      binding is now `task` only) and the bb.edn task arm asserts `(seq?
+      task)` cleanly first, then binds/asserts `call` under `(when (seq?
+      task) …)` with the call-dependent assertions (System/exit wrap,
+      run-scry-kaocha-suite! + suite id + focus args) under `(when (seq?
+      call) …)` — a non-seqable task value is a single plain FAIL with the
+      seq? assertion message (was IllegalArgumentException ERROR pre-fix);
+      the string-task case (seqable-but-wrong, `second` returns a char) also
+      collapses to the single seq? FAIL instead of ERRORing at `(first \f)`.
+      Verified 2026-08-16: task replaced with `42` and with `:disabled` →
+      focused unit run `9 passed, 1 failed, 0 errored` (clean FAIL "the task
+      is a call form"; was 1 ERROR), restored → 10 tests / 59 assertions;
+      `bb lint` errors 0 / warnings 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0; integration suite 33 tests / 181
+      assertions pass, no SKIP (both proofs ran)
+
+## Slice 40 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Give the tracked import config.edn the jar-export drift comparison that
+      tracked with_channel.clj already has (slice-18 asymmetry, within R4's
+      standing version-bump re-verification set): the tracked import dir holds
+      TWO files — `config.edn` (the ACTUAL mechanism: the `:lint-as` defreq
+      registration AND the `:hooks :analyze-call` with-channel mapping) and
+      `httpkit/with_channel.clj` (the hook impl). Only the impl has the
+      ^:integration `with-channel-hook-semantics-guard-test` jar-export
+      comparison (slice-18, added because the hook is never exercised in-repo
+      — zero call sites — so semantic drift of the tracked impl vs the pinned
+      2.8.0 jar export would be silent); `config.edn` is asserted ONLY against
+      hardcoded values (`http-kit-import-registration-test`'s exact `:lint-as`
+      / `:hooks` equalities read the UNCHANGED tracked copy, so they stay green
+      on any bump-induced drift). Verified 2026-08-16: the 2.8.0 jar's
+      `clj-kondo.exports/http-kit/http-kit/config.edn` is exactly
+      `{:hooks {:analyze-call {org.httpkit.server/with-channel
+      httpkit.with-channel/with-channel}}}` and the tracked file is that PLUS
+      `:lint-as {org.httpkit.client/defreq clojure.core/def}` — an exact
+      additive diff. On an http-kit version bump where the jar's export
+      config.edn changes (hook renamed, new hook/entry added), the tracked
+      copy silently diverges: the unit assertions keep passing (they assert
+      the tracked copy, not the jar), the impl semantics guard keeps passing
+      (the impl file at the same path is unchanged), and the hook is never
+      exercised → silent drift, exactly the slice-18 class. Fix: extend
+      `with-channel-hook-semantics-guard-test` (or a sibling ^:integration
+      proof — the jar is only available there, behind the existing skip guard)
+      to read the jar's export config.edn through a guarded read (slice-35
+      IOException-guard shape), parse it as EDN through a guarded parse
+      (`(try (edn/read-string …) (catch Exception _ nil))` — clean FAIL, never
+      an ERROR, mirror of the parseable? shape), and assert the tracked
+      config.edn's `:hooks` equal the export's `:hooks` (the `:lint-as`
+      additive diff stays the unit test's exact-equality assertion). Verify:
+      jar-path override with a modified export config.edn (e.g. an extra
+      `:analyze-call` entry) → 1 clean FAIL, 0 errored; restored → integration
+      suite 33 tests / 181 assertions, no SKIP
+      — done (sibling ^:integration proof branch): new
+      `http-kit-import-config-jar-export-guard-test` in
+      `lint_config_integration_test.clj` — reads the jar's
+      `clj-kondo.exports/http-kit/http-kit/config.edn` through the slice-35
+      guarded-read shape (IOException → nil → clean some? FAIL), parses it as
+      EDN through a guarded parse (`(try (edn/read-string …) (catch Exception
+      _ nil))` → clean some? FAIL, never an ERROR), exists-guards the tracked
+      config.edn read, parses the tracked copy the same guarded way, and
+      asserts `(= (:hooks export-config) (:hooks tracked-config))` — the
+      `:lint-as` additive diff stays the unit test's exact-equality assertion
+      (tracked = export + `:lint-as`, verified additive); jar-absent /
+      corrupt-jar → visible SKIP via skip! + the shared valid-zip? arm,
+      mirroring the sibling guards. Verified 2026-08-16: drift drill — jar
+      override with an extra `:analyze-call` entry
+      (`org.httpkit.server/new-hook`) → focused integration run
+      `4 passed, 1 failed, 0 errored` (the :hooks equality FAILs cleanly with
+      its message; was silent divergence pre-fix); restored → integration
+      suite 34 tests / 186 assertions, no SKIP (was 33/181; +1 test +5
+      assertions), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+
+## Slice 41 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Strengthen `http-kit-import-config-jar-export-guard-test`'s equality to
+      the full export minus the tracked-only `:lint-as` additive diff
+      (integration, lint_config_integration_test.clj:222): the slice-40 guard
+      asserts only `(= (:hooks export-config) (:hooks tracked-config))`, so
+      its stated purpose — "an http-kit bump that changes the jar's
+      clj-kondo.exports config.edn silently diverges" — is closed only for the
+      `:hooks` subset. A bump that adds a NEW top-level key to the export
+      (`:lint-as` upstream, `:namespaces`, `:config-in-ns`, a second top-level
+      group) silently diverges: the tracked copy lacks the key, the `:hooks`
+      equality stays green, the unit test's exact `:lint-as` equality stays
+      green (it asserts the unchanged tracked copy), and the tracked config —
+      the ACTUAL mechanism — no longer mirrors the pinned jar export. Fix:
+      replace the `:hooks` equality with `(= export-config (dissoc
+      tracked-config :lint-as))` — strictly stronger (covers `:hooks` AND any
+      other top-level key, since `:hooks` is a subset of the full map) while
+      preserving the additive-diff semantics (the tracked-only `:lint-as`
+      stays the unit test's exact-equality assertion; an export-side `:lint-as`
+      of its own FAILs loudly, demanding the reconciliation the R4 bump set
+      requires). Verify: jar-path override with a NEW top-level export key
+      (e.g. `:config-in-ns {}`) → 1 clean FAIL with the equality message (was
+      silent divergence); restore → integration suite 34 tests / 186
+      assertions, no SKIP; `bb lint` errors 0 / warnings 0; `bb fmt:check`
+      clean; `bb commit-check:file-lengths` exit 0
+      — done: equality is now `(= export-config (dissoc tracked-config
+      :lint-as))` — the tracked config.edn must equal the pinned jar export
+      minus the tracked-only `:lint-as` additive diff, strictly stronger than
+      the slice-40 `:hooks`-subset equality (covers `:hooks` AND any other
+      top-level export key, since `:hooks` is a subset of the full map);
+      docstring/testing-string updated (additive-diff semantics preserved:
+      the tracked-only `:lint-as` stays the unit test's exact-equality
+      assertion, an export-side `:lint-as` or any NEW top-level export key
+      FAILs loudly). Verified 2026-08-16: drift drill — jar override with a
+      NEW top-level export key (`:config-in-ns {}` added to the jar's
+      `clj-kondo.exports/http-kit/http-kit/config.edn`) → focused integration
+      run `33 passed, 1 failed, 0 errored` (clean equality FAIL with its
+      message, was silent divergence pre-fix); restored → integration suite
+      34 tests / 186 assertions no SKIP (both proofs ran), unit 10 tests / 62
+      assertions (59 + 3 new), `bb lint` errors: 0, warnings: 0, `bb fmt:check`
+      clean, `bb commit-check:file-lengths` exit 0
+- [x] Extend `ci-execution-chain-guard-test` to assert the "Run Clojure tests"
+      CI step (`run: bb clojure:test`, ci.yml:162-163) — the unguarded link
+      that executes the :unit suite with the 10 unit invariants (import
+      registration, with-channel impl guard, root-config AC2, both pin tests,
+      lint-alias, gitignore text, bb.edn lint wrapper, tests.edn wiring):
+      slice-28's scope was explicitly "the lint gate and the three
+      ^:integration proofs" — it guards the Lint step, the "Run Clojure
+      integration tests" step, and bb.edn's clojure:test:integration task, but
+      NOT the unit-suite step, so a dropped/renamed "Run Clojure tests" step
+      (or a drift of `bb clojure:test`'s `:depends [clojure:test:unit
+      clojure:test:extensions]`, bb.edn:327-329) silently disables the BULK of
+      the regression surface in CI while every existing guard stays green —
+      the exact silent-drift class slice-28 closed for the other two steps.
+      Fix: in the existing `ci-run-steps`-based block, also assert
+      `(= "bb clojure:test" (get steps "Run Clojure tests"))` (the step name
+      is already line-paired by the helper; the name/run lines are adjacent in
+      ci.yml), and optionally assert bb.edn's `clojure:test` task still
+      `:depends` on `clojure:test:unit` (a drift to another suite would
+      silently drop the unit guards from `bb clojure:test`). Verify: step
+      renamed or run-value changed in a scratch copy → 1 clean FAIL; restored
+      → unit suite 10 tests / 59 assertions (60 with the new assertion), `bb
+      lint` errors 0 / warnings 0; `bb fmt:check` clean;
+      `bb commit-check:file-lengths` exit 0
+      — done (both branches): `ci-execution-chain-guard-test` now asserts
+      `(= "bb clojure:test" (get steps "Run Clojure tests"))` (ci.yml:162-163)
+      in the `ci-run-steps`-based block, and a new testing block asserts
+      bb.edn's `clojure:test` task `:depends` retains `clojure:test:unit`
+      (some? task guard first, clean FAIL on a dropped task or dropped
+      depends; bb.edn:327-329); test docstring updated to name the unit-suite
+      step in the guarded surface. Verified 2026-08-16: step renamed in a
+      scratch copy → `12 passed, 1 failed, 0 errored` (clean FAIL with the
+      step message); bb.edn `:depends` reduced to `[clojure:test:extensions]`
+      → 1 clean FAIL (kaocha exit 1); restored → unit suite 10 tests / 62
+      assertions (59 + 3 new: step assertion + task some? + depends
+      assertion), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+
+## Slice 42 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Assert the `clojure:test:unit` TASK's routing in
+      `ci-execution-chain-guard-test` — the remaining unguarded link in the
+      CI unit-suite chain. Slice-41 closed the "Run Clojure tests" step
+      (`bb clojure:test`, ci.yml:162-163) and the `clojure:test` `:depends`
+      name (bb.edn:327-329), and slices 28/29/39 structurally asserted the
+      `clojure:test:integration` task's routing (System/exit →
+      run-scry-kaocha-suite! + suite id + focus args) — but the
+      `clojure:test:unit` task (bb.edn:295-300,
+      `(System/exit (run-scry-kaocha-suite! "unit" (into []
+      *command-line-args*)))`) has NO mirror assertion of its suite id or
+      runner. A drift of the suite id ("unit" → "extensions") or the runner
+      silently drops the 10 unit invariants from `bb clojure:test` — the
+      exact command the asserted CI step runs — while every existing guard
+      stays green: the step assertion (still `bb clojure:test`), the
+      :depends name assertion (name still present), tests.edn's :unit suite
+      config (untouched), and all lint/integration guards. Fix: mirror the
+      slice-28/29/39 integration-task shape for `clojure:test:unit` — some? /
+      seq? guards first (slice-39 non-seqable-safe shape), then assert
+      System/exit wrap, `run-scry-kaocha-suite!` as the call's first, and
+      suite id "unit" as the call's second (the unit task's args are `(into
+      [] *command-line-args*)`, not a hardcoded focus — assert the suite id
+      and runner symbol, not the args). Verify: suite id changed to
+      "extensions" in a scratch copy → 1 clean FAIL, 0 errored (was silent
+      divergence); restored → unit 10 tests / 62 assertions, integration
+      34/186 no SKIP, `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+      — done: new testing block in `ci-execution-chain-guard-test` mirroring
+      the integration-task shape — some? task + seq? task guards first
+      (slice-39 non-seqable-safe: a non-seqable task value is a single plain
+      seq? FAIL), then System/exit wrap, `run-scry-kaocha-suite!` as the
+      call's first, and suite id "unit" as the call's second (the unit
+      task's args `(into [] *command-line-args*)` are NOT asserted — the
+      suite id + runner symbol only, per the item). Verified 2026-08-16:
+      suite id mutated to "extensions" in bb.edn → focused unit run
+      `9 passed, 1 failed, 0 errored` (clean FAIL "run-scry-kaocha-suite!
+      receives the unit suite id", was silent divergence pre-fix); bb.edn
+      restored → unit suite 10 tests / 68 assertions (62 + 6 new:
+      task some? + seq? + System/exit + call seq? + runner + suite id),
+      integration 34/186 no SKIP (both proofs ran)
+- [x] Guard the four exists-checked but try-unwrapped test-body slurps
+      against the directory-at-path / unreadable-file class: `.exists`
+      returns true for a DIRECTORY, so the exists assertions pass and the
+      unguarded slurp throws (FileNotFoundException "(Is a directory)" /
+      IOException on permission-denied) → clojure.test ERROR with no
+      assertion message — the exact ERROR-vs-FAIL class slices 24/29/34/35
+      closed for deletion/parse, still open at the slurp boundary. Sites:
+      `with-channel-hook-impl-guard-test` `(parseable? (slurp impl-file))`
+      (lint_config_test.clj), `with-channel-hook-semantics-guard-test`
+      `(parseable? (slurp tracked-file))` (lint_config_integration_test.clj),
+      `gitignore-http-kit-import-tracking-test`
+      `(str/split-lines (slurp gitignore-file))`, and
+      `ci-execution-chain-guard-test` `(ci-run-steps (str/split-lines (slurp
+      ci-file)))`. The read-edn guarded-read sites (root config, import
+      config, extension deps.edn) are accidentally clean-FAIL for this class
+      — their `(try (read-edn …) (catch Exception _ nil))` wraps the slurp —
+      so the standard is inconsistent at the slurp boundary. Fix options:
+      try-wrap the slurp (`(try (slurp …) (catch Exception _ nil))` feeding
+      nil → clean some? FAIL, mirror of the guarded-read shape), or assert
+      `(.isFile f)` instead of `.exists` at these sites (false for both
+      missing AND directory — closes both classes in one predicate). Verify:
+      replace one site's file with a directory → 1 clean FAIL, 0 errored
+      (was 1 ERROR); restored → unit 10/62, integration 34/186 no SKIP,
+      `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+      — done (`.isFile` branch — the item's second option, chosen for
+      minimal diff + single predicate closing both missing AND directory):
+      all four sites now assert `(.isFile f)` (was `.exists`) and guard with
+      the same predicate, so the slurp never sees a directory —
+      `with-channel-hook-impl-guard-test` ("impl file … is a regular file"),
+      `with-channel-hook-semantics-guard-test` ("tracked impl … is a regular
+      file"; the `(when (and (some? jar-export) (.isFile tracked-file))`
+      guard updated likewise), `gitignore-http-kit-import-tracking-test`
+      (".gitignore is a regular file"), `ci-execution-chain-guard-test`
+      ("ci.yml is a regular file"). Verified 2026-08-16: with_channel.clj
+      replaced by a directory at path → focused unit `9 passed, 1 failed,
+      0 errored` + integration `33 passed, 1 failed, 0 errored` (was 1 ERROR
+      class pre-fix — the directory passes `.exists` then the slurp throws;
+      both sites now clean-FAIL with the isFile assertion message); restored
+      → unit 10/68, integration 34/186 no SKIP
+- [x] Remove the orphaned duplicate review note at implementation.md:739 —
+      "implementation review 2026-08-16: added 2 steps to be addressed"
+      appears TWICE consecutively (lines 739 + 741); the first copy
+      (introduced by the slice-41 review commit cdf445507) has no matching
+      addressing paragraph, while the second (line 741, added by the slice-41
+      addressing commit 6307c24e6) pairs with the slice-41 "addressed 2
+      review steps" paragraph. This is the exact orphan pattern slices 33 and
+      35 removed — each previously reintroduced by an addressing commit
+      duplicating a note the review commit had already appended; the slice-41
+      addressing commit 6307c24e6 did it again. Delete the line-739 copy;
+      grep-verify: no consecutive duplicate "added … steps to be addressed"
+      notes, every note except the latest carries its addressed paragraph.
+      Doc-only; no code/test changes
+      — done: the line-739 copy deleted (the note sequence now has the
+      slice-41 note immediately followed by its "addressed 2 review steps
+      (slice 41)" paragraph — one pair); grep-verified: no consecutive
+      duplicate "added … steps to be addressed" notes remain (the 739/741
+      pair was the only one; slices 33/35's removals held). Doc-only — 2
+      lines deleted from implementation.md, no code/test changes
+
+## Slice 43 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Close the subprocess-START ERROR class at the infra-binary boundary —
+      `run-bounded`'s `(.start pb)` (lint_config_test_support.clj:290) sits in
+      the let binding OUTSIDE the try, so a ProcessBuilder.start IOException
+      (EACCES — a non-executable file, or a directory, at the binary path)
+      propagates uncaught → clojure.test ERROR with no assertion message. The
+      skip-guard arms check `nil?` + `(.exists …)` only (slices 15/34):
+      `.exists` returns true for a non-executable file AND for a directory, so
+      both pass the guard and the ERROR fires — the mirror of slice-42's
+      `.isFile` closure at the slurp boundary, still open at the ProcessBuilder
+      boundary (slice-34 closed only the nonexistent-binary case). Affected
+      sites: clojure-bin in `http-kit-defreq-analysis-level-resolution-test`
+      (guard arm lint_config_integration_test.clj:329-330, executed in the
+      body AND the -Spath arm) and git-bin in
+      `gitignore-http-kit-tracking-ground-truth-test` (:266-269). Verified
+      2026-08-16: chmod-644 non-executable file at the
+      `psi.lint-config-test.clojure-bin` override → focused integration run
+      `33 passed, 1 errored` (IOException "Permission denied" from
+      ProcessBuilder.start, confirmed in .scry-results; the designed shape is
+      the visible SKIP, was ERROR). Fix: extend both binary skip-guard arms
+      with an executable check — `(or (not (.isFile (io/file bin)))
+      (not (.canExecute (io/file bin))))` (`.isFile` closes the directory
+      class, `.canExecute` closes the chmod-cleared class; mirror of the
+      slice-30 valid-zip? corrupt-jar arm's present-but-unusable → visible
+      SKIP shape) — or, fallback, move `(.start pb)` inside run-bounded's try
+      and convert a start failure into the loud ex-info carrying :cmd (still
+      ERROR-shaped, but with context; the SKIP arm is the standard). Verify:
+      non-executable clojure-bin override → visible `SKIP task-252
+      analysis-level proof: …` line, 0 errored (was 1 ERROR); non-executable
+      git-bin override → visible SKIP, 0 errored; restored → unit 10/68,
+      integration 34/186 no SKIP, `bb lint` errors 0 / warnings 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+      — done (executable-check arm branch, both binaries): the clojure-bin and
+      git-bin skip-guard conds each gained `(or (not (.isFile (io/file bin)))
+      (not (.canExecute (io/file bin))))` → visible-SKIP arm (message
+      `(str bin " is not an executable file")`) between the .exists arm and
+      the jar arms — .isFile closes the directory class, .canExecute closes
+      the chmod-cleared class, mirror of the slice-30 valid-zip?
+      present-but-unusable → visible SKIP shape. Verified 2026-08-16:
+      chmod-644 non-executable clojure-bin override →
+      `SKIP task-252 analysis-level proof: /tmp/ck252-nonexec-clojure is not
+      an executable file` in runner output, 0 errored (was 1 ERROR); chmod-644
+      non-executable git-bin override → `SKIP task-252 git check-ignore ground
+      truth: /tmp/ck252-nonexec-git is not an executable file`, 0 errored;
+      restored → unit 10 tests / 69 assertions (68 + the new --cache-dir
+      assertion, slice-43 item 2), integration 34 tests / 186 assertions no
+      SKIP (both proofs ran), `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [x] Add `--cache-dir` to the lint-alias masking-flag list —
+      `lint-alias-lints-extensions-test`'s forbidden-flag doseq is
+      `["--cache" "--config" "--config-dir" "--dependencies"]` with EXACT
+      string matching, so a drift adding `--cache-dir <dir>` to the :lint
+      alias's :main-opts is invisible: "--cache" does not match
+      "--cache-dir" (exact-match), and "--cache-dir" is not in the list. A
+      fresh `--cache-dir` means the http-kit jar is never analyzed (empty
+      cache) → the two dev-http warnings vanish → the exact design-step-9
+      masking this test exists to close (the same class as `--cache false`,
+      which IS listed — a cache-disabling drift via --cache-dir is the
+      unguarded sibling). Verified 2026-08-16 (scratch main-opts evaluation):
+      `["-m" "clj-kondo.main" "--lint" "bb.edn" "extensions" "--cache-dir"
+      "/tmp/fresh-cache"]` → all four existing assertions pass while
+      "--cache-dir" is present (blind spot confirmed; the actual deps.edn
+      alias is clean today). Fix: add "--cache-dir" to the doseq list (one
+      string). Verify: synthetic main-opts containing "--cache-dir" →
+      1 clean FAIL (was silent pass); restored → unit 10/68, `bb lint` errors
+      0 / warnings 0, `bb fmt:check` clean
+      — done: "--cache-dir" added to the doseq list (now
+      `["--cache" "--cache-dir" "--config" "--config-dir" "--dependencies"]`)
+      and the testing block's docstring updated to name the --cache-dir
+      masking class (a fresh cache dir means the jar is never analyzed — the
+      same masking as --cache false; exact-match on --cache does not catch
+      the sibling). Verified 2026-08-16 via scratch: the 5-flag doseq against
+      the synthetic main-opts `["-m" "clj-kondo.main" "--lint" "bb.edn"
+      "extensions" "--cache-dir" "/tmp/fresh-cache"]` now throws
+      `Assert failed: :lint :main-opts must not contain --cache-dir` (was
+      silent pass with all four assertions); the real deps.edn alias is clean
+      (unit suite 10 tests / 69 assertions pass, 68 + the new flag
+      assertion)
+
+## Slice 44 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Close the unreadable-regular-file sub-class at the four slice-42
+      text-slurp sites (+ the fifth transit slurp): slice-42's `.isFile`
+      hardening closed the missing AND directory classes at
+      with-channel-hook-impl-guard-test `(parseable? (slurp impl-file))`,
+      with-channel-hook-semantics-guard-test `(parseable? (slurp tracked-file))`,
+      gitignore-http-kit-import-tracking-test `(str/split-lines (slurp
+      gitignore-file))`, and ci-execution-chain-guard-test `(ci-run-steps
+      (str/split-lines (slurp ci-file)))` — but `.isFile` returns TRUE for a
+      chmod-000 regular file (it IS a regular file), and the slice-42 item's
+      own class text named "IOException on permission-denied": an unreadable
+      file at any of the four paths passes `.isFile` and the unguarded slurp
+      throws IOException (Permission denied) outside any try → clojure.test
+      ERROR with no assertion message. Slice-43 closed the chmod-cleared
+      class at the BINARY boundary via `.canExecute` — the slurp boundary has
+      no mirror. The no-reg transit slurp in
+      http-kit-defreq-analysis-level-resolution-test (`(slurp transit-file)`
+      under `.exists`) is the fifth exists-checked-but-unguarded slurp —
+      slice-42's list named four; this site keeps the pre-slice-42 `.exists`
+      shape, which passes for a directory AND an unreadable file. Fix: extend
+      the four slice-42 site guards to `(and (.isFile f) (.canRead f))` —
+      single predicate closing missing + directory + unreadable, mirror of
+      slice-43's `.canExecute` arm — and switch the transit site's `.exists`
+      to the same shape. Verify: chmod-000 the impl file → focused unit
+      `9 passed, 1 failed, 0 errored` (clean FAIL "is a regular file" or the
+      canRead message, was 1 ERROR with no assertion message); chmod-000 a
+      site in the integration guards likewise; restore → unit 10/69,
+      integration 34/186 no SKIP, `bb lint` errors 0 / warnings 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+      — done (2026-08-16): all four slice-42 site guards + the transit site
+      now assert and guard with `(and (.isFile f) (.canRead f))` — the
+      canRead conjunct closes the chmod-000 unreadable-regular-file class
+      slice-42's own item text named ("IOException on permission-denied")
+      but its .isFile fix did not close (mirror of slice-43's .canExecute
+      binary arm). Sites: `with-channel-hook-impl-guard-test` (assertion
+      message "impl file … is a regular readable file"; when-guard updated
+      likewise), `with-channel-hook-semantics-guard-test` ("tracked impl …
+      is a regular readable file"; the `(when (and (some? jar-export) (.isFile
+      tracked-file) …))` guard updated likewise),
+      `gitignore-http-kit-import-tracking-test` (".gitignore is a regular
+      readable file"), `ci-execution-chain-guard-test` ("ci.yml is a regular
+      readable file"), and the no-reg transit slurp in
+      `http-kit-defreq-analysis-level-resolution-test` (`.exists` →
+      isFile+canRead; "no-reg transit is a regular readable file"). The
+      `http-kit-import-config-jar-export-guard-test` tracked-config slurp is
+      NOT in the item's four+one scope — its `(try (edn/read-string (slurp
+      …)) (catch Exception _ nil))` guarded-read already clean-FAILs the
+      unreadable class (slice-42's recorded "accidentally clean-FAIL" note).
+      Verified 2026-08-16: chmod-000 impl file → unit `9 passed, 1 failed,
+      0 errored` (clean FAIL "is a regular readable file", was ERROR);
+      chmod-000 tracked impl → integration `33 passed, 1 failed, 0 errored`
+      (clean FAIL, was ERROR); restore → unit 10/69, integration 34/186 no
+      SKIP (both proofs ran), `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [x] Align the analysis-level proof's jar skip arms with the slice-30
+      visible-SKIP convention: the two sibling ^:integration guards
+      (with-channel-hook-semantics-guard-test, http-kit-import-config-
+      jar-export-guard-test) skip VISIBLY on a corrupt/truncated http-kit jar
+      (`valid-zip?` arm, slice-30) — but http-kit-defreq-analysis-level-
+      resolution-test's skip guard checks only `(not (.exists …))` for BOTH
+      http-kit-jar and clj-kondo-jar, so the same environmental condition (a
+      corrupt jar / non-jar override at psi.lint-config-test.http-kit-jar or
+      psi.lint-config-test.clj-kondo-jar — the documented injection seams)
+      passes the guard and the proof FAILs multiple clean assertions (the jar
+      `--dependencies` subprocess exits non-zero / the corrupt analyzer jar
+      has no clj-kondo.main → the -Spath and lint arms FAIL) instead of the
+      sibling visible SKIP. The transit-arm comment documents the
+      corrupt-jar → FAIL path but the sibling-guard divergence was never
+      reconciled. Fix: add `(not (valid-zip? (io/file http-kit-jar)))` and
+      `(not (valid-zip? (io/file clj-kondo-jar)))` arms to the proof's skip
+      guard (valid-zip? is already defined in the same ns; mirror of the
+      sibling arms → visible SKIP line), or explicitly record the FAIL as the
+      intentional divergence in the addressing note. Verify: corrupt-jar
+      override at psi.lint-config-test.http-kit-jar → visible
+      `SKIP task-252 analysis-level proof: …` line, 0 errored, 0 failed (was
+      clean FAILs from the subprocess); restore → integration 34/186 no SKIP,
+      unit 10/69, `bb lint` errors 0 / warnings 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+      — done (valid-zip? arms branch — the fix, not the divergence record):
+      the analysis-level proof's skip guard gained
+      `(not (valid-zip? (io/file http-kit-jar)))` and
+      `(not (valid-zip? (io/file clj-kondo-jar)))` arms (each after its
+      `.exists` arm, message "… is not a valid zip archive" — the sibling
+      slice-30 message shape; valid-zip? opens the archive catching
+      IOException, the ZipException superclass — also covers a directory at
+      the path), so a corrupt jar / non-jar override at either documented
+      injection seam is now a visible SKIP (via skip!/report-skip!), never
+      clean FAILs from a doomed subprocess (the jar `--dependencies` arm
+      exits non-zero / the corrupt analyzer jar has no clj-kondo.main → the
+      -Spath and lint arms FAIL). Verified 2026-08-16: corrupt http-kit-jar
+      override → all three http-kit-jar-dependent proofs skip visibly
+      (`SKIP task-252 analysis-level proof: /tmp/ck252-corrupt.jar is not a
+      valid zip archive` — was clean FAILs from the subprocess), 0 errored,
+      0 failed; corrupt clj-kondo-jar override →
+      `SKIP task-252 analysis-level proof: /tmp/ck252-corrupt-clj-kondo.jar
+      is not a valid zip archive` while the two http-kit-jar-dependent sibling
+      proofs still run; restore → integration 34/186 no SKIP (both proofs
+      ran), unit 10/69, `bb lint` errors: 0, warnings: 0, `bb fmt:check`
+      clean, `bb commit-check:file-lengths` exit 0
+
+## Slice 45 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Close the exec-format sub-class at the infra-binary boundary — slice-43
+      closed the START ERROR class for EACCES (chmod-cleared) and directory
+      inputs via the `(or (not (.isFile …)) (not (.canExecute …)))` guard
+      arms, but `.canExecute` is ACCESS-MODE only (verified 2026-08-16: a
+      chmod +x TEXT file returns `canExecute: true` / `isFile: true`), so a
+      present-but-wrong-format binary at either injection seam — a shell
+      script without a shebang, a wrong-arch binary, a corrupted binary with
+      the exec bit set — passes both guards and reaches
+      `run-bounded`'s `(.start pb)` (lint_config_test_support.clj:290), which
+      sits in the let binding OUTSIDE the try. The outcome is
+      PLATFORM-DIVERGENT for the same input: on Linux CI (GitHub Actions
+      ubuntu — the environment that actually runs the ^:integration proofs)
+      the JVM throws `IOException "error=8, Exec format error"` (ENOEXEC) at
+      `.start` → uncaught → clojure.test ERROR with no assertion message, the
+      exact class slice-43 closed for EACCES/directory; on macOS
+      (verified 2026-08-16: chmod +x text file AND random-bytes binary at the
+      seam) `.start` succeeds and the subprocess exits 126/127 → clean FAIL
+      on the exit assertions. slice-43's item text named only "EACCES — a
+      non-executable file, or a directory" as the start IOException classes;
+      the wrong-format sub-class was not in scope, and slice-43 recorded the
+      boundary-level fallback branch ("move `(.start pb)` inside run-bounded's
+      try and convert a start failure into the loud ex-info carrying :cmd")
+      that was not taken. Fix (either branch): (a) take the recorded fallback —
+      move `(.start pb)` inside run-bounded's try and convert any start
+      IOException into the loud ex-info carrying :cmd (+ the exception
+      message), so the wrong-format class surfaces with context on every
+      platform, never a bare uncaught ERROR with no assertion message; or (b)
+      extend both binary skip-guard conds with a start-probe / format check
+      (mirror of the slice-30 valid-zip? present-but-unusable → visible SKIP
+      shape; note no portable pre-start format check exists, so (a) is the
+      robust locus); or (c) record the platform divergence as the accepted
+      design (Linux CI ERROR class — weakest). Verify: chmod +x text file at
+      the `psi.lint-config-test.clojure-bin` override → on macOS currently
+      clean FAILs from the doomed subprocess (exit 127); on Linux CI an
+      uncaught IOException ERROR; after fix → the designed loud failure shape
+      with :cmd (branch (a)) or visible SKIP (branch (b)) on both platforms,
+      0 errored; restore → unit 10/69, integration 34/186 no SKIP (both
+      proofs ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+      — done (branch (a) — the recorded robust-locus fallback, per the item's
+      own "no portable pre-start format check exists, so (a) is the robust
+      locus"): `(.start pb)` moved INSIDE run-bounded's try — the let now
+      binds only the ProcessBuilder + the drain fns; the process + drain
+      futures are bound in an inner try under the outer one, and an outer
+      `(catch java.io.IOException e …)` converts any start IOException into
+      the loud ex-info `"failed to start subprocess: <cmd> — <message>"`
+      carrying `{:cmd cmd :message …}` with the IOException as cause — so the
+      wrong-format class surfaces with context on every platform (Linux CI
+      "error=8, Exec format error" now a contextual ex-info, never a bare
+      uncaught ERROR with no assertion message), while macOS `.start` still
+      succeeds and the doomed subprocess exits 126/127 → clean assertion FAILs
+      (unchanged, verified below). The start IOException is the only
+      IOException source inside the try (drain swallows its futures'
+      ExecutionExceptions into markers; waitFor/destroyForcibly do not throw
+      IOException), so the outer catch is precise. Verified 2026-08-16:
+      directory-at-cmd scratch (`run-bounded ["/tmp"]`, the macOS-compatible
+      start-IOException trigger — EACCES at exec) → loud ex-info with
+      `{:cmd ["/tmp"] :message "… Exec failed, error: 13 (Permission denied)"}`
+      and IOException cause, was a bare uncaught start ERROR; chmod +x text
+      file at the `psi.lint-config-test.clojure-bin` override → integration
+      focused run 33 passed / 1 failed / 0 errored (clean FAILs from the
+      doomed exit-127 subprocess, the documented macOS shape — was the same
+      clean FAIL class pre-fix, never an ERROR/hang); normal `echo hello` →
+      `{:exit 0 :out "hello\n" :err ""}` in 7 ms (unchanged); restore → unit
+      10/69, integration 34/186 no SKIP (both proofs ran), `bb lint` errors:
+      0, warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths`
+      exit 0
+- [x] Consolidate the guarded-read shape into a single support-ns fixture —
+      the `(try (read-edn rel) (catch Exception _ nil))` shape is now inlined
+      at FOUR unit sites (root-config-ac2-invariant-test, http-kit-import-
+      registration-test, with-channel-hook-impl-guard-test, http-kit-pin-
+      sourced-from-deps-edn-test's extension block) and the ^:integration
+      jar-export guard's tracked-config read uses a DIVERGENT raw form
+      `(try (edn/read-string (slurp tracked-file)) (catch Exception _ nil))`
+      (lint_config_integration_test.clj:238) that bypasses the shared
+      `read-edn` fixture entirely — the exact duplicated-shape class slices
+      27/28/32 consolidated (parse-forms inline copy → :refer'd parseable?,
+      which-* byte-identical copies → which-bin, 3× skip-reporting tail →
+      skip!) under the support ns's "each fixture is DEFINED here once"
+      contract; a future hardening of the guarded-read shape (reader opts,
+      *read-eval* binding, error capture) or a regression would diverge
+      silently across the four sites, and the integration site would not
+      inherit a read-edn hardening at all. Fix: add a guarded-read fixture
+      (e.g. `read-edn-or-nil`, single definition site in
+      lint_config_test_support.clj, mirror of parseable?) and replace the
+      four inlined copies + the integration site's raw edn/read-string slurp
+      (which also gains the shared fixture's repo-root resolution and any
+      future hardening). Verify: unit 10/69 unchanged (same assertion counts
+      and messages), integration 34/186 no SKIP (both proofs ran), `bb lint`
+      errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+      — done: new `read-edn-or-nil` fixture in lint_config_test_support.clj
+      (single definition site, mirror of parseable? — `(try (read-edn rel)
+      (catch Exception _ nil))` delegating to the shared read-edn, so repo-
+      root resolution + any future read-edn hardening are inherited); all
+      FOUR inlined unit copies replaced
+      (`(read-edn-or-nil cfg-rel)` ×2, `(read-edn-or-nil
+      ".clj-kondo/config.edn")`, `(read-edn-or-nil
+      "extensions/dev-http/deps.edn")`) and the integration jar-export
+      guard's divergent raw `(try (edn/read-string (slurp tracked-file))
+      (catch Exception _ nil))` replaced with `(read-edn-or-nil
+      tracked-rel)` (the tracked-rel path resolves through the shared
+      fixture's repo-root — same file, plus the fixture's opts/hardening
+      inheritance). The jar-export SIDE of that guard still parses the jar
+      entry STRING with `(edn/read-string jar-export)` — not a file read, so
+      read-edn-or-nil does not apply there. Each site's rationale comment
+      updated to name the shared fixture (slice-45 note). Verified 2026-08-16:
+      unit 10/69 unchanged (same assertion counts and messages), integration
+      34/186 no SKIP (both proofs ran), `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+
+## Slice 46 — Implementation-review follow-ups (2026-08-16)
+
+- [x] Close the unguarded test-body read-edn sites for tests.edn and bb.edn
+      (ERROR-vs-FAIL class; the mirror of slices 31/35/36/38/39's exists +
+      guarded-read hardening, never yet applied to these five sites):
+      `tests-edn-suite-wiring-test` reads `(read-edn "tests.edn"
+      {:readers {'kaocha/v1 identity}})` in the let binding
+      (lint_config_test.clj:489), `bb-edn-lint-task-wrapper-test` reads
+      `(read-edn "bb.edn")` (:467), and `ci-execution-chain-guard-test`
+      reads bb.edn three times in let bindings (:604/:655/:673 — the
+      clojure:test:integration, clojure:test:unit, and clojure:test :depends
+      arms). tests.edn is NOT a repo-root marker (the marker set is root
+      deps.edn + bb.edn), so a whole-file deletion of tests.edn does NOT fail
+      ns-load — the exact rationale slice-38 applied to the extension
+      deps.edn read ("the file is NOT a repo-root marker … so ns-load does
+      not fail on its deletion") — and the test whose whole purpose is to
+      guard tests.edn suite wiring then throws FileNotFoundException in its
+      let binding → clojure.test ERROR with the suite assertions unreachable.
+      bb.edn IS a marker, but the marker check is `.exists` only
+      (psi.test-support.repo-root), so a PRESENT-but-unparseable bb.edn (bad
+      merge, hand-edit truncation — the file exists, the marker check
+      passes, and NOTHING parses bb.edn at ns-load; the support ns reads
+      only deps.edn for the version defs) loads the ns fine and the four
+      bb.edn test-body reads throw ("Unmatched delimiter: …") inside the
+      let/when → clojure.test ERROR with no assertion message — the exact
+      slice-39 mirror for the extension deps.edn (exists-guard closed,
+      unparseable class still open). The three root deps.edn reads
+      (:259/:269/:328 — clj-kondo-pin-sourced-from-deps-edn-test,
+      http-kit-pin-sourced-from-deps-edn-test's root block,
+      lint-alias-lints-extensions-test) are NOT in scope: the support ns
+      parses deps.edn at ns-load for http-kit-version/clj-kondo-version, so
+      both the deletion AND corruption classes fail ns-load before any
+      test-body read runs (loud, though as a load ERROR). Fix (the five
+      sites): bind the file, assert `(and (.isFile f) (.canRead f))` first
+      (slice-44 predicate — closes missing + directory + unreadable in one),
+      then read only under `when` via the shared read-edn-or-nil fixture
+      (assert some? "parses as EDN" clean-FAIL, then the suite assertions
+      under `when cfg` — mirror of the root-config shape). Note the
+      read-edn-or-nil fixture (lint_config_test_support.clj) currently has
+      only the 1-arity; the tests.edn read needs the `#kaocha/v1` tag reader,
+      so add the 2-arity `[rel-path opts]` overload delegating to
+      `(read-edn rel-path opts)` — the slice-45 single-definition-site
+      contract means the guarded-read shape stays in ONE place. Verify:
+      moved-aside tests.edn → focused unit 9 passed / 1 failed / 0 errored
+      (clean FAIL, was ERROR); corrupt bb.edn → 1+ clean FAILs, 0 errored
+      (was ERRORs); restored → unit 10/69, integration 34/186 no SKIP (both
+      proofs ran), `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+      — done 2026-08-16: 2-arity `[rel-path opts]` overload added to
+      read-edn-or-nil in lint_config_test_support.clj (delegates to
+      `(read-edn rel-path opts)` — the guarded-read shape stays in ONE
+      place); all FIVE test-body reads guarded with the slice-44
+      `(and (.isFile f) (.canRead f))` predicate asserted first (clean FAIL
+      with message), then read only under `when` via read-edn-or-nil (assert
+      some? "parses as EDN" clean-FAIL, then the assertions under `when`) —
+      bb-edn-lint-task-wrapper-test (1 site), tests-edn-suite-wiring-test
+      (1 site, via the new opts arity for the #kaocha/v1 reader),
+      ci-execution-chain-guard-test (3 sites HOISTED into one guarded read
+      wrapping the clojure:test:integration / clojure:test:unit /
+      clojure:test :depends arms). Verified 2026-08-16: moved-aside tests.edn
+      → direct clojure.test run (kaocha itself cannot load without its
+      tests.edn config) 10 tests / 1 failure / 0 errors — clean FAIL
+      "tests.edn is a regular readable file", was FileNotFoundException
+      ERROR; corrupt bb.edn (first form broken with `{:tasks {`) → 10 tests /
+      2 failures / 0 errors — clean FAILs "bb.edn parses as EDN", was
+      "Unmatched delimiter" ERRORs (an APPENDED corrupt tail is silently
+      ignored — edn/read-string reads only the FIRST form, so the corruption
+      must break the first form); restored → unit 10/75 (69 + 6 new
+      guarded-read assertions), integration 34/189 no SKIP, `bb lint` errors:
+      0, warnings: 0, `bb fmt:check` clean, `bb commit-check:file-lengths`
+      exit 0
+- [x] Close the jar-export FILE-SET enumeration gap at the tracked import dir
+      (the slice-40→41 bump-drift class at the file level): the two
+      ^:integration jar-export guards compare the CONTENT of the two known
+      tracked files against their pinned-jar counterparts —
+      `http-kit-import-config-jar-export-guard-test`
+      (lint_config_integration_test.clj:165) asserts full-map config.edn
+      equality minus the tracked-only :lint-as (slice-41), and
+      `with-channel-hook-semantics-guard-test` (:50) asserts parsed-form
+      with_channel.clj equality (slice-18) — but NEITHER enumerates the jar's
+      `clj-kondo.exports/http-kit/http-kit/` entry SET vs the tracked import
+      dir's file set (currently exactly config.edn +
+      httpkit/with_channel.clj, verified against the pinned 2.8.0 jar). A
+      http-kit bump ADDING a new export file that config.edn does not
+      reference keeps both content equalities green while the tracked dir
+      silently misses the file — the tracked dir's purpose per plan decision
+      2 is a faithful copy of the jar's clj-kondo.exports + the tracked-only
+      :lint-as additive — and a STALE tracked file (an orphan hook file
+      committed under the import dir, no longer in the jar) is likewise
+      invisible to both content guards. This is the exact slice-40 item's
+      shape ("a bump adding a NEW top-level export key silently diverges
+      while the :hooks equality stays green") at the file-set level; slice-41
+      strengthened the map equality but the entry list was never guarded.
+      Fix: in `http-kit-import-config-jar-export-guard-test` (or a sibling
+      arm), enumerate the jar's export-dir entries (ZipFile entries under
+      the `clj-kondo.exports/http-kit/http-kit/` prefix, non-directory,
+      relativized) and assert set-equality with the tracked import dir's
+      file set (relative paths under
+      `.clj-kondo/imports/http-kit/http-kit/`, file-seq filtered to files,
+      relativized). Jar-absent/corrupt → the existing valid-zip? SKIP arm
+      already covers the container; an entry-enumeration failure → clean
+      FAIL/visible SKIP mirroring the sibling arms. Verify: scratch jar
+      override with an extra export file (e.g. `httpkit/new_hook.clj`) →
+      focused integration 33 passed / 1 failed / 0 errored (clean FAIL with
+      the file-set message, was silent divergence); stale extra tracked file
+      → same clean FAIL; restored → integration 34/186 no SKIP (both proofs
+      ran), unit 10/69, `bb lint` errors: 0, warnings: 0, `bb fmt:check`
+      clean, `bb commit-check:file-lengths` exit 0
+      — done 2026-08-16: file-set enumeration arm added to
+      `http-kit-import-config-jar-export-guard-test` (the else-branch let,
+      after the config.edn equality block) — the jar's export-dir entries
+      (ZipFile entries under the `clj-kondo.exports/http-kit/http-kit/`
+      prefix, directory entries removed, prefix relativized → set, guarded
+      read → nil on IOException → clean FAIL, never an uncaught ZipException)
+      vs the tracked import dir's file set (file-seq filtered to files,
+      relativized via `.toPath` — `io/file` is java.io.File and has no
+      relativize method — the slice-44 `.isDirectory` predicate closes the
+      missing/dir classes) → set-equality assertion. Verified 2026-08-16:
+      scratch jar override (2.8.0 + `httpkit/new_hook.clj` added via zip) →
+      focused integration 33 passed / 1 failed / 0 errored (clean FAIL with
+      the file-set message, was silent divergence); stale extra tracked file
+      (`httpkit/stale_hook.clj`) → same clean FAIL; restored → integration
+      34/189 (186 + 3 new file-set assertions) no SKIP (both proofs ran),
+      unit 10/75, `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+
+## Slice 47 — Implementation-review follow-ups (2026-08-16)
+
+- [ ] Close the `gitignore-http-kit-tracking-ground-truth-test` not-ignored arm's
+      vacuity — `git check-ignore` (with or without `-v`) NEVER reports paths
+      tracked in the index, so the arm proves the negation works only by
+      accident of the file being tracked, and a broken/removed negation keeps
+      every assertion green. Verified 2026-08-16 (git 2.55.0): the tracked
+      `.clj-kondo/imports/http-kit/http-kit/config.edn` — which DOES match
+      `.gitignore:3: **/.clj-kondo/imports/*` — exits 1 (not reported) with and
+      without `-v`, exactly like the tracked component import files; a scratch
+      repo confirms the rule: a tracked file under a matching ignore pattern
+      exits 1, an untracked sibling in the same ignored dir exits 0. The
+      ground-truth test's first arm (`(not (zero? exit))` on the tracked
+      config.edn) therefore passes whether or not the negation lines exist —
+      the file is tracked, so check-ignore never reports it — and removing /
+      re-ordering / shadowing the negation lines (the exact slice-13 drift this
+      test exists to catch) keeps arm 1 (exit 1 via tracked), arm 2 (malli
+      still ignored via the base rule), and arm 3 (ls-files — still tracked)
+      green: the ^:integration ground-truth does NOT test git's interpretation
+      of the negation; only the TEXT test (gitignore-http-kit-import-tracking-
+      test) guards the lines. Two further exit-code traps in the same test:
+      (a) `git check-ignore -v` on an UNTRACKED path whose last matching rule
+      is a NEGATION prints the negation pattern and exits 0 (verified:
+      `PROBE.edn` under the http-kit dir → `.gitignore:5:!.clj-kondo/imports/
+      http-kit/**`, exit 0; plain `check-ignore` without -v → exit 1) — so with
+      `-v` an exit of 0 means "a pattern matched", NOT "path is ignored", and
+      the negated-vs-ignored distinction lives ONLY in the printed pattern
+      content; (b) `(not (zero? exit))` conflates git's fatal exit 128
+      (verified: `check-ignore -v` outside a repo / on an invalid absolute
+      path → 128) with the intended not-ignored exit 1 — a fatal git failure
+      would falsely pass the "not ignored" arm. Fix: (1) probe an UNTRACKED
+      (nonexistent — check-ignore evaluates paths regardless of existence, no
+      file creation needed) path under the http-kit import dir, e.g.
+      `.clj-kondo/imports/http-kit/http-kit/__tracking_probe__.edn`, with
+      plain `git check-ignore` (NO `-v`) asserting `(= 1 exit)` — a removed/
+      broken negation makes the probe exit 0 → clean FAIL with message; (2)
+      add a `-v` arm on the same probe asserting the effective rule is the
+      NEGATION pattern `!.clj-kondo/imports/http-kit/**` (a shadowing re-ignore
+      added BELOW the negations — last-match-wins — surfaces the base
+      `**/.clj-kondo/imports/*` rule instead → clean FAIL); (3) tighten the
+      existing malli arm to `(= 0 exit)` (fatal 128 → clean FAIL, was false
+      pass) and keep the ls-files arm (its `(zero? exit)` already distinguishes
+      128). Verify: scratch copy with the negation lines removed → probe arm 1
+      clean FAIL (exit 0, was green); scratch copy with a trailing
+      `**/.clj-kondo/imports/*` re-ignore → -v arm clean FAIL (base rule, was
+      green); restore → integration 34 tests / ≥189 assertions no SKIP (both
+      proofs ran), unit 10/75, `bb lint` errors: 0, warnings: 0,
+      `bb fmt:check` clean, `bb commit-check:file-lengths` exit 0
+- [ ] Give the slice-44 `.isFile+.canRead` readable-regular-file predicate a
+      single definition site in lint_config_test_support.clj (the task's own
+      slice-27/28/32 consolidation standard: parse-forms → parseable?,
+      which-* → which-bin, 3× skip-reporting tails → skip!): the predicate is
+      currently INLINED at ~11 sites as 22 occurrences — 18 in
+      lint_config_test.clj (with-channel-hook-impl-guard-test,
+      gitignore-http-kit-import-tracking-test, bb-edn-lint-task-wrapper-test,
+      tests-edn-suite-wiring-test, ci-execution-chain-guard-test's ci.yml +
+      bb.edn blocks; each site pairs the `(is (and (.isFile …) (.canRead …))
+      …)` assertion with the identical `(when (and (.isFile …) (.canRead …))
+      …)` guard) and 4 in lint_config_integration_test.clj
+      (with-channel-hook-semantics-guard-test's tracked impl assertion+guard,
+      http-kit-defreq-analysis-level-resolution-test's no-reg transit
+      assertion+guard) — while the support ns's own docstring commits to
+      "each fixture is DEFINED here once". A future hardening of the predicate
+      (symlink check, length bound, error capture — the permission-denied /
+      directory / missing classes slices 42/44/46 closed one predicate at a
+      time) or a regression must touch 22 inlined sites and can diverge
+      silently between them. Fix: add `readable-regular-file?` (File → bool,
+      `(and (.isFile f) (.canRead f))`) to lint_config_test_support.clj
+      (:refer'd into both test namespaces like parseable?/read-edn-or-nil) and
+      replace all 22 inlined occurrences — assertion and when-guard — with it
+      (the `.exists`-guarded sites whose guarded read already turns the
+      directory/unreadable classes into clean FAILs — e.g. the import
+      config.edn exists assertions feeding read-edn-or-nil — may stay `.exists`
+      per their own rationale, but the slurp-adjacent predicate sites must
+      share the fixture). Verify: pure refactor — unit 10 tests / 75
+      assertions unchanged, integration 34/189 no SKIP (both proofs ran),
+      `bb lint` errors: 0, warnings: 0, `bb fmt:check` clean,
+      `bb commit-check:file-lengths` exit 0
+
+## Slice 48 — Closure (2026-08-18)
+
+- [x] Remove the regression-test guard suite (scope decision): deleted
+      `lint_config_test.clj`, `lint_config_test_support.clj`,
+      `lint_config_integration_test.clj` — the ~1,980-line suite guarding a
+      2-line fix had grown to 47+ review slices of recursive over-engineering
+      that never converged.
+- [x] Restore tests.edn `:capture-output? true` (the slice-15 `false` flip was
+      guard-suite-only; original value was `true`).
+- [x] Retain the actual fix: import config.edn `:lint-as`, `.gitignore`
+      negation, with_channel.clj hook.
+- [x] Verify: `bb lint` errors 0 / warnings 0 (both dev-http warnings resolved);
+      unit suite passes (only the pre-existing environmental
+      `workflow_delegate_review_step_live_test` model failure remains, unrelated);
+      integration suite 30 passed / 151 assertions, 0 failed.
+- [x] Close task.

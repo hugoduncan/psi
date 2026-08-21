@@ -9,7 +9,8 @@
    [babashka.fs :as fs]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [psi.history.git :as git])
+   [psi.history.git :as git]
+   [psi.test-support.fs :as test-fs])
   (:import
    (java.io File)
    (java.nio.file Files)
@@ -47,13 +48,6 @@
             (canonical-path (:git.worktree/path %)))
         worktrees))
 
-(defn- delete-recursively!
-  [path]
-  (let [f (File. (str path))]
-    (when (.exists f)
-      (doseq [child (reverse (file-seq f))]
-        (.delete ^java.io.File child)))))
-
 (defn- linked-worktree-root
   [ctx]
   (str (:repo-dir ctx) "-worktrees"))
@@ -73,8 +67,8 @@
      (try
        ~@body
        (finally
-         (delete-recursively! (:repo-dir ctx#))
-         (delete-recursively! (linked-worktree-root ctx#))))))
+         (test-fs/delete-recursively! (:repo-dir ctx#))
+         (test-fs/delete-recursively! (linked-worktree-root ctx#))))))
 
 (deftest with-null-context-deletes-repo-dir-in-finally-test
   ;; Guards the finally-block cleanup wiring itself, not just the behaviour
@@ -237,7 +231,7 @@
           (testing "returns no current worktree"
             (is (nil? (git/current-worktree ctx)))))
         (finally
-          (delete-recursively! tmp))))))
+          (test-fs/delete-recursively! tmp))))))
 
 (deftest worktree-list-command-failure-emits-telemetry-and-empty
   ;; Tests worktree-list failure handling and telemetry callback behavior.
@@ -705,5 +699,5 @@
           (is (not (some #(str/includes? (:git.commit/subject %) "only in B")
                          (git/log ctx-a {})))))
         (finally
-          (delete-recursively! (:repo-dir ctx-a))
-          (delete-recursively! (:repo-dir ctx-b)))))))
+          (test-fs/delete-recursively! (:repo-dir ctx-a))
+          (test-fs/delete-recursively! (:repo-dir ctx-b)))))))

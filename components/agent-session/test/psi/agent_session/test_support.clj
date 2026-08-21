@@ -25,6 +25,7 @@
    [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
    [psi.session-state.model :as session-data]
    [psi.skill-registry.root-storage :as skill-storage]
+   [psi.test-support.fs :as test-fs]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-step-materialization.core]
    [psi.workflow-step-session-config.core]
@@ -155,11 +156,15 @@
    :execution-result/stop-reason      :stop})
 
 (defn delete-recursively!
+  "Recursively delete `path` (file or directory tree). No-op if it does not
+  exist. Delegates to the shared psi.test-support.fs helper (the single
+  definition site since the slice-27 consolidation); kept here as the
+  component's public fixture so existing callers
+  (test-support/delete-recursively! from query_graph_test,
+  task_artifact_content_resolver_test, and this ns's own cleanup hooks) are
+  unchanged."
   [path]
-  (let [f (java.io.File. (str path))]
-    (when (.exists f)
-      (doseq [child (reverse (file-seq f))]
-        (.delete ^java.io.File child)))))
+  (test-fs/delete-recursively! path))
 
 (defn- register-cleanup-shutdown-hook!
   "Register a JVM shutdown hook that recursively deletes `path`.

@@ -424,6 +424,7 @@
       (is (contains? d :thinking-level))
       (is (contains? d :pending-messages))
       (is (contains? d :retry-attempt))
+      (is (contains? d :retry-deadline-ms))
       (is (contains? d :extension-count))
       (is (contains? d :journal-entries))
       (is (contains? d :agent-diagnostics))))
