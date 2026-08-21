@@ -1050,3 +1050,15 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `deadline-ms` constructor. Focused real-sleep-path coverage passes
       `Long/MAX_VALUE`, cancels before waiting, and proves the boundary neither
       overflows nor loses cancellation polling.
+
+## Review follow-up (code-shaper fourth re-review)
+
+- [ ] Single-source overflow-safe epoch addition. The latest sleep-boundary fix
+      reuses `retry/deadline-ms`, but that helper independently duplicates
+      `session-state.model/saturating-epoch-add`: both implement the same
+      subtraction-guarded addition and saturation at `Long/MAX_VALUE`, and the
+      retry namespace already depends on the session model. Expose one clearly
+      named retry-time arithmetic helper and use it for retry-window deadlines,
+      retry metadata `:resume-at`, and production sleep deadlines so future
+      boundary fixes cannot drift between the three paths; retain focused
+      boundary coverage for each caller.
