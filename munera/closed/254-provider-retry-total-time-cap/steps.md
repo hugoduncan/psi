@@ -1153,3 +1153,19 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       shared `saturating-epoch-add` authority. Focused model coverage exercises
       helper/retry-metadata omission plus near-Long/MAX saturation and
       near-Long/MIN exact addition; existing retry-header tests remain green.
+
+## Review follow-up (code-shaper ninth re-review)
+
+- [ ] Remove the truncated-final branch's remaining independent epoch addition.
+      `execute-prepared-request!` (`turn-runtime/core.clj`) builds
+      `truncated-meta` with `:resume-at (+ now final-sleep-ms)`, even though the
+      fourth code-shaper re-review established
+      `session-state.model/saturating-epoch-add` as the single retry-time
+      arithmetic authority for retry metadata, retry-window deadlines, and
+      production sleep deadlines. This branch shapes retry metadata outside
+      `retry-metadata` and therefore escaped that consolidation. Its resume time
+      is definitionally the already-computed `deadline-ms`; use that value
+      directly (or the shared helper) so the invariant is locally obvious and
+      future arithmetic changes cannot drift, and add focused truncated-final
+      boundary coverage asserting the emitted/persisted `:resume-at` equals the
+      retry-window deadline.
