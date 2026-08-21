@@ -732,3 +732,24 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       last-schedule `final?` keying rule), the oversized/near-Long `Retry-After`
       floor fixes, and the 16th-turn positive-delay floor (zero base/max config
       never hot-loops).
+
+## Review follow-up (implementation review, seventeenth turn)
+
+- [ ] Replace the 1 ms production fallback for a zero base/max retry delay with a
+      floor that actually prevents a provider-request storm, or reject the invalid
+      configuration before entering the retry loop. `retry-metadata`
+      (session-state/model.clj) currently applies `(max 1 ...)`; under the default
+      600000 ms cap-free window, a persistent error can therefore issue roughly
+      1000 provider attempts per second / 600000 attempts over ten minutes. This
+      avoids a literal zero-delay loop but does not resolve the structural
+      performance failure described by the 16th-turn follow-up. Pin a safe minimum
+      or validation rule and add a runtime test proving the misconfiguration is
+      bounded without relying on a 3 ms synthetic budget.
+- [ ] Make retry-window deadline construction overflow-safe for large positive
+      `:auto-retry-total-timeout-ms` values. `execute-prepared-request!`
+      (turn-runtime/core.clj) computes `(+ now budget-timeout-ms)` with checked long
+      arithmetic; an operator value near `Long/MAX_VALUE` therefore throws
+      `ArithmeticException` on the first retryable failure instead of opening a
+      bounded window or rejecting the config. Validate/cap the timeout (or use a
+      subtraction/saturating deadline calculation) and add a focused runtime test
+      covering the overflow boundary.
