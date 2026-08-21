@@ -835,3 +835,17 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       deadline clearing enabled before rethrowing. The regression test seeds a
       future active retry window and asserts `:retry-attempt` resets to zero,
       `:retry` becomes nil, and `:retry-deadline-ms` is absent.
+
+## Review follow-up (test review)
+
+- [ ] Replace the task-added retry tests' `with-redefs` of
+      `psi.turn-runtime.core/execute-live-turn!` with an injected nullable
+      provider that returns the same response sequences through the real
+      provider execution boundary. The current tests inject behavior by
+      replacing the logic under test (including all tests in
+      `retry_config_test.clj` and the total-window/count-cap/deadline/
+      `Retry-After`/cancellation cases in `response_mode_retry_test.clj`), which
+      violates the task-test-review `¬mock`/`¬stub` rule and the design
+      constraint to drive retries through the provider seam. Keep injected
+      state-only clock/sleep/cancellation seams and preserve the existing
+      outcome, event, retry-state, and attempt-count assertions.
