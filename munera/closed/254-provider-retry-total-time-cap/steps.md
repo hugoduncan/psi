@@ -1207,3 +1207,17 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       validates those settings only when an enabled retryable failure would
       schedule a retry sleep. Align the comments with the runtime behavior,
       design, user documentation, and regression tests.
+
+## Review follow-up (test review, current turn)
+
+- [ ] Add one deterministic runtime acceptance test for the actual default retry
+      policy (omit retry timeout/count/base/max overrides) that advances the
+      injected clock through the complete retry window and asserts the scheduled
+      delays are `2000, 4000, 8000, 16000, 32000`, then remain capped at
+      `60000` with the final delay truncated to land exactly at `600000` ms.
+      Existing runtime coverage either uses a shortened `5000` ms window or runs
+      the default window only to check the first scheduled delay and terminal
+      reason; the model unit tests check isolated attempts but do not prove the
+      runtime advances attempts, applies the 60-second cap repeatedly, and
+      exhausts at the configured default deadline rather than an earlier count
+      boundary.
