@@ -1011,3 +1011,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       then runs with metadata only when scheduling remains possible. Cap 0 plus
       an invalid delay terminates normally after one provider attempt with
       `:count-cap` and no retry schedule.
+
+## Review follow-up (code-shaper second re-review)
+
+- [ ] Make canonical retry defaults and the resolved typed retry policy the only
+      sources used by retry runtime helpers. `retry.clj` currently duplicates
+      `session-model/default-config` in private `retry-policy-defaults`, repeats
+      timeout/cap literals in `retry-policy-preview`, and has
+      `retry-min-clock-advance-ms` re-read/coerce raw base/max config instead of
+      consuming the already validated delay policy. This leaves three policy
+      representations that can drift and weakens the new typed boundary. Derive
+      fallback/preview values from the canonical defaults, and pass the resolved
+      delay values (or a derived minimum) to the hot-loop guard so downstream
+      retry machinery does not reinterpret raw operator config. Add focused
+      coverage proving preview, resolution, and guard derivation agree when
+      canonical defaults and explicit overrides are used.
