@@ -1,3 +1,4 @@
+- addressed 2 final documentation review steps.
 - addressed 1 latest implementation review step.
 - addressed 1 implementation review step.
 - addressed 1 code-shaper ninth re-review step.

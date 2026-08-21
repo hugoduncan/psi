@@ -1246,7 +1246,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (documentation review, final turn)
 
-- [ ] Align `doc/configuration.md`'s retry-setting type contract with the typed
+- [x] Align `doc/configuration.md`'s retry-setting type contract with the typed
       runtime boundary. The settings table currently says only `integer`,
       `non-negative integer`, or `positive integer`, but
       `resolve-retry-limiters!` / `resolve-retry-delays!` accept only integers
@@ -1254,7 +1254,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       and out-of-range values with `Invalid retry configuration`. State the
       64-bit range constraint (and retain the existing inactive-setting timing)
       so valid-looking EDN big integers are not documented as accepted.
-- [ ] Add `CHANGELOG.md` [Unreleased] Fixed coverage for the user-visible retry
+- [x] Add `CHANGELOG.md` [Unreleased] Fixed coverage for the user-visible retry
       configuration fixes landed after the prior documentation review: malformed
       or fractional limiter/delay values and negative count caps now fail with an
       informative retry-configuration error instead of leaking coercion/comparison
