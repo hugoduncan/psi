@@ -1280,3 +1280,15 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       provider request is allowed to finish after the deadline and can still
       succeed. Without this qualification, the docs promise a hard 10-minute
       end-to-end retry duration that the runtime intentionally does not enforce.
+
+## Review follow-up (documentation review, current turn)
+
+- [ ] Qualify the retry-window summary in `ramora/IMPLEMENTED.md` with the
+      implemented elapsed-time boundary already documented in
+      `doc/configuration.md` and `CHANGELOG.md`: the default 10-minute window
+      opens at the first retry decision (excluding initial-request execution)
+      and is checked only between attempts, so an in-flight provider request may
+      finish after the deadline and still succeed. The current AI-facing summary
+      says only “10-minute total-time window,” which can be read as a hard
+      10-minute end-to-end limit and is inconsistent with the authoritative
+      runtime behavior.
