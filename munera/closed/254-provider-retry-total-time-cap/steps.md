@@ -1031,3 +1031,18 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       the hot-loop guard, which no longer reinterprets raw config. Focused
       coverage proves preview/resolution agreement and guard-threshold derivation
       for canonical defaults and explicit overrides.
+
+## Review follow-up (code-shaper third re-review)
+
+- [ ] Make the production interruptible-sleep deadline overflow-safe.
+      `interruptible-sleep-for-retry!` (`turn-runtime/retry.clj`) still computes
+      `(+ (System/currentTimeMillis) (long delay-ms))` with checked addition, so
+      a valid near-`Long/MAX_VALUE` configured base/max delay passes the typed
+      policy boundary and produces saturated retry metadata, but throws
+      `ArithmeticException` before the real sleep begins. The existing
+      `near-long-delay-metadata-saturates-test` sets
+      `:provider-retry-sleep? false`, so it never exercises this boundary. Use
+      saturating deadline construction (or remaining-time accounting that cannot
+      overflow) in the interruptible sleep and add focused production-sleep-path
+      coverage that avoids waiting while proving a near-Long delay does not
+      throw and remains cancellable.
