@@ -10,6 +10,7 @@
    [psi.ai.models :as models]
    [psi.ai.structured-output :as structured-output]
    [psi.ai.textual-tool-calls :as textual-tool-calls]
+   [psi.session-state.model :as session-model]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.accumulator :as accum]
    [psi.turn-runtime.recording :as recording]
@@ -561,7 +562,7 @@
                 now              (retry/now-ms ctx)
                 deadline-ms      (or retry-deadline-ms
                                      (when (and retry-eligible? budget-active?)
-                                       (retry/deadline-ms now budget-timeout-ms)))
+                                       (session-model/saturating-epoch-add now budget-timeout-ms)))
                 immediate-decision (retry/give-up-decision {:retryable? retryable?
                                                             :retry-enabled? retry-enabled?
                                                             :retry-attempt retry-attempt

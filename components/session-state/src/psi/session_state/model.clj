@@ -507,7 +507,8 @@
       (> delay (quot (long max-ms) 2)) (long max-ms)
       :else (recur (dec remaining) (* 2 delay)))))
 
-(defn- saturating-epoch-add
+(defn saturating-epoch-add
+  "Adds a non-negative delay to epoch millis, saturating at Long/MAX_VALUE."
   [epoch-ms delay-ms]
   (if (> epoch-ms (- Long/MAX_VALUE delay-ms))
     Long/MAX_VALUE

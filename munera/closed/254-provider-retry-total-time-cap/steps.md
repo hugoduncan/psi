@@ -1053,7 +1053,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper fourth re-review)
 
-- [ ] Single-source overflow-safe epoch addition. The latest sleep-boundary fix
+- [x] Single-source overflow-safe epoch addition. The latest sleep-boundary fix
       reuses `retry/deadline-ms`, but that helper independently duplicates
       `session-state.model/saturating-epoch-add`: both implement the same
       subtraction-guarded addition and saturation at `Long/MAX_VALUE`, and the
@@ -1062,3 +1062,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       retry metadata `:resume-at`, and production sleep deadlines so future
       boundary fixes cannot drift between the three paths; retain focused
       boundary coverage for each caller.
+      → Done: `session-state.model/saturating-epoch-add` is now the public
+      retry-time arithmetic authority. Retry metadata, retry-window deadline
+      construction, and production interruptible-sleep deadlines all call it;
+      the duplicate `retry/deadline-ms` helper was removed. Existing focused
+      model/runtime tests retain overflow-boundary coverage for all three callers.

@@ -86,13 +86,6 @@
                   (not budget-active?) 3
                   :else nil)}))
 
-(defn deadline-ms
-  "Adds a positive timeout to epoch millis, saturating at Long/MAX_VALUE."
-  [now timeout-ms]
-  (if (> now (- Long/MAX_VALUE timeout-ms))
-    Long/MAX_VALUE
-    (+ now timeout-ms)))
-
 (defn now-ms
   "Injected-clock epoch millis for the retry window, mirroring retry-metadata-for."
   [ctx]
@@ -328,7 +321,9 @@
 
 (defn interruptible-sleep-for-retry!
   [ctx session-id delay-ms]
-  (let [sleep-deadline-ms (deadline-ms (System/currentTimeMillis) (long delay-ms))
+  (let [sleep-deadline-ms (session-model/saturating-epoch-add
+                           (System/currentTimeMillis)
+                           (long delay-ms))
         poll-ms           (retry-sleep-poll-ms ctx delay-ms)]
     (loop []
       (let [remaining-ms (- sleep-deadline-ms (System/currentTimeMillis))]
