@@ -1084,3 +1084,26 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `retry-metadata-for`; metadata no longer reads the injected clock independently.
       A focused runtime test uses an advancing clock and asserts one read plus
       `:resume-at` derived from that same sample.
+
+## Review follow-up (code-shaper sixth re-review)
+
+- [ ] Preserve a terminal provider-event lifecycle and clear canonical retry-window
+      state when `assert-test-seam-no-hot-loop!` rejects a retry seam. The guard
+      currently runs after the failed attempt has emitted
+      `provider_request_finished` with `:final? false`, and throws before either a
+      retry schedule or terminal event; unlike the retry-policy validation error
+      path, it also skips the `:window-close` clear. A guarded test therefore leaves
+      `:retry-deadline-ms` persisted and the provider request stranded non-final.
+      Route guard failures through the same terminal-error boundary (or run/catch
+      the guard before the ordinary non-final emission), then extend both guard
+      tests to assert a final failed event and reset `:retry-attempt` / `:retry` /
+      `:retry-deadline-ms` state.
+- [ ] Make the hot-loop guard's threshold and clock comparison robust at their
+      boundary. `:retry-min-clock-advance-ms` is consumed without validation, so a
+      negative override disables the guard and a wrong type leaks a comparison
+      exception; `(- now last-retry-now)` is checked arithmetic and can itself
+      overflow for a non-monotonic injected clock spanning the long range, both in
+      the predicate and again while building ex-data. Validate the override as a
+      positive long integer and compare clock samples without overflow (treat a
+      backward clock as non-advancing), with focused tests for invalid overrides
+      and a backward/extreme injected clock.
