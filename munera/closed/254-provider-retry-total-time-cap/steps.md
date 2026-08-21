@@ -1226,3 +1226,15 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       default schedule, asserts the initial exponential delays plus eight
       60-second capped delays and the final 58-second truncation, and verifies
       deadline exhaustion at exactly 600000 ms with no count cap.
+
+## Review follow-up (test review, latest turn)
+
+- [ ] Add deterministic runtime coverage for the retry-window execution-time
+      boundary: drive the real nullable provider with an injected clock that
+      advances substantially during the initial failing request and assert the
+      deadline opens only when that failure reaches the first retry decision;
+      then advance a later in-flight retry past that deadline and assert its
+      successful result is returned rather than being cut off. This proves the
+      Acceptance contract that initial-attempt execution time is outside the
+      retry window and the deadline governs only inter-attempt scheduling, not
+      an already-running provider request.
