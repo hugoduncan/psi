@@ -1210,7 +1210,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (test review, current turn)
 
-- [ ] Add one deterministic runtime acceptance test for the actual default retry
+- [x] Add one deterministic runtime acceptance test for the actual default retry
       policy (omit retry timeout/count/base/max overrides) that advances the
       injected clock through the complete retry window and asserts the scheduled
       delays are `2000, 4000, 8000, 16000, 32000`, then remain capped at
@@ -1221,3 +1221,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       runtime advances attempts, applies the 60-second cap repeatedly, and
       exhausts at the configured default deadline rather than an earlier count
       boundary.
+      → Done: `default-retry-policy-runs-complete-ten-minute-window-test` omits
+      all retry-policy overrides, advances an injected clock through the real
+      default schedule, asserts the initial exponential delays plus eight
+      60-second capped delays and the final 58-second truncation, and verifies
+      deadline exhaustion at exactly 600000 ms with no count cap.

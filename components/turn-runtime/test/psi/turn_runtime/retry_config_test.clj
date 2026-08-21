@@ -53,6 +53,42 @@
    :turn-ctx nil
    :assistant-message assistant-message})
 
+(deftest default-retry-policy-runs-complete-ten-minute-window-test
+  ;; The actual default policy advances through exponential backoff, remains
+  ;; capped at 60 seconds, and truncates its final sleep at the 10-minute deadline.
+  (let [clock*           (atom 0)
+        ctx              (session/create-context
+                          (test-support/safe-context-opts
+                           {:persist? false
+                            :now-fn #(java.time.Instant/ofEpochMilli @clock*)
+                            :provider-retry-sleep-fn #(swap! clock* + (long %))}))
+        session-id       (:session-id (session/new-session-in! ctx nil {}))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)
+        expected-delays  (vec (concat [2000 4000 8000 16000 32000]
+                                      (repeat 8 60000)
+                                      [58000]))]
+    (retry-provider/with-nullable-provider [ai-ctx (fn [& _]
+                                                     (swap! attempts* inc)
+                                                     (provider-result {:role "assistant"
+                                                                       :content [{:type :error
+                                                                                  :text "Connection reset by peer"}]
+                                                                       :stop-reason :error
+                                                                       :error-message "Connection reset by peer"
+                                                                       :timestamp (java.time.Instant/now)}))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       ai-ctx ctx session-id prepared nil)
+            outcome   (:execution-result/retry-outcome result)
+            scheduled (filterv #(= "provider_retry_scheduled" (:type %))
+                               (provider-events ctx session-id))]
+        (is (= expected-delays (mapv :delay-ms scheduled)))
+        (is (= 600000 @clock*))
+        (is (= 600000 (:resume-at (last scheduled))))
+        (is (= 14 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :deadline (:exhausted-reason outcome)))
+        (is (nil? (:max-retries outcome)))))))
+
 (deftest successful-request-ignores-invalid-retry-delay-config-test
   ;; Retry delay config is inactive when the initial provider request succeeds.
   (let [[ctx session-id] (create-session-context)
