@@ -115,6 +115,21 @@
              (turn-runtime/execute-prepared-request!
               {:provider-registry (atom {})} ctx session-id prepared nil)))
         (is (= 1 @attempts*))
-        (is (= ["provider_request_started" "provider_request_finished"]
-               (mapv :type (provider-events ctx session-id))))
+        (let [events         (provider-events ctx session-id)
+              terminal-event (last events)]
+          (is (= ["provider_request_started" "provider_request_finished"]
+                 (mapv :type events)))
+          (is (= {:type "provider_request_finished"
+                  :provider-request-id "turn-1"
+                  :retry-attempt 0
+                  :status :failed
+                  :final? true
+                  :retryable? true
+                  :error-kind :transport
+                  :stop-reason :error
+                  :error-message "Connection reset by peer"}
+                 (select-keys terminal-event
+                              [:type :provider-request-id :retry-attempt :status
+                               :final? :retryable? :error-kind :stop-reason
+                               :error-message]))))
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))

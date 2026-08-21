@@ -573,6 +573,21 @@
                                                  :last-error-message error-message})
                                    exhausted? (assoc :exhausted? true
                                                      :exhausted-reason (:exhausted-reason decision)))]
+            ;; Delay config becomes active only when this enabled, retryable
+            ;; failure will schedule a full or truncated retry sleep. Validate
+            ;; before emitting the ordinary non-final attempt event; when the
+            ;; config is invalid, close the provider lifecycle before rethrowing.
+            (when-not immediate-final?
+              (try
+                (retry/validate-retry-config! ctx)
+                (catch clojure.lang.ExceptionInfo error
+                  (retry/dispatch-provider-event!
+                   ctx
+                   "provider_request_finished"
+                   (failed-attempt-finished-event
+                    session-id turn-id attempt-data* attempt-result retry-attempt
+                    error-fields true {}))
+                  (throw error))))
             (retry/dispatch-provider-event!
              ctx
              "provider_request_finished"
@@ -583,11 +598,6 @@
                 immediate-final? (assoc :failure-reason failure-reason)
                 (and immediate-final? exhausted?) (assoc :exhausted? true
                                                          :exhausted-reason (:exhausted-reason decision)))))
-            ;; Delay config becomes active only when this enabled, retryable
-            ;; failure will schedule a full or truncated retry sleep. Successes
-            ;; and terminal failures must not be blocked by irrelevant settings.
-            (when-not immediate-final?
-              (retry/validate-retry-config! ctx))
             (cond
               ;; Immediate final (no sleep): non-retryable / retry-disabled /
               ;; count-cap / deadline-reached.

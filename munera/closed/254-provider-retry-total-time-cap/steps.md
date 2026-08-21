@@ -801,7 +801,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (implementation review, twentieth turn)
 
-- [ ] Preserve a terminal provider-event lifecycle when retry-delay validation
+- [x] Preserve a terminal provider-event lifecycle when retry-delay validation
       rejects a retryable failure. `execute-prepared-request!` currently dispatches
       `provider_request_finished` with `:final? false` before calling
       `retry/validate-retry-config!`; validation then throws before either
@@ -813,3 +813,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       so the completed provider attempt has an authoritative terminal event while
       still rejecting before retry state/scheduling, and assert the terminal
       event fields (including `:final?`) in the regression test.
+      → Done: retry-delay validation now runs before the ordinary non-final failed
+      event; an invalid config emits one final failed `provider_request_finished`
+      event and then rethrows, without scheduling or retry-state writes. The
+      regression test asserts the terminal event's lifecycle and error fields.
