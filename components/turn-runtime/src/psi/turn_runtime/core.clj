@@ -650,7 +650,7 @@
                 ;; Fail fast on a non-advancing-clock hot loop under the
                 ;; sleep-disabled, budget-active, cap-free test seam (review
                 ;; follow-up, 4th turn): the loop cannot reach its deadline.
-                (retry/assert-test-seam-no-hot-loop! ctx budget-active? count-cap last-retry-now now)
+                (retry/assert-test-seam-no-hot-loop! ctx retry-policy last-retry-now now)
                 (let [cancelled? (schedule-and-sleep! ctx session-id turn-id progress-queue attempt-data*
                                                       retry-attempt next-attempt retry-metadata
                                                       error-fields deadline-ms (:delay-ms retry-metadata) true)]

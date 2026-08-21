@@ -1014,7 +1014,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper second re-review)
 
-- [ ] Make canonical retry defaults and the resolved typed retry policy the only
+- [x] Make canonical retry defaults and the resolved typed retry policy the only
       sources used by retry runtime helpers. `retry.clj` currently duplicates
       `session-model/default-config` in private `retry-policy-defaults`, repeats
       timeout/cap literals in `retry-policy-preview`, and has
@@ -1026,3 +1026,8 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       retry machinery does not reinterpret raw operator config. Add focused
       coverage proving preview, resolution, and guard derivation agree when
       canonical defaults and explicit overrides are used.
+      → Done: retry fallback and preview values now derive from
+      `session-model/default-config`; the resolved typed delay policy flows into
+      the hot-loop guard, which no longer reinterprets raw config. Focused
+      coverage proves preview/resolution agreement and guard-threshold derivation
+      for canonical defaults and explicit overrides.

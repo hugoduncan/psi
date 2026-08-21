@@ -18,12 +18,6 @@
   [ctx session-id]
   (or (:retry-attempt (ss/get-session-data-in ctx session-id)) 0))
 
-(def ^:private retry-policy-defaults
-  {:auto-retry-total-timeout-ms 600000
-   :auto-retry-max-retries nil
-   :auto-retry-base-delay-ms 2000
-   :auto-retry-max-delay-ms 60000})
-
 (defn- long-integer?
   [value]
   (and (integer? value)
@@ -38,7 +32,7 @@
 
 (defn- configured-policy-value
   [ctx config-key]
-  (get (:config ctx) config-key (get retry-policy-defaults config-key)))
+  (get (:config ctx) config-key (get session-model/default-config config-key)))
 
 (defn resolve-retry-limiters!
   "Resolves the retry policy fields required to decide immediate termination.
@@ -83,8 +77,8 @@
   "Non-throwing policy preview used only before settings become active at an
    enabled, retryable failure. Invalid raw values remain inert at this stage."
   [ctx]
-  (let [timeout       (get-in ctx [:config :auto-retry-total-timeout-ms] 600000)
-        explicit-cap  (get-in ctx [:config :auto-retry-max-retries])
+  (let [timeout        (configured-policy-value ctx :auto-retry-total-timeout-ms)
+        explicit-cap   (configured-policy-value ctx :auto-retry-max-retries)
         budget-active? (boolean (and (long-integer? timeout) (pos? timeout)))]
     {:budget-active? budget-active?
      :count-cap (cond
@@ -150,20 +144,15 @@
 (defn- retry-min-clock-advance-ms
   "Minimum injected-clock advance (ms) between consecutive scheduled retries
    below which a sleep-disabled, budget-active, cap-free retry seam is treated
-   as a non-advancing (hot-loop) clock. Derived from the configured backoff
-   delays — (min :auto-retry-base-delay-ms :auto-retry-max-delay-ms), floored
-   at 1 — so a delay-driven advancing clock (advance >= the smallest configured
-   delay) never trips a false positive even with sub-second base delays (e.g.
-   :auto-retry-base-delay-ms 10), while a constant clock (advance 0) and real
-   wall-clock jitter (~0-1 ms between fast stub attempts) still do. Overridable
-   per-test via :retry-min-clock-advance-ms on the ctx (e.g. for a cap-free
-   budget-active test whose smallest delay is a provider Retry-After below the
-   configured base)."
-  [ctx]
+   as a non-advancing (hot-loop) clock. Derived from the resolved backoff
+   delays — (min :base-delay-ms :max-delay-ms) — so downstream retry machinery
+   does not reinterpret raw operator config. Overridable per-test via
+   :retry-min-clock-advance-ms on the ctx (e.g. for a cap-free budget-active
+   test whose smallest delay is a provider Retry-After below the configured
+   base)."
+  [ctx {:keys [base-delay-ms max-delay-ms]}]
   (or (:retry-min-clock-advance-ms ctx)
-      (let [base-ms (long (get-in ctx [:config :auto-retry-base-delay-ms] 2000))
-            max-ms  (long (get-in ctx [:config :auto-retry-max-delay-ms] 60000))]
-        (max 1 (min base-ms max-ms)))))
+      (min base-delay-ms max-delay-ms)))
 
 (defn assert-test-seam-no-hot-loop!
   "Fail fast when the test-seam retry loop cannot reach its deadline: with real
@@ -181,14 +170,14 @@
    All session contexts supply a default wall-clock :now-fn
    (java.time.Instant/now) and create fresh fn instances, so 'no injected
    :now-fn' cannot be detected statically; the behavioral check below treats an
-   injected clock that advanced < (retry-min-clock-advance-ms ctx) between
-   retries as non-advancing. The threshold is derived from the configured
-   backoff delays (override: :retry-min-clock-advance-ms on the ctx), so
-   sub-second base delays do not false-positive. last-retry-now is the previous
-   scheduled retry's now-ms (nil on the first retry), now the current failed
-   attempt's."
-  [ctx budget-active? count-cap last-retry-now now]
-  (let [min-advance (retry-min-clock-advance-ms ctx)]
+   injected clock that advanced less than the resolved policy's minimum
+   backoff delay between retries as non-advancing. The threshold remains
+   overridable via :retry-min-clock-advance-ms on the ctx, so sub-second base
+   delays do not false-positive. last-retry-now is the previous scheduled
+   retry's now-ms (nil on the first retry), now the current failed attempt's."
+  [ctx retry-policy last-retry-now now]
+  (let [{:keys [budget-active? count-cap]} retry-policy
+        min-advance (retry-min-clock-advance-ms ctx retry-policy)]
     (when (and (or (= false (:provider-retry-sleep? ctx))
                    (some? (:provider-retry-sleep-fn ctx)))
                budget-active?

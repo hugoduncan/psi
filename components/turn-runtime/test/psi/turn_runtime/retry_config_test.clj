@@ -4,6 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
+   [psi.session-state.model :as session-model]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.retry-provider-test-support :as retry-provider]
    [psi.turn-runtime.core :as turn-runtime]
@@ -185,6 +186,41 @@
                (get-in result [:execution-result/retry-outcome :exhausted-reason])))
         (is (= Long/MAX_VALUE (:delay-ms scheduled)))
         (is (= Long/MAX_VALUE (:resume-at scheduled)))))))
+
+(deftest retry-policy-sources-agree-test
+  ;; Preview, typed resolution, and the hot-loop guard derive one policy from
+  ;; canonical defaults plus explicit operator overrides.
+  (doseq [overrides [{}
+                     {:auto-retry-total-timeout-ms 100
+                      :auto-retry-base-delay-ms 10
+                      :auto-retry-max-delay-ms 500}]]
+    (let [[ctx _]         (create-session-context overrides)
+          expected-config (merge session-model/default-config overrides)
+          preview         (retry/retry-policy-preview ctx)
+          limiters        (retry/resolve-retry-limiters! ctx)
+          policy          (retry/resolve-retry-delays! ctx limiters)
+          expected-min    (min (:auto-retry-base-delay-ms expected-config)
+                               (:auto-retry-max-delay-ms expected-config))
+          guard-error     (try
+                            (retry/assert-test-seam-no-hot-loop!
+                             (assoc ctx :provider-retry-sleep? false)
+                             policy
+                             0
+                             (dec expected-min))
+                            nil
+                            (catch clojure.lang.ExceptionInfo error
+                              error))]
+      (is (= (select-keys limiters [:budget-active? :count-cap])
+             preview))
+      (is (= {:budget-timeout-ms (:auto-retry-total-timeout-ms expected-config)
+              :base-delay-ms (:auto-retry-base-delay-ms expected-config)
+              :max-delay-ms (:auto-retry-max-delay-ms expected-config)}
+             (select-keys policy
+                          [:budget-timeout-ms :base-delay-ms :max-delay-ms])))
+      (is (re-find #"^Test-seam misconfiguration"
+                   (ex-message guard-error)))
+      (is (= expected-min
+             (:min-retry-clock-advance-ms (ex-data guard-error)))))))
 
 (deftest retry-clear-mode-is-required-test
   ;; Retry deadline lifecycle cannot be selected by omission or truthiness.
