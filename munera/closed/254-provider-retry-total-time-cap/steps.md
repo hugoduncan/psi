@@ -1034,7 +1034,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (code-shaper third re-review)
 
-- [ ] Make the production interruptible-sleep deadline overflow-safe.
+- [x] Make the production interruptible-sleep deadline overflow-safe.
       `interruptible-sleep-for-retry!` (`turn-runtime/retry.clj`) still computes
       `(+ (System/currentTimeMillis) (long delay-ms))` with checked addition, so
       a valid near-`Long/MAX_VALUE` configured base/max delay passes the typed
@@ -1046,3 +1046,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       overflow) in the interruptible sleep and add focused production-sleep-path
       coverage that avoids waiting while proving a near-Long delay does not
       throw and remains cancellable.
+      → Done: the production interruptible sleep now reuses the saturating
+      `deadline-ms` constructor. Focused real-sleep-path coverage passes
+      `Long/MAX_VALUE`, cancels before waiting, and proves the boundary neither
+      overflows nor loses cancellation polling.

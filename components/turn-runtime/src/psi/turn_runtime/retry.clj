@@ -328,10 +328,10 @@
 
 (defn interruptible-sleep-for-retry!
   [ctx session-id delay-ms]
-  (let [deadline-ms (+ (System/currentTimeMillis) (long delay-ms))
-        poll-ms     (retry-sleep-poll-ms ctx delay-ms)]
+  (let [sleep-deadline-ms (deadline-ms (System/currentTimeMillis) (long delay-ms))
+        poll-ms           (retry-sleep-poll-ms ctx delay-ms)]
     (loop []
-      (let [remaining-ms (- deadline-ms (System/currentTimeMillis))]
+      (let [remaining-ms (- sleep-deadline-ms (System/currentTimeMillis))]
         (when (and (pos? remaining-ms)
                    (not (provider-retry-cancelled? ctx session-id)))
           (Thread/sleep (long (min poll-ms remaining-ms)))

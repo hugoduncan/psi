@@ -187,6 +187,19 @@
         (is (= Long/MAX_VALUE (:delay-ms scheduled)))
         (is (= Long/MAX_VALUE (:resume-at scheduled)))))))
 
+(deftest near-long-production-sleep-is-overflow-safe-and-cancellable-test
+  ;; The real interruptible-sleep path saturates its deadline before observing
+  ;; cancellation, so a near-Long delay neither overflows nor waits.
+  (let [[ctx session-id] (create-session-context)
+        cancellation-checks* (atom 0)
+        ctx                   (assoc ctx :provider-retry-cancelled?
+                                     (fn [_]
+                                       (swap! cancellation-checks* inc)
+                                       true))]
+    (is (nil? (retry/interruptible-sleep-for-retry!
+               ctx session-id Long/MAX_VALUE)))
+    (is (= 1 @cancellation-checks*))))
+
 (deftest retry-policy-sources-agree-test
   ;; Preview, typed resolution, and the hot-loop guard derive one policy from
   ;; canonical defaults plus explicit operator overrides.
