@@ -33,17 +33,22 @@
                                                                          :model-id "claude-sonnet-4"
                                                                          :thinking-level :medium
                                                                          :prompt-mode :prose
-                                                                         :nucleus-prelude-override "user prelude"}})
+                                                                         :nucleus-prelude-override "user prelude"
+                                                                         :auto-retry-base-delay-ms 3000
+                                                                         :auto-retry-total-timeout-ms 120000}})
                   project-prefs/read-preferences (fn [cwd]
                                                    (is (= "/tmp/project" cwd))
                                                    {:agent-session {:model-provider "openai"
                                                                     :model-id "gpt-5"
-                                                                    :prompt-mode :lambda}})]
+                                                                    :prompt-mode :lambda
+                                                                    :auto-retry-total-timeout-ms 300000}})]
       (is (= {:model-provider "openai"
               :model-id "gpt-5"
               :thinking-level :medium
               :prompt-mode :lambda
-              :nucleus-prelude-override "user prelude"}
+              :nucleus-prelude-override "user prelude"
+              :auto-retry-base-delay-ms 3000
+              :auto-retry-total-timeout-ms 300000}
              (config-resolution/resolve-config "/tmp/project")))))
 
   (testing "ignores non-agent-session keys from user and project config"
@@ -58,6 +63,28 @@
               :prompt-mode :lambda
               :nucleus-prelude-override nil}
              (config-resolution/resolve-config "/tmp/project"))))))
+
+(deftest resolved-session-runtime-config-test
+  ;; Runtime settings retain resolved values, including nil disable sentinels.
+  (is (= {:auto-retry-max-retries nil
+          :auto-retry-base-delay-ms 3000
+          :auto-retry-total-timeout-ms 0
+          :llm-stream-idle-timeout-ms 45000}
+         (config-resolution/resolved-session-runtime-config
+          {:model-id "ignored"
+           :auto-retry-max-retries nil
+           :auto-retry-base-delay-ms 3000
+           :auto-retry-total-timeout-ms 0
+           :llm-stream-idle-timeout-ms 45000}))))
+
+(deftest resolved-auto-retry-enabled-test
+  ;; The session preference preserves an explicit false value.
+  (is (= {:present? true :value false}
+         (config-resolution/resolved-auto-retry-enabled
+          {:auto-retry-enabled false})))
+  (is (nil? (config-resolution/resolved-auto-retry-enabled {})))
+  (is (nil? (config-resolution/resolved-auto-retry-enabled
+             {:auto-retry-enabled :disabled}))))
 
 (deftest resolved-model-test
   (testing "returns keywordized provider and id when both fields are valid strings"

@@ -946,7 +946,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (documentation review)
 
-- [ ] Make the retry policy's operator configuration surface real and document it.
+- [x] Make the retry policy's operator configuration surface real and document it.
       `CHANGELOG.md` presents `:auto-retry-total-timeout-ms` and
       `:auto-retry-max-retries` as configurable controls, but
       `doc/configuration.md` omits all `:auto-retry-*` settings and the documented
@@ -960,3 +960,13 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       and correct the changelog to name it. Include the existing base/max-delay
       controls and their positive-value validation so the settings form one
       coherent reference.
+      → Done: shared-config now projects the retry runtime keys from resolved
+      user/project `:agent-session` configuration, and app-runtime merges those
+      settings into the agent context before runtime session overrides (which
+      remain highest precedence). `:auto-retry-enabled` is applied as a
+      presence-aware initial session preference. `doc/configuration.md` now
+      documents the master switch, count cap, base/max delays, total-time budget,
+      defaults, disable/count-only semantics, positive delay validation, and an
+      EDN example. Shared-config precedence and real project-config → app-runtime
+      propagation tests pass; focused suites, lint, file-length, changelog, and
+      dispatch-architecture checks are green.

@@ -101,7 +101,45 @@ layers.
 | `:effort-override` | keyword or nil | — | Optional provider reasoning-effort override — `:low`, `:medium`, `:high`, `:xhigh`, or nil |
 | `:prompt-mode` | keyword | `:lambda` | System prompt style — `:lambda` or `:prose` |
 | `:nucleus-prelude-override` | string | — | Replace the nucleus prelude block in the system prompt |
+| `:auto-retry-enabled` | boolean | `true` | Master switch for provider auto-retry |
+| `:auto-retry-max-retries` | non-negative integer or nil | `nil` | Optional hard cap on retries; nil leaves the active time window as the limiter |
+| `:auto-retry-base-delay-ms` | positive integer | `2000` | Initial exponential-backoff delay in milliseconds |
+| `:auto-retry-max-delay-ms` | positive integer | `60000` | Maximum exponential-backoff delay in milliseconds |
+| `:auto-retry-total-timeout-ms` | integer or nil | `600000` | Total retry-window duration in milliseconds; nil, absent, zero, or negative disables the time budget |
 | `:llm-stream-idle-timeout-ms` | positive integer | `1200000` | Milliseconds without provider stream progress before the backend aborts the run |
+
+### Provider auto-retry policy
+
+Retry settings use the same user → project-shared → project-local precedence as
+other `:agent-session` settings. Runtime session overrides, including CLI or RPC
+settings where available, take precedence over file configuration.
+
+With defaults, an enabled session retries retryable provider failures for up to
+10 minutes. Set `:auto-retry-enabled` to `false` to disable retries for sessions
+created from that configuration. Backoff starts at 2 seconds, doubles per attempt, and is capped at
+60 seconds; a positive provider `Retry-After` value takes precedence for that
+attempt. The retry window remains interruptible by turn cancellation.
+
+`:auto-retry-max-retries` is a hard cap only when set to an integer. Its default
+`nil` value means the active total-time window is the sole limiter. Set
+`:auto-retry-total-timeout-ms` to `nil`, `0`, or a negative integer to disable
+the time budget; when no explicit retry cap is set in that count-only mode, Psi
+preserves the fallback cap of 3 retries. Setting either delay control to zero or
+a negative value is invalid when an enabled, retryable failure reaches retry
+scheduling; successful requests and non-retryable failures do not use or
+validate inactive delay settings.
+
+Example project policy:
+
+```edn
+{:version 1
+ :agent-session
+ {:auto-retry-enabled          true
+  :auto-retry-total-timeout-ms 300000
+  :auto-retry-max-retries      8
+  :auto-retry-base-delay-ms    1000
+  :auto-retry-max-delay-ms     30000}}
+```
 
 Both `:model-provider` and `:model-id` must be set together; a partial entry is
 ignored and the next lower source is used instead. Catalog validation is distinct
