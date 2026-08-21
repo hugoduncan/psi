@@ -1115,3 +1115,15 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       Clock advance uses arbitrary-precision subtraction, clamps backward movement
       to zero, and shares that safe value between the predicate and ex-data.
       Focused tests cover malformed overrides and a full-range backward clock.
+
+## Review follow-up (code-shaper seventh re-review)
+
+- [ ] Make `give-up-decision`'s remaining-window arithmetic safe across the same
+      full-range injected/persisted clock boundary now covered by the hot-loop
+      guard. Its overshoot branch still evaluates `(- deadline-ms now)` twice
+      with checked long subtraction; for example, a persisted deadline of
+      `Long/MAX_VALUE` and an injected `now` of `Long/MIN_VALUE` throws
+      `ArithmeticException` before returning a retry decision. Compute the
+      remainder once with arbitrary-precision subtraction (or compare without
+      subtraction overflow), then convert only a bounded `:final-sleep-ms` to
+      long. Add focused `give-up-decision` coverage for the extreme clock range.
