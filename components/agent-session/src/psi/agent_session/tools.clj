@@ -61,7 +61,7 @@
 (def write-tool
   {:name               "write"
    :label              "Write"
-   :description        "Write content to path, creating it if it does not exist."
+   :description        "Write content to path, overwriting it, or creating it if it does not exist."
    :lambda-description "λ{path content}. create(path,content) ∨ overwrite(path, content)"
    :parameters         {:type       "object"
                         :properties {:path    {:type "string" :description "File path"}
