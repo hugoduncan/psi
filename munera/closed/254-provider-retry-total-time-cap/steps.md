@@ -913,3 +913,25 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       `:done` or `:error`. Focused tests cover malformed assistant messages,
       collection shape, event payloads/types, and terminal events. Helper and both
       consuming retry suites pass; changed tests lint clean.
+
+## Review follow-up (test-shaper third re-review)
+
+- [ ] Exercise malformed scripted responses through the public
+      `nullable-provider-context` provider boundary instead of dereferencing the
+      private `response->events` var in every helper test. The current tests are
+      coupled to the helper's internal decomposition, so a behavior-preserving
+      rename/extraction breaks them while the actual contract — invoking the
+      nullable provider's stream with a bad scripted response throws the
+      informative boundary error — is not directly proved. Keep a narrow public
+      boundary assertion for the error message/ex-data and retain table-driven
+      malformed cases without reaching through `#'` private-var access.
+- [ ] Tighten scripted payload validation to reject structurally malformed but
+      currently accepted sequences. A successful `:assistant-message` accepts any
+      sequential `:content` (for example `[nil]` or an unsupported content map),
+      which `assistant-message->events` silently drops into an empty successful
+      response. Explicit streams accept a terminal event before the last event,
+      duplicate/misplaced `:start` events, and events before `:start`, because only
+      individual event shapes and the final event are checked. Define the minimal
+      content-item and stream-topology invariants used by this test provider, then
+      add representative malformed cases proving each invalid partition fails at
+      the scripted-provider boundary with a meaningful error.
