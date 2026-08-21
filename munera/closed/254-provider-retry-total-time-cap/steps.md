@@ -859,7 +859,7 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
 
 ## Review follow-up (test-shaper review)
 
-- [ ] Migrate
+- [x] Migrate
       `execute-prepared-request-streaming-retry-discards-failed-partial-output-test`
       off its remaining `with-redefs` of `psi.turn-runtime.core/do-stream!`.
       It replaces runtime logic rather than driving the real provider boundary,
@@ -869,3 +869,9 @@ Retry machinery extracted into a dedicated `psi.turn-runtime.retry` namespace
       scripted nullable provider support to accept explicit per-attempt stream
       event sequences (partial text followed by error, then successful text),
       and preserve the existing final-content and provider-event assertions.
+      → Done: `retry-provider-test-support` now accepts explicit `:stream-events`
+      per scripted response. The test drives partial-text/error then successful-text
+      attempts through the nullable provider's real streaming boundary, with its
+      final-content isolation and provider-event lifecycle assertions preserved.
+      Focused retry suite: 23 tests, 135 assertions, all green; changed tests lint
+      clean.

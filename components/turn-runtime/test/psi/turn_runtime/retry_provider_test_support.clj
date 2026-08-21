@@ -20,15 +20,20 @@
                          content)
            [{:type :done :reason stop-reason}]))))
 
+(defn- response->events
+  [{:keys [stream-events assistant-message]}]
+  (or stream-events
+      (assistant-message->events assistant-message)))
+
 (defn nullable-provider-context
   "Return an isolated AI context whose provider executes `response-fn` through
-   the real streaming boundary. `response-fn` returns the same turn-result maps
-   formerly supplied by direct execution-function replacements."
+   the real streaming boundary. Each response may provide explicit
+   `:stream-events` or the same `:assistant-message` maps formerly supplied by
+   direct execution-function replacements."
   [response-fn]
   (let [provider {:name :nullable-retry-provider
                   :stream (fn [_conversation _model _options consume-fn]
-                            (doseq [event (assistant-message->events
-                                           (:assistant-message (response-fn)))]
+                            (doseq [event (response->events (response-fn))]
                               (consume-fn event)))}]
     (ai/create-context
      {:providers {:anthropic provider

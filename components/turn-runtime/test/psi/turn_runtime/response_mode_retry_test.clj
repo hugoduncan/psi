@@ -59,22 +59,26 @@
                                                   :config {:auto-retry-max-retries 1}
                                                   :provider-retry-sleep? false})
         prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
-    (with-redefs [psi.turn-runtime.core/do-stream!
-                  (fn [_ai-ctx _conv _model _opts consume-fn]
-                    (if (= 1 (swap! attempts* inc))
-                      (do
-                        (consume-fn {:type :start})
-                        (consume-fn {:type :text-delta :content-index 0 :delta "partial failed "})
-                        (consume-fn {:type :error
-                                     :error-message "Connection reset by peer"}))
-                      (do
-                        (consume-fn {:type :start})
-                        (consume-fn {:type :text-delta :content-index 0 :delta "final answer"})
-                        (consume-fn {:type :done :reason :stop}))))]
+        responses*       (atom [{:stream-events
+                                 [{:type :start}
+                                  {:type :text-delta
+                                   :content-index 0
+                                   :delta "partial failed "}
+                                  {:type :error
+                                   :error-message "Connection reset by peer"}]}
+                                {:stream-events
+                                 [{:type :start}
+                                  {:type :text-delta
+                                   :content-index 0
+                                   :delta "final answer"}
+                                  {:type :done :reason :stop}]}])]
+    (retry-provider/with-nullable-provider [ai-ctx (fn []
+                                                     (let [response (first @responses*)]
+                                                       (swap! responses* rest)
+                                                       response))]
       (let [result (turn-runtime/execute-prepared-request!
-                    {:provider-registry (atom {})} ctx session-id prepared nil)]
-        (is (= 2 @attempts*))
+                    ai-ctx ctx session-id prepared nil)]
+        (is (empty? @responses*))
         (is (= :stop (:execution-result/stop-reason result)))
         (is (= [{:type :text :text "final answer"}]
                (get-in result [:execution-result/assistant-message :content])))
