@@ -4,6 +4,7 @@
 - ambiguity review added 2 new design steps (global-footer "fallback" wording contradicts Rules/example; empty-string `:footer` behavior unspecified)
 - no new inconsistency review feedback (only inconsistency is the global-footer contradiction already tracked in design-steps.md)
 - architectural review (2nd pass) added 1 new design step: design omits user-visible artifact obligations (doc/extensions.md config + CHANGELOG [Unreleased] entry) for the new `:footer` config key
+- no new ambiguity review feedback (2nd pass): design is fully specified after the prior pass. Borderline non-string `:footer` coercion is below the actionable threshold — config is unvalidated EDN and the `str`+`not-empty` idiom (as used for `:id`) gives a single interpretation, so do not re-raise it.
 
 ## Addressing the design-steps
 
