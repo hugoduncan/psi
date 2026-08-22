@@ -21,7 +21,7 @@
     {:type :source, :from {:step "review", :yield :text}}
     {:type :template,
      :text
-     "For the Munera task identified by {{input}}, execute the newly added actionable follow-up items in design-steps.md addressing {{aspect}}. Work independently. Use the preloaded review result to understand what was added in the preceding review pass. Read and update the task's design.md, plan.md, steps.md, and implementation.md as needed. Complete any newly added unchecked design-steps when possible, updating task artifacts as you work. If a design-step is completed, mark it done in design-steps.md. If a design-step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Do not execute items from steps.md. Commit when done.",
+     "For the Munera task identified by {{input}}, execute the actionable follow-up items in design-steps.md addressing {{aspect}}. Work independently. Use the preloaded review result to understand what was added in the preceding review pass. Read and update the task's design.md, plan.md, steps.md, and implementation.md as needed. Complete any unchecked design-steps when possible, updating task artifacts as you work. If a design-step is completed, mark it done in design-steps.md. If a design-step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Do not execute items from steps.md. Commit when done.",
      :vars
      {"input" {:from :workflow-input, :path [:input]},
       "aspect" {:from :workflow-input, :path [:aspect]}}}]}
