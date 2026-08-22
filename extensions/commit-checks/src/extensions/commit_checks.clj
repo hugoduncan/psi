@@ -99,7 +99,7 @@
          "output:\n"
          (let [output* (truncate-output max-output-chars output)]
            (if footer*
-             (str (str/replace output* #"\R+$" "") "\n" footer*)
+             (str (str/replace output* #"\R+$" "") "\n" footer* "\n")
              (str output* "\n"))))))
 
 (defn- build-prompt
