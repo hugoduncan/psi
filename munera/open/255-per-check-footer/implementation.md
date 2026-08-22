@@ -67,3 +67,5 @@
 - Re-ran the focused Scry suite after strengthening the legacy assertion: 11 tests and 66 assertions passed. `clj-kondo --lint extensions/commit-checks/src/extensions/commit_checks.clj extensions/commit-checks/test/extensions/commit_checks_test.clj` completed with 0 errors and 0 warnings.
 - Prompt-order review: populated footer is emitted after output; absent and empty footer are omitted; successful configured footer is filtered with its successful command; the global trailer occurs exactly once and is final. Timeout results carry `:footer` through the same result-map path as normal failures.
 - Re-read implementation, tests, documentation, changelog, and all design acceptance criteria: coherent. No deviations or dependencies added.
+
+- no new architectural review feedback (design-review first turn)
