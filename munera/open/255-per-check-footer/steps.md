@@ -33,3 +33,7 @@
 ## Implementation review follow-up
 
 - [x] Add a handler-level timeout regression test proving a timed-out command's non-empty `:footer` is rendered after its timeout output and before the global trailer.
+
+## Test review follow-up
+
+- [ ] Strengthen `failure-footers-are-rendered-per-failing-command-test` with exact section-boundary assertions showing that absent and empty-string `:footer` values add neither footer text nor an extra blank line before the next failure section.
