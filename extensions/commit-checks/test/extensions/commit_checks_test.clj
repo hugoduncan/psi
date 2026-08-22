@@ -248,9 +248,9 @@
                                 :cmd ["bash" "-lc" "echo lint-output && exit 1"]
                                 :footer lint-footer}
                                {:id "no-footer"
-                                :cmd ["bash" "-lc" "echo no-footer-output && exit 1"]}
+                                :cmd ["bash" "-lc" "printf no-footer-output; exit 1"]}
                                {:id "empty-footer"
-                                :cmd ["bash" "-lc" "echo empty-footer-output && exit 1"]
+                                :cmd ["bash" "-lc" "printf empty-footer-output; exit 1"]
                                 :footer ""}
                                {:id "test"
                                 :cmd ["bash" "-lc" "echo test-output && exit 1"]

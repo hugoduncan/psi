@@ -100,7 +100,7 @@
          (let [output* (truncate-output max-output-chars output)]
            (if footer*
              (str (str/replace output* #"\R+$" "") "\n" footer*)
-             output*)))))
+             (str output* "\n"))))))
 
 (defn- build-prompt
   [{:keys [prompt-header max-output-chars]} {:keys [workspace-dir head session-id]} failures]
