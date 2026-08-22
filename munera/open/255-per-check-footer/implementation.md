@@ -3,6 +3,7 @@
 - no architectural review feedback
 - ambiguity review added 2 new design steps (global-footer "fallback" wording contradicts Rules/example; empty-string `:footer` behavior unspecified)
 - no new inconsistency review feedback (only inconsistency is the global-footer contradiction already tracked in design-steps.md)
+- architectural review (2nd pass) added 1 new design step: design omits user-visible artifact obligations (doc/extensions.md config + CHANGELOG [Unreleased] entry) for the new `:footer` config key
 
 ## Addressing the design-steps
 
