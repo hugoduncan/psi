@@ -25,3 +25,9 @@
 - Item 1: rewrote only the Design prose sentence; Rules/Acceptance/example left untouched (they were already the authoritative reading).
 - Item 2: added a Rules bullet + an Acceptance criterion stating empty-string `:footer` is treated as absent (no per-section footer).
 - Structural fact for implementation: `run-command!` destructures `{:keys [id cmd timeout-ms]}` and its result map does **not** carry `:footer`, so the per-command `:footer` is currently dropped before `render-failure-section` sees it. The implementer must thread `:footer` from the config command into the failure result (or pass it alongside) — `render-failure-section`'s signature will need to change. Use the `not-empty` idiom so `:footer ""` is treated as absent.
+
+## Architecture review (3rd pass)
+
+- No new actionable architectural-fit feedback. The design is a clean, backward-compatible addition confined to the self-contained commit-checks extension's prompt rendering (`build-prompt` / `render-failure-section`); it touches no state, dispatch, resolvers, or cross-adapter surface, and the optional `:footer` key follows the existing unvalidated-EDN + `not-empty` config idiom.
+- The sole architectural-fit obligation — `doc/extensions.md` config-shape/example + `CHANGELOG.md` `[Unreleased]` entry for the new user-visible `:footer` key — is already the open (unchecked) design-steps item; not re-raised.
+- Naming clarification for later reviews: the design's `:footer` is a trailing instruction string in the injected commit-checks prompt, unrelated to the app-runtime "footer semantic model" in `doc/architecture.md` (a UI status-bar footer). No conflict; do not conflate.
