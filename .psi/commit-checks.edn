@@ -1,16 +1,19 @@
 {:enabled true
- :prompt-header "Commit checks failed after the latest commit. Diagnose and fix the problems with minimal changes.  For file length issues, break the files into multiple logically consistent files; do no introduce forarding vars."
+ :prompt-header "Commit checks failed after the latest commit."
  :max-output-chars 12000
  :commands
  [{:id "rama-cc"
    :cmd ["bb" "commit-check:rama-cc"]
-   :timeout-ms 20000}
+   :timeout-ms 20000
+   :footer "Refactor the code to improve the failed metrics, without changing behaviour"}
   {:id "file-lengths"
    :cmd ["bb" "commit-check:file-lengths"]
-   :timeout-ms 20000}
+   :timeout-ms 20000
+   :footer "Break the offending files into multiple logically consistent files; do no introduce forarding vars; do not remove single line spacing between top level forms."}
   {:id "ramora-word-limit"
    :cmd ["bb" "commit-check:ramora-word-limit"]
-   :timeout-ms 20000}
+   :timeout-ms 20000
+   :footer "Make the offending files more concise without losing meaning, or break the offending files into multiple logically consistent files"}
   {:id "dispatch-architecture"
    :cmd ["bb" "commit-check:dispatch-architecture"]
    :timeout-ms 20000}]}
