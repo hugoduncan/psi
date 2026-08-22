@@ -270,6 +270,8 @@
             global-index (.indexOf prompt global-footer)]
         (is (string? prompt))
         (is (< (.indexOf prompt "lint-output") lint-index (.indexOf prompt "## no-footer")))
+        (is (str/includes? prompt "output:\nlint-output\nFix lint output.\n## no-footer"))
+        (is (not (str/includes? prompt "output:\nlint-output\n\nFix lint output.")))
         (is (str/includes? prompt
                            "output:\nno-footer-output\n\n## empty-footer"))
         (is (str/includes? prompt

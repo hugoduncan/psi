@@ -85,3 +85,4 @@
 - added 1 step to be addressed
 - addressed 1 review step: strengthened exact absent/empty footer section-boundary assertions; focused Scry suite passed (12 tests, 73 assertions) and clj-kondo reported 0 errors and 0 warnings.
 - added 1 step to be addressed
+- addressed 1 review step: normalized newline-terminated output before a per-command footer and added exact prompt-boundary coverage; focused Scry suite passed (12 tests, 75 assertions) and clj-kondo reported 0 errors and 0 warnings.

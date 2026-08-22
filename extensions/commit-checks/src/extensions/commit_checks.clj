@@ -97,9 +97,10 @@
          "command: " (render-command cmd) "\n"
          "exit: " exit "\n"
          "output:\n"
-         (truncate-output max-output-chars output)
-         (when footer*
-           (str "\n" footer*)))))
+         (let [output* (truncate-output max-output-chars output)]
+           (if footer*
+             (str (str/replace output* #"\R+$" "") "\n" footer*)
+             output*)))))
 
 (defn- build-prompt
   [{:keys [prompt-header max-output-chars]} {:keys [workspace-dir head session-id]} failures]

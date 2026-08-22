@@ -37,4 +37,4 @@
 ## Test review follow-up
 
 - [x] Strengthen `failure-footers-are-rendered-per-failing-command-test` with exact section-boundary assertions showing that absent and empty-string `:footer` values add neither footer text nor an extra blank line before the next failure section.
-- [ ] Normalize the separator before a non-empty per-command `:footer` so a normally newline-terminated command output is followed immediately by its footer (as in the documented prompt shape), rather than by an unintended blank line; add an exact prompt-boundary assertion for that case.
+- [x] Normalize the separator before a non-empty per-command `:footer` so a normally newline-terminated command output is followed immediately by its footer (as in the documented prompt shape), rather than by an unintended blank line; add an exact prompt-boundary assertion for that case.
