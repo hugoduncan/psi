@@ -71,3 +71,4 @@
 - no new architectural review feedback (design-review first turn)
 - no new ambiguity review feedback (design-review second turn)
 - no new inconsistency review feedback (design-review third turn)
+- Follow-up status: the sole unchecked doc/changelog design step is already delivered in `doc/extensions.md` and `CHANGELOG.md`; reconcile its checklist state rather than duplicating those edits.
