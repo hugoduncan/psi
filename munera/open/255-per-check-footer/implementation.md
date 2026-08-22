@@ -98,3 +98,4 @@
 - addressed 1 review step: labeled the repository-command commit-checks snippet illustrative, so its optional `file-lengths` footer and abbreviated command list do not claim to mirror `.psi/commit-checks.edn` exactly.
 - added 1 step to be addressed
 - addressed 1 review step: documented the optional per-command `:footer` in the AI-facing commit-check setup guidance, including failed-check-only emission.
+- added 1 step to be addressed

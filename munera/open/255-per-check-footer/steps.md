@@ -47,3 +47,7 @@
 
 - [x] Reconcile `doc/extensions.md`'s commit-checks example with the checked-in `.psi/commit-checks.edn`: the documentation presents the repository-specific `file-lengths` command with a `:footer`, but the actual config has no command footer (and includes additional commands omitted by the snippet). Either add the documented footer to the config or explicitly label/correct the snippet as illustrative so users are not told it is the repository's configuration.
 - [x] Document the optional per-command `:footer` prompt instruction in `ramora/develop/setup-hooks.md`'s commit-checks guidance, including that it is emitted only for its failed check; this AI-facing setup reference currently describes `.psi/commit-checks.edn` but omits the new configuration surface.
+
+## Code-shaper review follow-up
+
+- [ ] Reconcile `design-steps.md` with the delivered documentation and changelog: its final doc/changelog obligation remains unchecked even though the corresponding artifacts and implementation notes say it is complete.
