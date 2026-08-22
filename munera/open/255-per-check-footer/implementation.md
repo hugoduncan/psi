@@ -44,3 +44,5 @@
 
 - Doc example nuance: the `doc/extensions.md` commit-checks example is anchored to real repo bb tasks (`bb commit-check:rama-cc`, `bb commit-check:file-lengths`, `:id "rama-cc"`/`"file-lengths"`), whereas design.md's example uses generic `lint`/`test`/`format`. "Keep the example consistent with design.md's example" means add `:footer` to the existing repo-specific example entries (e.g. one of them), NOT replace the repo-specific example with design.md's generic one — the doc example documents the actual in-repo config.
 - Relevant non-task files: `doc/extensions.md` (commit-checks section, config example ~line 184), `CHANGELOG.md` (`[Unreleased]` → `### Added`), `extensions/commit-checks/src/extensions/commit_checks.clj` (code), `extensions/commit-checks/test/extensions/commit_checks_test.clj` (tests).
+
+- no new ambiguity review feedback (plan/steps pass): plan and steps are unambiguous and consistent with design/code/docs; the open design-steps doc+changelog item is already tracked and addressed by Slice 1, not a new ambiguity
