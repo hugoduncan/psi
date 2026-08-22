@@ -5,6 +5,13 @@
 - no new inconsistency review feedback (only inconsistency is the global-footer contradiction already tracked in design-steps.md)
 - architectural review (2nd pass) added 1 new design step: design omits user-visible artifact obligations (doc/extensions.md config + CHANGELOG [Unreleased] entry) for the new `:footer` config key
 - no new ambiguity review feedback (2nd pass): design is fully specified after the prior pass. Borderline non-string `:footer` coercion is below the actionable threshold — config is unvalidated EDN and the `str`+`not-empty` idiom (as used for `:id`) gives a single interpretation, so do not re-raise it.
+- no new inconsistency review feedback (2nd pass): design is internally consistent and consistent with `commit_checks.clj` code structure and `doc/extensions.md`. The prior global-footer wording inconsistency was already resolved.
+
+## Addressing the open design step (doc + changelog artifact)
+
+- Doc target: `doc/extensions.md` commit-checks section — add `:footer` to the config-shape prose and the example config (a per-command optional string; empty/absent → no per-section footer). Keep the example consistent with design.md's example.
+- Changelog target: `CHANGELOG.md` `[Unreleased]` → `### Added` — user-visible config addition (per-command `:footer` in `.psi/commit-checks.edn`). Entry must precede the code commit per the changelog rule.
+- Principle: doc + changelog describe the *user-facing config surface*, not the internal `render-failure-section` threading — keep them at the config/behaviour level, matching how `:prompt-header`/`:max-output-chars` are documented.
 
 ## Addressing the design-steps
 
