@@ -42,3 +42,7 @@
 - [x] Add a handler-level regression test for a non-empty per-command `:footer` with `:max-output-chars` truncation, proving the footer follows the truncated-output marker and still precedes the global trailer.
 - [x] Add handler-level coverage for a multi-line non-empty per-command `:footer`, proving its complete text is rendered verbatim after that command's output and before the next section or global trailer.
 - [x] Restore the existing blank separator after a failed command with a non-empty per-command `:footer`; rendering currently leaves only one newline before the next failure section or global trailer, contrary to the documented prompt shape. Update the exact boundary tests to protect the separator.
+
+## Documentation review follow-up
+
+- [ ] Reconcile `doc/extensions.md`'s commit-checks example with the checked-in `.psi/commit-checks.edn`: the documentation presents the repository-specific `file-lengths` command with a `:footer`, but the actual config has no command footer (and includes additional commands omitted by the snippet). Either add the documented footer to the config or explicitly label/correct the snippet as illustrative so users are not told it is the repository's configuration.
