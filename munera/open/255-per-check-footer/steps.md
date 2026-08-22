@@ -32,4 +32,4 @@
 
 ## Implementation review follow-up
 
-- [ ] Add a handler-level timeout regression test proving a timed-out command's non-empty `:footer` is rendered after its timeout output and before the global trailer.
+- [x] Add a handler-level timeout regression test proving a timed-out command's non-empty `:footer` is rendered after its timeout output and before the global trailer.

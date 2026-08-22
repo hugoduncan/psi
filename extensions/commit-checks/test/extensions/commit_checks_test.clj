@@ -276,6 +276,35 @@
         (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote global-footer)) prompt))))
         (is (= global-footer (subs prompt global-index)))))))
 
+(deftest timed-out-command-footer-precedes-global-trailer-test
+  ;; Timeout failures follow the same command-local footer path as exits.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/commit_checks.clj"})
+        workspace-dir (temp-dir)
+        timeout-ms 50
+        timeout-output (str "Command timed out after " timeout-ms "ms")
+        command-footer "Inspect and fix the timed-out check."
+        global-footer "Please inspect these failures and make the minimal necessary fixes."]
+    (write-config! workspace-dir
+                   {:enabled true
+                    :commands [{:id "slow"
+                                :cmd ["bash" "-lc" "sleep 1"]
+                                :timeout-ms timeout-ms
+                                :footer command-footer}]})
+    (sut/init api)
+    (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
+      (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)
+            timeout-index (.indexOf prompt timeout-output)
+            footer-index (.indexOf prompt command-footer)
+            global-index (.indexOf prompt global-footer)]
+        (is (string? prompt))
+        (is (< timeout-index footer-index global-index))
+        (is (= global-footer (subs prompt global-index)))))))
+
 (deftest handler-prefers-workspace-dir-over-cwd-test
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
                              {:path "/test/commit_checks.clj"})
