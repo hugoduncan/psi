@@ -8,7 +8,7 @@ Key decisions:
 
 - Thread `:footer` through `run-command!` into its result map so filtering failures does not lose the command-local configuration.
 - In `render-failure-section`, append the footer after the possibly truncated output only when `(not-empty footer)` is truthy. Use the footer verbatim; do not interpolate it or replace the global trailer.
-- Prove the full prompt behavior through the extension's existing handler-level tests: populated footer placement, absent footer, empty footer, global trailer position, and unchanged no-footer behavior.
+- Prove the full prompt behavior through the extension's existing handler-level tests: populated footer placement, absent footer, empty footer, exclusion of successful-command footers, global trailer position, and unchanged no-footer behavior.
 - Document `:footer` on the user-facing commit-checks config surface and add an `[Unreleased]` changelog entry before committing the implementation.
 
 ## Risks
