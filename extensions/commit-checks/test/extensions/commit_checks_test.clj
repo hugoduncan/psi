@@ -286,6 +286,34 @@
         (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote global-footer)) prompt))))
         (is (= global-footer (subs prompt global-index)))))))
 
+(deftest multi-line-command-footer-is-rendered-verbatim-test
+  ;; A command-local footer retains every configured line before the global trailer.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/commit_checks.clj"})
+        workspace-dir (temp-dir)
+        command-footer "Inspect the failure.\nApply the minimal fix."
+        global-footer "Please inspect these failures and make the minimal necessary fixes."]
+    (write-config! workspace-dir
+                   {:enabled true
+                    :commands [{:id "failing-check"
+                                :cmd ["bash" "-lc" "printf command-output; exit 1"]
+                                :footer command-footer}]})
+    (sut/init api)
+    (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
+      (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)]
+        (is (string? prompt))
+        (is (str/includes? prompt
+                           (str "output:\ncommand-output\n"
+                                command-footer "\n"
+                                global-footer)))
+        (is (< (.indexOf prompt "command-output")
+               (.indexOf prompt command-footer)
+               (.indexOf prompt global-footer)))))))
+
 (deftest timed-out-command-footer-precedes-global-trailer-test
   ;; Timeout failures follow the same command-local footer path as exits.
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
