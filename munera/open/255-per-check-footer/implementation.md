@@ -79,3 +79,5 @@
 
 - Re-ran the focused commit-checks Scry suite: 11 tests and 66 assertions passed; `clj-kondo` reported 0 errors and 0 warnings for the changed source and test namespaces.
 - Checklist reconciliation is complete: all four implementation slices are marked done. No mechanism, API, dependency, or design changes were needed in this verification pass.
+
+- added 1 step to be addressed

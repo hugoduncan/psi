@@ -29,3 +29,7 @@
 - [x] Review the generated prompt ordering for populated, absent, empty, mixed-success, and timeout cases against `design.md`.
 - [x] Re-read changed source, tests, docs, and changelog to verify they are coherent with every acceptance criterion.
 - [x] Record implementation decisions, verification commands, and results in `implementation.md` as work proceeds.
+
+## Implementation review follow-up
+
+- [ ] Add a handler-level timeout regression test proving a timed-out command's non-empty `:footer` is rendered after its timeout output and before the global trailer.
