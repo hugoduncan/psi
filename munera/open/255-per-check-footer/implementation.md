@@ -35,3 +35,7 @@
 ## Ambiguity review (3rd pass)
 
 - No new actionable ambiguity feedback. The design is fully specified after the prior passes. Per-section footer placement is pinned by the example output (footer line directly after the output block, then the existing blank-line section separator) and is consistent with the current `render-failure-section` + `str/join "\n"` structure — single interpretation. Footer applies only to failing checks; "after the output block" means after the (possibly truncated) output; `:footer` is used verbatim (plain string, no templating); per-section and global footers are explicitly separated. Non-string `:footer` coercion remains below the actionable threshold (unvalidated EDN + `str`/`not-empty` idiom).
+
+## Inconsistency review (3rd pass)
+
+- No new actionable inconsistency feedback. design.md is internally consistent (Goal/Design/Config/Prompt-output/Rules/Acceptance all agree on per-section vs. global footer semantics; the prior global-footer "fallback" contradiction was already resolved). Consistent with `commit_checks.clj` structure (`build-prompt` global end-trailer + `render-failure-section` per-section) and with `doc/extensions.md` (the doc's missing `:footer` is the open design-steps doc-update obligation, not a design claim). The design's example `:prompt-header` value differs from the code/doc default string — illustrative only, not a contradiction.
