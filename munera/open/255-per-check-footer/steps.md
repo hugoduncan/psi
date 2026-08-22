@@ -50,4 +50,4 @@
 
 ## Code-shaper review follow-up
 
-- [ ] Reconcile `design-steps.md` with the delivered documentation and changelog: its final doc/changelog obligation remains unchecked even though the corresponding artifacts and implementation notes say it is complete.
+- [x] Reconcile `design-steps.md` with the delivered documentation and changelog: its final doc/changelog obligation remains unchecked even though the corresponding artifacts and implementation notes say it is complete.
