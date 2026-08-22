@@ -16,7 +16,7 @@ This is too generic. Different checks (lint, test, format) benefit from differen
 
 ## Design
 
-Each entry in `:commands` may optionally include a `:footer` key (string). When a check fails and has a `:footer`, that text is appended to that specific failure section (after the output block). The global footer remains as a fallback for commands that do not specify one.
+Each entry in `:commands` may optionally include a `:footer` key (string). When a check fails and has a `:footer`, that text is appended to that specific failure section (after the output block). The global footer is a single end-trailer appended once at the end of the combined prompt; it is not emitted per-section, and a command without `:footer` simply gets no per-section footer.
 
 ### Config shape
 
@@ -66,6 +66,7 @@ Please inspect these failures and make the minimal necessary fixes.
 ### Rules
 
 - `:footer` is optional per command; when absent, no per-section footer is emitted for that check.
+- An empty-string `:footer` (e.g. `:footer ""`) is treated as absent: no per-section footer is emitted for that check.
 - The global footer (`"Please inspect these failures and make the minimal necessary fixes."`) is always appended at the end of the combined prompt.
 - `:footer` is a plain string, no interpolation or templating.
 
@@ -73,5 +74,6 @@ Please inspect these failures and make the minimal necessary fixes.
 
 - [ ] A command with `:footer` renders that text after its output section in the injected prompt.
 - [ ] A command without `:footer` renders no per-section footer.
+- [ ] A command with an empty-string `:footer` renders no per-section footer (treated as absent).
 - [ ] The global footer is still present at the end of the combined prompt.
 - [ ] Existing behaviour (no `:footer` on any command) is unchanged.
