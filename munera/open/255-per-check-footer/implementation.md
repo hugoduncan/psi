@@ -69,3 +69,4 @@
 - Re-read implementation, tests, documentation, changelog, and all design acceptance criteria: coherent. No deviations or dependencies added.
 
 - no new architectural review feedback (design-review first turn)
+- no new ambiguity review feedback (design-review second turn)
