@@ -39,3 +39,8 @@
 ## Inconsistency review (3rd pass)
 
 - No new actionable inconsistency feedback. design.md is internally consistent (Goal/Design/Config/Prompt-output/Rules/Acceptance all agree on per-section vs. global footer semantics; the prior global-footer "fallback" contradiction was already resolved). Consistent with `commit_checks.clj` structure (`build-prompt` global end-trailer + `render-failure-section` per-section) and with `doc/extensions.md` (the doc's missing `:footer` is the open design-steps doc-update obligation, not a design claim). The design's example `:prompt-header` value differs from the code/doc default string — illustrative only, not a contradiction.
+
+## Slice notes — addressing the open design step (doc + changelog)
+
+- Doc example nuance: the `doc/extensions.md` commit-checks example is anchored to real repo bb tasks (`bb commit-check:rama-cc`, `bb commit-check:file-lengths`, `:id "rama-cc"`/`"file-lengths"`), whereas design.md's example uses generic `lint`/`test`/`format`. "Keep the example consistent with design.md's example" means add `:footer` to the existing repo-specific example entries (e.g. one of them), NOT replace the repo-specific example with design.md's generic one — the doc example documents the actual in-repo config.
+- Relevant non-task files: `doc/extensions.md` (commit-checks section, config example ~line 184), `CHANGELOG.md` (`[Unreleased]` → `### Added`), `extensions/commit-checks/src/extensions/commit_checks.clj` (code), `extensions/commit-checks/test/extensions/commit_checks_test.clj` (tests).
