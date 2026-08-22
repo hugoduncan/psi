@@ -178,7 +178,7 @@ Purpose: run project-local external checks after a new local commit and inject f
   - `:workspace-dir`
   - `:head`
 
-Example config:
+Illustrative config using commands from this repository (the checked-in `.psi/commit-checks.edn` may configure additional commands or different optional per-command footers):
 
 ```clojure
 {:enabled true

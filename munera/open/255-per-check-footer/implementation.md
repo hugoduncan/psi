@@ -95,3 +95,4 @@
 - added 1 step to be addressed
 - addressed 1 review step: restored the blank separator after non-empty per-command footers and protected it with exact single- and multi-line/truncated-output boundary assertions; focused Scry suite passed (13 tests, 81 assertions) and clj-kondo reported 0 errors and 0 warnings.
 - added 1 step to be addressed
+- addressed 1 review step: labeled the repository-command commit-checks snippet illustrative, so its optional `file-lengths` footer and abbreviated command list do not claim to mirror `.psi/commit-checks.edn` exactly.
