@@ -74,3 +74,8 @@
 - Follow-up status: the sole unchecked doc/changelog design step is already delivered in `doc/extensions.md` and `CHANGELOG.md`; reconcile its checklist state rather than duplicating those edits.
 - no new inconsistency review feedback (plan-review second turn): the pre-existing stale unchecked doc/changelog design-step is already identified above, while plan, read-only steps, design, implementation notes, and delivered artifacts otherwise agree.
 - Design-step follow-up: the remaining item is checklist reconciliation only — preserve the existing `doc/extensions.md` behavior/example distinction and `CHANGELOG.md` `[Unreleased]` entry; do not duplicate or alter those delivered user-facing artifacts.
+
+## Final implementation verification — 2026-08-22
+
+- Re-ran the focused commit-checks Scry suite: 11 tests and 66 assertions passed; `clj-kondo` reported 0 errors and 0 warnings for the changed source and test namespaces.
+- Checklist reconciliation is complete: all four implementation slices are marked done. No mechanism, API, dependency, or design changes were needed in this verification pass.
