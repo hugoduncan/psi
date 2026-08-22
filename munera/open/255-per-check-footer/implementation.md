@@ -49,3 +49,9 @@
 
 - no new ambiguity review feedback (plan/steps pass): plan and steps are unambiguous and consistent with design/code/docs; the open design-steps doc+changelog item is already tracked and addressed by Slice 1, not a new ambiguity
 - no new inconsistency review feedback (plan/steps pass): plan.md and steps.md slice order, doc/changelog obligations, and test coverage are mutually consistent and consistent with design.md; the open design-steps doc+changelog item is addressed by Slice 1, not a contradiction
+
+## Slice 1 — user-facing contract
+
+- Added the optional per-command `:footer` contract to both the commit-checks behavior prose and the existing repository-specific example in `doc/extensions.md`; the `rama-cc` command intentionally remains footer-less to demonstrate optionality.
+- Added the required `[Unreleased]` `Added` changelog entry. Both surfaces distinguish the command-local footer from the always-present global prompt trailer.
+- Verification: re-read the documentation and changelog changes. No Clojure behavior changed in this slice; Slice 2 must establish the executable prompt contract.

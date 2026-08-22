@@ -2,10 +2,10 @@
 
 ## Slice 1 — User-facing contract
 
-- [ ] Add the optional per-command `:footer` string and its absent/empty behavior to the commit-checks config documentation in `doc/extensions.md`.
-- [ ] Add representative footer instructions to the existing repository-specific commit-checks example without replacing its real bb task commands.
-- [ ] Add an `[Unreleased]` `Added` entry to `CHANGELOG.md` for per-command commit-check footers before committing implementation code.
-- [ ] Verify the documentation and changelog distinguish per-section footers from the always-present global prompt trailer.
+- [x] Add the optional per-command `:footer` string and its absent/empty behavior to the commit-checks config documentation in `doc/extensions.md`.
+- [x] Add representative footer instructions to the existing repository-specific commit-checks example without replacing its real bb task commands.
+- [x] Add an `[Unreleased]` `Added` entry to `CHANGELOG.md` for per-command commit-check footers before committing implementation code.
+- [x] Verify the documentation and changelog distinguish per-section footers from the always-present global prompt trailer.
 
 ## Slice 2 — Executable prompt contract
 

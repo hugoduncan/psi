@@ -171,7 +171,8 @@ Purpose: run project-local external checks after a new local commit and inject f
   - runs each configured command with `babashka.process`
   - command form is a non-empty vector of strings under `:cmd`
   - collects only failing commands (non-zero exit or timeout)
-  - injects one combined follow-up prompt with the failing outputs
+  - an optional per-command `:footer` string is appended only to that failing command's section; absent or empty footers add no per-section text
+  - injects one combined follow-up prompt with the failing outputs and its always-present global end-trailer
 - Event payload relied on:
   - `:session-id`
   - `:workspace-dir`
@@ -189,7 +190,8 @@ Example config:
    :timeout-ms 20000}
   {:id "file-lengths"
    :cmd ["bb" "commit-check:file-lengths"]
-   :timeout-ms 20000}]}
+   :timeout-ms 20000
+   :footer "Fix files that exceed the configured line limit; do not suppress the check."}]}
 ```
 
 The example project config in this repo defines these bb tasks:
