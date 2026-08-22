@@ -81,6 +81,7 @@
 - Checklist reconciliation is complete: all four implementation slices are marked done. No mechanism, API, dependency, or design changes were needed in this verification pass.
 
 - added 1 step to be addressed
+- addressed 1 review step: added truncated-output footer ordering coverage; focused Scry suite passed (12 tests, 77 assertions) and clj-kondo reported 0 errors and 0 warnings.
 - added 1 step to be addressed
 - addressed 1 review step: restored the no-footer trailing newline and covered newline-less absent/empty footer boundaries; focused Scry suite passed (12 tests, 75 assertions) and clj-kondo reported 0 errors and 0 warnings.
 - addressed 1 review step: added timeout-footer ordering coverage; focused Scry suite passed (12 tests, 69 assertions) and clj-kondo reported 0 errors and 0 warnings.

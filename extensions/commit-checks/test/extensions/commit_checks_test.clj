@@ -336,16 +336,31 @@
         (is (not (.contains (str (:content prompt)) (str "workspace-dir: " wrong-dir))))))))
 
 (deftest prompt-output-is-truncated-test
+  ;; A command-local footer follows truncated output and precedes the global trailer.
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
                              {:path "/test/commit_checks.clj"})
-        workspace-dir (temp-dir)]
+        workspace-dir (temp-dir)
+        truncation-marker "[output truncated to 20 chars]"
+        command-footer "Fix the truncated check output."
+        global-footer "Please inspect these failures and make the minimal necessary fixes."]
     (write-config! workspace-dir
                    {:enabled true
                     :max-output-chars 20
-                    :commands [{:id "long" :cmd ["bash" "-lc" "printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' 1>&2; exit 1"]}]})
+                    :commands [{:id "long"
+                                :cmd ["bash" "-lc" "printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' 1>&2; exit 1"]
+                                :footer command-footer}]})
     (sut/init api)
     (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
       (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
-      (let [prompt (first (filter #(= "extension-prompt" (:custom-type %)) (:messages @state)))]
-        (is (some? prompt))
-        (is (.contains (str (:content prompt)) "[output truncated to 20 chars]"))))))
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)
+            truncation-index (.indexOf prompt truncation-marker)
+            command-footer-index (.indexOf prompt command-footer)
+            global-footer-index (.indexOf prompt global-footer)]
+        (is (string? prompt))
+        (is (< truncation-index command-footer-index global-footer-index))
+        (is (str/includes? prompt
+                           (str truncation-marker "\n" command-footer "\n" global-footer)))
+        (is (= global-footer (subs prompt global-footer-index)))))))
