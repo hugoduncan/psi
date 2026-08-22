@@ -100,3 +100,8 @@
 - added 1 step to be addressed
 - addressed 1 review step: documented the optional per-command `:footer` in the AI-facing commit-check setup guidance, including failed-check-only emission.
 - added 1 step to be addressed
+
+## Closure — 2026-08-22
+
+- Completed: every checklist item in `steps.md` is checked, focused verification and lint passed, implementation review follow-ups were resolved, and mementum extraction found no additional non-duplicate durable knowledge to write.
+- Closed as completed; no outstanding task-specific work or blockers remain.
