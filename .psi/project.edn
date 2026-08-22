@@ -31,34 +31,34 @@
      {:model-provider "anthropic"
       :model-id "claude-sonnet-5"
       :thinking-level :low}}
-  #_{:designing
-     {:model-provider "openai"
-      :model-id "gpt-5.6-sol"
-      :thinking-level :low}
-     :fixing-design
-     {:model-provider "openai"
-      :model-id "gpt-5.6-terra"
-      :thinking-level :low}
-     :planning
-     {:model-provider "openai"
-      :model-id "gpt-5.6-sol"
-      :thinking-level :low}
-     :fixing-plan
-     {:model-provider "openai"
-      :model-id "gpt-5.6-terra"
-      :thinking-level :low}
-     :implementing
-     {:model-provider "openai"
-      :model-id "gpt-5.6-terra"
-      :thinking-level :low}
-     :reviewing-implementation
-     {:model-provider "openai"
-      :model-id "gpt-5.6-sol"
-      :thinking-level :low}
-     :fixing-implementation
-     {:model-provider "openai"
-      :model-id "gpt-5.6-sol"
-      :thinking-level :low}}
+  {:designing
+   {:model-provider "openai"
+    :model-id "gpt-5.6-sol"
+    :thinking-level :low}
+   :fixing-design
+   {:model-provider "openai"
+    :model-id "gpt-5.6-terra"
+    :thinking-level :low}
+   :planning
+   {:model-provider "openai"
+    :model-id "gpt-5.6-sol"
+    :thinking-level :low}
+   :fixing-plan
+   {:model-provider "openai"
+    :model-id "gpt-5.6-terra"
+    :thinking-level :low}
+   :implementing
+   {:model-provider "openai"
+    :model-id "gpt-5.6-terra"
+    :thinking-level :low}
+   :reviewing-implementation
+   {:model-provider "openai"
+    :model-id "gpt-5.6-sol"
+    :thinking-level :low}
+   :fixing-implementation
+   {:model-provider "openai"
+    :model-id "gpt-5.6-sol"
+    :thinking-level :low}}
   ;; The deepseek profiles are the committed default. The provider/model
   ;; comes from the committed .psi/models.edn (deepseek-v4-flash via
   ;; https://api.deepseek.com/anthropic), so the profiles resolve on fresh
@@ -118,31 +118,31 @@
      {:model-provider "deepseek"
       :model-id "deepseek-v4-flash"
       :thinking-level :low}}
-  {:designing
-   {:model-provider "llama-swap"
-    :model-id "qwen3.8-27b"
-    :thinking-level :low}
-   :fixing-design
-   {:model-provider "llama-swap"
-    :model-id "qwen3.8-27b"
-    :thinking-level :low}
-   :planning
-   {:model-provider "llama-swap"
-    :model-id "qwen3.8-27b"
-    :thinking-level :low}
-   :fixing-plan
-   {:model-provider "llama-swap"
-    :model-id "qwen3.8-27b"
-    :thinking-level :low}
-   :implementing
-   {:model-provider "llama-swap"
-    :model-id "qwen3.8-27b"
-    :thinking-level :low}
-   :reviewing-implementation
-   {:model-provider "llama-swap"
-    :model-id "qwen3.8-27b"
-    :thinking-level :low}
-   :fixing-implementation
-   {:model-provider "llama-swap"
-    :model-id "qwen3.8-27b"
-    :thinking-level :low}}}}
+  #_{:designing
+     {:model-provider "llama-swap"
+      :model-id "qwen3.8-27b"
+      :thinking-level :low}
+     :fixing-design
+     {:model-provider "llama-swap"
+      :model-id "qwen3.8-27b"
+      :thinking-level :low}
+     :planning
+     {:model-provider "llama-swap"
+      :model-id "qwen3.8-27b"
+      :thinking-level :low}
+     :fixing-plan
+     {:model-provider "llama-swap"
+      :model-id "qwen3.8-27b"
+      :thinking-level :low}
+     :implementing
+     {:model-provider "llama-swap"
+      :model-id "qwen3.8-27b"
+      :thinking-level :low}
+     :reviewing-implementation
+     {:model-provider "llama-swap"
+      :model-id "qwen3.8-27b"
+      :thinking-level :low}
+     :fixing-implementation
+     {:model-provider "llama-swap"
+      :model-id "qwen3.8-27b"
+      :thinking-level :low}}}}
