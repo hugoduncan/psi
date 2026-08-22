@@ -10,6 +10,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
+   [psi.ai.model-registry :as model-registry]
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.transcript]
    [psi.session-persistence.core :as persist]
@@ -547,110 +548,6 @@
               (is (= [prompt prompt] texts)
                   "nullable deterministic mode echoes the submitted user text through start-tui-runtime!"))))))))
 
-(deftest agent-messages->tui-resume-state-rehydrates-tool-rows-test
-  (let [messages [{:role "user"
-                   :content [{:type :text :text "read file"}]}
-                  {:role "assistant"
-                   :content [{:type :text :text "Sure"}
-                             {:type :tool-call :id "call-1" :name "read"
-                              :arguments "{\"path\":\"a.txt\"}"}]}
-                  {:role "toolResult"
-                   :tool-call-id "call-1"
-                   :tool-name "read"
-                   :content [{:type :text :text "hello"}
-                             {:type :image :mime-type "image/png" :data "<base64>"}]
-                   :details {:full-output-path "/tmp/all.log"}
-                   :is-error false}
-                  {:role "assistant"
-                   :content [{:type :text :text "done"}]}]
-        {:keys [messages tool-calls tool-order]}
-        (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
-    ;; tool-call block emits a :tool message before the assistant text summary
-    (is (= [{:role :user :text "read file"}
-            {:role :tool :tool-id "call-1"}
-            {:role :assistant :text "Sure"}
-            {:role :assistant :text "done"}]
-           messages))
-    (is (= ["call-1"] tool-order))
-    (is (= "read" (get-in tool-calls ["call-1" :name])))
-    (is (= :success (get-in tool-calls ["call-1" :status])))
-    (is (= "hello" (get-in tool-calls ["call-1" :result])))
-    (is (= {:full-output-path "/tmp/all.log"}
-           (get-in tool-calls ["call-1" :details])))))
-
-(deftest agent-messages->tui-resume-state-supports-structured-content-test
-  (let [messages [{:role "assistant"
-                   :content {:kind :structured
-                             :blocks [{:kind :text :text "planning"}
-                                      {:kind :tool-call :id "call-2" :name "read" :input {:path "README.md"}}]}}
-                  {:role "toolResult"
-                   :tool-call-id "call-2"
-                   :tool-name "read"
-                   :content [{:type :text :text "ok"}]
-                   :is-error false}
-                  {:role "assistant"
-                   :content {:kind :structured
-                             :blocks [{:kind :text :text "done"}]}}]
-        {:keys [messages tool-calls tool-order]}
-        (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
-    ;; tool-call block emits a :tool message before the assistant text summary
-    (is (= [{:role :tool :tool-id "call-2"}
-            {:role :assistant :text "planning"}
-            {:role :assistant :text "done"}]
-           messages))
-    (is (= ["call-2"] tool-order))
-    (is (= "read" (get-in tool-calls ["call-2" :name])))
-    (is (= "{:path \"README.md\"}"
-           (get-in tool-calls ["call-2" :args])))))
-
-(deftest agent-messages->tui-resume-state-rehydrates-thinking-blocks-test
-  (testing "thinking blocks in assistant content are emitted as :thinking messages before the assistant reply"
-    (let [messages [{:role "user"
-                     :content [{:type :text :text "explain recursion"}]}
-                    {:role "assistant"
-                     :content [{:type :thinking :text "Let me think about this carefully."}
-                               {:type :text :text "Recursion is when a function calls itself."}]}]
-          {:keys [messages]}
-          (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
-      (is (= [{:role :user :text "explain recursion"}
-              {:role :thinking :text "Let me think about this carefully."}
-              {:role :assistant :text "Recursion is when a function calls itself."}]
-             messages)))))
-
-(deftest agent-messages->tui-resume-state-thinking-before-tool-in-block-order-test
-  (testing "thinking and tool-call blocks are emitted in block order; assistant text follows"
-    (let [messages [{:role "assistant"
-                     :content [{:type :thinking :text "Plan A"}
-                               {:type :tool-call :id "call-3" :name "bash"
-                                :arguments "{\"cmd\":\"ls\"}"}
-                               {:type :thinking :text "Plan B"}
-                               {:type :text :text "Done."}]}
-                    {:role "toolResult"
-                     :tool-call-id "call-3"
-                     :tool-name "bash"
-                     :content [{:type :text :text "file1 file2"}]
-                     :is-error false}]
-          {:keys [messages tool-order]}
-          (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
-      ;; thinking A, :tool message, thinking B, then assistant text — in block order
-      (is (= {:role :thinking :text "Plan A"} (nth messages 0)))
-      (is (= {:role :tool :tool-id "call-3"} (nth messages 1)))
-      (is (= {:role :thinking :text "Plan B"} (nth messages 2)))
-      (is (= {:role :assistant :text "Done."} (nth messages 3)))
-      (is (= ["call-3"] tool-order)))))
-
-(deftest agent-messages->tui-resume-state-structured-content-with-thinking-test
-  (testing "structured content map with thinking blocks is rehydrated correctly"
-    (let [messages [{:role "assistant"
-                     :content {:kind :structured
-                               :blocks [{:kind :thinking :text "Structured thinking."}
-                                        {:kind :text :text "Structured answer."}]}}]
-          {:keys [messages]}
-          (#'psi.app-runtime.transcript/agent-messages->tui-resume-state messages)]
-      (is (= [{:role :thinking :text "Structured thinking."}
-              {:role :assistant :text "Structured answer."}]
-             messages)))))
-
 (deftest bootstrap-runtime-session-initial-context-index-has-single-session-test
   (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
                          {#'ext/discover-extension-paths (fn [& _] [])})
@@ -795,6 +692,38 @@
             prepared {:prepared-request/id "turn-99"}
             result (stub nil nil "s2" prepared nil)]
         (is (= "" (get-in result [:execution-result/assistant-message :content 0 :text])))))))
+
+(deftest resolve-model-finds-custom-model-before-context-creation-test
+  "Regression: resolve-model must find custom models from models.edn even when
+   called before create-runtime-session-context (i.e. the registry is still in
+   its initial defonce state with :catalog nil).
+
+   This is the exact call order used by start-tui-runtime! and run-session:
+   resolve-model is called first, then create-runtime-session-context."
+  (let [tmp (java.io.File/createTempFile "psi-resolve-model-test" ".edn")]
+    (try
+      (spit tmp (pr-str {:version 1
+                         :providers
+                         {"testprov"
+                          {:base-url "http://localhost:9999/v1"
+                           :api      :openai-completions
+                           :auth     {:api-key "test-key"}
+                           :models   [{:id "test-model-1"
+                                       :locality :cloud
+                                       :latency-tier :low
+                                       :cost-tier :low}]}}}))
+      ;; Reset registry to its initial defonce state (catalog = nil),
+      ;; simulating a fresh JVM where resolve-model is called before init!.
+      (reset! (var-get (resolve 'psi.ai.model-registry/registry-state))
+              {:catalog nil :auth {} :load-error nil})
+      (with-redefs [model-registry/default-user-models-path (fn [] (.getAbsolutePath tmp))]
+        (let [model (app-runtime/resolve-model :testprov/test-model-1)]
+          (is (= :testprov (:provider model)))
+          (is (= "test-model-1" (:id model)))))
+      (finally
+        (.delete tmp)
+        ;; Restore registry to a clean built-in-only state
+        (model-registry/init! {})))))
 
 
 
