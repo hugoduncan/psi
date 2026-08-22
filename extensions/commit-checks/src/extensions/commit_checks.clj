@@ -92,13 +92,14 @@
 
 (defn- render-failure-section
   [max-output-chars {:keys [id cmd exit footer output]}]
-  (str "## " (or (not-empty (str id)) (render-command cmd)) "\n"
-       "command: " (render-command cmd) "\n"
-       "exit: " exit "\n"
-       "output:\n"
-       (truncate-output max-output-chars output) "\n"
-       (when (not-empty footer)
-         (str footer "\n"))))
+  (let [footer* (not-empty footer)]
+    (str "## " (or (not-empty (str id)) (render-command cmd)) "\n"
+         "command: " (render-command cmd) "\n"
+         "exit: " exit "\n"
+         "output:\n"
+         (truncate-output max-output-chars output)
+         (when footer*
+           (str "\n" footer*)))))
 
 (defn- build-prompt
   [{:keys [prompt-header max-output-chars]} {:keys [workspace-dir head session-id]} failures]

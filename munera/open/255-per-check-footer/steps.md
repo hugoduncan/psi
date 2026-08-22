@@ -36,4 +36,4 @@
 
 ## Test review follow-up
 
-- [ ] Strengthen `failure-footers-are-rendered-per-failing-command-test` with exact section-boundary assertions showing that absent and empty-string `:footer` values add neither footer text nor an extra blank line before the next failure section.
+- [x] Strengthen `failure-footers-are-rendered-per-failing-command-test` with exact section-boundary assertions showing that absent and empty-string `:footer` values add neither footer text nor an extra blank line before the next failure section.

@@ -270,6 +270,14 @@
             global-index (.indexOf prompt global-footer)]
         (is (string? prompt))
         (is (< (.indexOf prompt "lint-output") lint-index (.indexOf prompt "## no-footer")))
+        (is (str/includes? prompt
+                           "output:\nno-footer-output\n\n## empty-footer"))
+        (is (str/includes? prompt
+                           "output:\nempty-footer-output\n\n## test"))
+        (is (not (str/includes? prompt
+                                "output:\nno-footer-output\n\n\n## empty-footer")))
+        (is (not (str/includes? prompt
+                                "output:\nempty-footer-output\n\n\n## test")))
         (is (< (.indexOf prompt "test-output") test-index global-index))
         (is (neg? (.indexOf prompt "Successful checks must not appear.")))
         (is (neg? (.indexOf prompt "## success")))
