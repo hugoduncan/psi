@@ -73,3 +73,4 @@
 - no new inconsistency review feedback (design-review third turn)
 - Follow-up status: the sole unchecked doc/changelog design step is already delivered in `doc/extensions.md` and `CHANGELOG.md`; reconcile its checklist state rather than duplicating those edits.
 - no new inconsistency review feedback (plan-review second turn): the pre-existing stale unchecked doc/changelog design-step is already identified above, while plan, read-only steps, design, implementation notes, and delivered artifacts otherwise agree.
+- Design-step follow-up: the remaining item is checklist reconciliation only — preserve the existing `doc/extensions.md` behavior/example distinction and `CHANGELOG.md` `[Unreleased]` entry; do not duplicate or alter those delivered user-facing artifacts.
