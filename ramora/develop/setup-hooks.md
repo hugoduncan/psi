@@ -98,6 +98,8 @@ bb lint
 
 Project-local commit checks can be wired through `.psi/commit-checks.edn` and
 run bb tasks that fail with a non-zero exit when a check should block follow-up.
+Each command may optionally set a `:footer` string with failure-specific prompt
+instructions; it is emitted only in that command's failed-check section.
 
 This repo defines:
 

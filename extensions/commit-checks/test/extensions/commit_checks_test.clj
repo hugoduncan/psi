@@ -229,7 +229,120 @@
         (is (.contains (str (:content prompt)) "commit: abc123"))
         (is (.contains (str (:content prompt)) "## bad-1"))
         (is (.contains (str (:content prompt)) "## bad-2"))
-        (is (not (.contains (str (:content prompt)) "## ok")))))))
+        (is (not (.contains (str (:content prompt)) "## ok")))
+        (is (= "Please inspect these failures and make the minimal necessary fixes."
+               (last (str/split-lines (:content prompt)))))))))
+
+(deftest failure-footers-are-rendered-per-failing-command-test
+  ;; Verifies configured instructions remain attached to their failed command,
+  ;; while absent, empty, and successful commands add no footer text.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/commit_checks.clj"})
+        workspace-dir (temp-dir)
+        global-footer "Please inspect these failures and make the minimal necessary fixes."
+        lint-footer "Fix lint output."
+        test-footer "Fix test output."]
+    (write-config! workspace-dir
+                   {:enabled true
+                    :commands [{:id "lint"
+                                :cmd ["bash" "-lc" "echo lint-output && exit 1"]
+                                :footer lint-footer}
+                               {:id "no-footer"
+                                :cmd ["bash" "-lc" "printf no-footer-output; exit 1"]}
+                               {:id "empty-footer"
+                                :cmd ["bash" "-lc" "printf empty-footer-output; exit 1"]
+                                :footer ""}
+                               {:id "test"
+                                :cmd ["bash" "-lc" "echo test-output && exit 1"]
+                                :footer test-footer}
+                               {:id "success"
+                                :cmd ["bash" "-lc" "echo success-output && exit 0"]
+                                :footer "Successful checks must not appear."}]})
+    (sut/init api)
+    (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
+      (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)
+            lint-index (.indexOf prompt lint-footer)
+            test-index (.indexOf prompt test-footer)
+            global-index (.indexOf prompt global-footer)]
+        (is (string? prompt))
+        (is (< (.indexOf prompt "lint-output") lint-index (.indexOf prompt "## no-footer")))
+        (is (str/includes? prompt "output:\nlint-output\nFix lint output.\n\n## no-footer"))
+        (is (not (str/includes? prompt "output:\nlint-output\nFix lint output.\n## no-footer")))
+        (is (not (str/includes? prompt "output:\nlint-output\n\nFix lint output.")))
+        (is (str/includes? prompt
+                           "output:\nno-footer-output\n\n## empty-footer"))
+        (is (str/includes? prompt
+                           "output:\nempty-footer-output\n\n## test"))
+        (is (not (str/includes? prompt
+                                "output:\nno-footer-output\n\n\n## empty-footer")))
+        (is (not (str/includes? prompt
+                                "output:\nempty-footer-output\n\n\n## test")))
+        (is (< (.indexOf prompt "test-output") test-index global-index))
+        (is (neg? (.indexOf prompt "Successful checks must not appear.")))
+        (is (neg? (.indexOf prompt "## success")))
+        (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote global-footer)) prompt))))
+        (is (= global-footer (subs prompt global-index)))))))
+
+(deftest multi-line-command-footer-is-rendered-verbatim-test
+  ;; A command-local footer retains every configured line before the global trailer.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/commit_checks.clj"})
+        workspace-dir (temp-dir)
+        command-footer "Inspect the failure.\nApply the minimal fix."
+        global-footer "Please inspect these failures and make the minimal necessary fixes."]
+    (write-config! workspace-dir
+                   {:enabled true
+                    :commands [{:id "failing-check"
+                                :cmd ["bash" "-lc" "printf command-output; exit 1"]
+                                :footer command-footer}]})
+    (sut/init api)
+    (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
+      (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)]
+        (is (string? prompt))
+        (is (str/includes? prompt
+                           (str "output:\ncommand-output\n"
+                                command-footer "\n\n"
+                                global-footer)))
+        (is (< (.indexOf prompt "command-output")
+               (.indexOf prompt command-footer)
+               (.indexOf prompt global-footer)))))))
+
+(deftest timed-out-command-footer-precedes-global-trailer-test
+  ;; Timeout failures follow the same command-local footer path as exits.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/commit_checks.clj"})
+        workspace-dir (temp-dir)
+        timeout-ms 50
+        timeout-output (str "Command timed out after " timeout-ms "ms")
+        command-footer "Inspect and fix the timed-out check."
+        global-footer "Please inspect these failures and make the minimal necessary fixes."]
+    (write-config! workspace-dir
+                   {:enabled true
+                    :commands [{:id "slow"
+                                :cmd ["bash" "-lc" "sleep 1"]
+                                :timeout-ms timeout-ms
+                                :footer command-footer}]})
+    (sut/init api)
+    (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
+      (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)
+            timeout-index (.indexOf prompt timeout-output)
+            footer-index (.indexOf prompt command-footer)
+            global-index (.indexOf prompt global-footer)]
+        (is (string? prompt))
+        (is (< timeout-index footer-index global-index))
+        (is (= global-footer (subs prompt global-index)))))))
 
 (deftest handler-prefers-workspace-dir-over-cwd-test
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
@@ -252,16 +365,31 @@
         (is (not (.contains (str (:content prompt)) (str "workspace-dir: " wrong-dir))))))))
 
 (deftest prompt-output-is-truncated-test
+  ;; A command-local footer follows truncated output and precedes the global trailer.
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
                              {:path "/test/commit_checks.clj"})
-        workspace-dir (temp-dir)]
+        workspace-dir (temp-dir)
+        truncation-marker "[output truncated to 20 chars]"
+        command-footer "Fix the truncated check output."
+        global-footer "Please inspect these failures and make the minimal necessary fixes."]
     (write-config! workspace-dir
                    {:enabled true
                     :max-output-chars 20
-                    :commands [{:id "long" :cmd ["bash" "-lc" "printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' 1>&2; exit 1"]}]})
+                    :commands [{:id "long"
+                                :cmd ["bash" "-lc" "printf 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' 1>&2; exit 1"]
+                                :footer command-footer}]})
     (sut/init api)
     (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
       (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
-      (let [prompt (first (filter #(= "extension-prompt" (:custom-type %)) (:messages @state)))]
-        (is (some? prompt))
-        (is (.contains (str (:content prompt)) "[output truncated to 20 chars]"))))))
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)
+            truncation-index (.indexOf prompt truncation-marker)
+            command-footer-index (.indexOf prompt command-footer)
+            global-footer-index (.indexOf prompt global-footer)]
+        (is (string? prompt))
+        (is (< truncation-index command-footer-index global-footer-index))
+        (is (str/includes? prompt
+                           (str truncation-marker "\n" command-footer "\n\n" global-footer)))
+        (is (= global-footer (subs prompt global-footer-index)))))))

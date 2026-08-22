@@ -52,7 +52,7 @@
        (every? string? cmd)))
 
 (defn- run-command!
-  [{:keys [id cmd timeout-ms]} workspace-dir]
+  [{:keys [id cmd footer timeout-ms]} workspace-dir]
   (when-not (valid-cmd? cmd)
     (throw (ex-info "commit check command must be a non-empty vector of strings"
                     {:id id :cmd cmd})))
@@ -71,11 +71,13 @@
           (catch Exception _ nil))
         {:id id
          :cmd cmd
+         :footer footer
          :timeout-ms timeout-ms*
          :exit :timeout
          :output (str "Command timed out after " timeout-ms* "ms")})
       {:id id
        :cmd cmd
+       :footer footer
        :timeout-ms timeout-ms*
        :exit (:exit result)
        :output (str (:out result) (:err result))})))
@@ -89,12 +91,16 @@
   (str/join " " cmd))
 
 (defn- render-failure-section
-  [max-output-chars {:keys [id cmd exit output]}]
-  (str "## " (or (not-empty (str id)) (render-command cmd)) "\n"
-       "command: " (render-command cmd) "\n"
-       "exit: " exit "\n"
-       "output:\n"
-       (truncate-output max-output-chars output) "\n"))
+  [max-output-chars {:keys [id cmd exit footer output]}]
+  (let [footer* (not-empty footer)]
+    (str "## " (or (not-empty (str id)) (render-command cmd)) "\n"
+         "command: " (render-command cmd) "\n"
+         "exit: " exit "\n"
+         "output:\n"
+         (let [output* (truncate-output max-output-chars output)]
+           (if footer*
+             (str (str/replace output* #"\R+$" "") "\n" footer* "\n")
+             (str output* "\n"))))))
 
 (defn- build-prompt
   [{:keys [prompt-header max-output-chars]} {:keys [workspace-dir head session-id]} failures]

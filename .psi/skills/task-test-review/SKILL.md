@@ -14,3 +14,5 @@ advertise: false
 - limit test coverage to the changes introduced by the task.
 - no test-only code paths in production
 - no test-only arguments or options
+- no tests covering tests
+- no tests preventing changes in implementation decisions
