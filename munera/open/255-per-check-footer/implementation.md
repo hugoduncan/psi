@@ -55,3 +55,15 @@
 - Added the optional per-command `:footer` contract to both the commit-checks behavior prose and the existing repository-specific example in `doc/extensions.md`; the `rama-cc` command intentionally remains footer-less to demonstrate optionality.
 - Added the required `[Unreleased]` `Added` changelog entry. Both surfaces distinguish the command-local footer from the always-present global prompt trailer.
 - Verification: re-read the documentation and changelog changes. No Clojure behavior changed in this slice; Slice 2 must establish the executable prompt contract.
+
+## Slices 2–3 — executable contract and mechanism
+
+- `run-command!` now carries configured `:footer` through both regular and timeout result maps; `render-failure-section` appends only a non-empty footer after the (possibly truncated) output. The existing `build-prompt` global trailer remains unchanged.
+- Added a handler-level sociable test using real short-lived shell commands and the nullable extension API. It proves command-local footer placement, absence/empty-footer omission, successful-command omission, exactly one global trailer, and the legacy test now asserts the global trailer remains final.
+- Verification: `clj-paren-repair extensions/commit-checks/src/extensions/commit_checks.clj extensions/commit-checks/test/extensions/commit_checks_test.clj`; `bb clojure:test:scry --namespace extensions.commit-checks-test` — 11 tests, 65 assertions passed.
+
+## Slice 4 — verification
+
+- Re-ran the focused Scry suite after strengthening the legacy assertion: 11 tests and 66 assertions passed. `clj-kondo --lint extensions/commit-checks/src/extensions/commit_checks.clj extensions/commit-checks/test/extensions/commit_checks_test.clj` completed with 0 errors and 0 warnings.
+- Prompt-order review: populated footer is emitted after output; absent and empty footer are omitted; successful configured footer is filtered with its successful command; the global trailer occurs exactly once and is final. Timeout results carry `:footer` through the same result-map path as normal failures.
+- Re-read implementation, tests, documentation, changelog, and all design acceptance criteria: coherent. No deviations or dependencies added.

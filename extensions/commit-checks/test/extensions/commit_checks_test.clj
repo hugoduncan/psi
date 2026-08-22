@@ -229,7 +229,52 @@
         (is (.contains (str (:content prompt)) "commit: abc123"))
         (is (.contains (str (:content prompt)) "## bad-1"))
         (is (.contains (str (:content prompt)) "## bad-2"))
-        (is (not (.contains (str (:content prompt)) "## ok")))))))
+        (is (not (.contains (str (:content prompt)) "## ok")))
+        (is (= "Please inspect these failures and make the minimal necessary fixes."
+               (last (str/split-lines (:content prompt)))))))))
+
+(deftest failure-footers-are-rendered-per-failing-command-test
+  ;; Verifies configured instructions remain attached to their failed command,
+  ;; while absent, empty, and successful commands add no footer text.
+  (let [{:keys [api state]} (nullable/create-nullable-extension-api
+                             {:path "/test/commit_checks.clj"})
+        workspace-dir (temp-dir)
+        global-footer "Please inspect these failures and make the minimal necessary fixes."
+        lint-footer "Fix lint output."
+        test-footer "Fix test output."]
+    (write-config! workspace-dir
+                   {:enabled true
+                    :commands [{:id "lint"
+                                :cmd ["bash" "-lc" "echo lint-output && exit 1"]
+                                :footer lint-footer}
+                               {:id "no-footer"
+                                :cmd ["bash" "-lc" "echo no-footer-output && exit 1"]}
+                               {:id "empty-footer"
+                                :cmd ["bash" "-lc" "echo empty-footer-output && exit 1"]
+                                :footer ""}
+                               {:id "test"
+                                :cmd ["bash" "-lc" "echo test-output && exit 1"]
+                                :footer test-footer}
+                               {:id "success"
+                                :cmd ["bash" "-lc" "echo success-output && exit 0"]
+                                :footer "Successful checks must not appear."}]})
+    (sut/init api)
+    (let [handler (first (get-in @state [:handlers "git_commit_created"]))]
+      (handler {:session-id "s1" :workspace-dir workspace-dir :head "abc123"})
+      (let [prompt (->> (:messages @state)
+                        (filter #(= "extension-prompt" (:custom-type %)))
+                        first
+                        :content)
+            lint-index (.indexOf prompt lint-footer)
+            test-index (.indexOf prompt test-footer)
+            global-index (.indexOf prompt global-footer)]
+        (is (string? prompt))
+        (is (< (.indexOf prompt "lint-output") lint-index (.indexOf prompt "## no-footer")))
+        (is (< (.indexOf prompt "test-output") test-index global-index))
+        (is (neg? (.indexOf prompt "Successful checks must not appear.")))
+        (is (neg? (.indexOf prompt "## success")))
+        (is (= 1 (count (re-seq (re-pattern (java.util.regex.Pattern/quote global-footer)) prompt))))
+        (is (= global-footer (subs prompt global-index)))))))
 
 (deftest handler-prefers-workspace-dir-over-cwd-test
   (let [{:keys [api state]} (nullable/create-nullable-extension-api
