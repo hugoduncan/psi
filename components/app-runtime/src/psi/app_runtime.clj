@@ -133,8 +133,15 @@
       v)))
 
 (defn resolve-model
-  "Return an ai.schemas.Model map for `model-key` keyword."
+  "Return an ai.schemas.Model map for `model-key` keyword.
+
+   Initializes the model registry (built-in + user-global + project-local)
+   before querying, so that custom models from models.edn are visible even
+   when this is called before create-runtime-session-context."
   [model-key]
+  (model-registry/init!
+   {:user-models-path    (model-registry/default-user-models-path)
+    :project-models-path (str (System/getProperty "user.dir") "/.psi/models.edn")})
   (let [all (model-registry/all-models-by-key)]
     (or (get all model-key)
         (throw (ex-info (str "Unknown model: " model-key

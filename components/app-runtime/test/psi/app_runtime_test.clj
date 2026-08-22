@@ -10,6 +10,7 @@
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
+   [psi.ai.model-registry :as model-registry]
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.transcript]
    [psi.session-persistence.core :as persist]
@@ -795,6 +796,38 @@
             prepared {:prepared-request/id "turn-99"}
             result (stub nil nil "s2" prepared nil)]
         (is (= "" (get-in result [:execution-result/assistant-message :content 0 :text])))))))
+
+(deftest resolve-model-finds-custom-model-before-context-creation-test
+  "Regression: resolve-model must find custom models from models.edn even when
+   called before create-runtime-session-context (i.e. the registry is still in
+   its initial defonce state with :catalog nil).
+
+   This is the exact call order used by start-tui-runtime! and run-session:
+   resolve-model is called first, then create-runtime-session-context."
+  (let [tmp (java.io.File/createTempFile "psi-resolve-model-test" ".edn")]
+    (try
+      (spit tmp (pr-str {:version 1
+                         :providers
+                         {"testprov"
+                          {:base-url "http://localhost:9999/v1"
+                           :api      :openai-completions
+                           :auth     {:api-key "test-key"}
+                           :models   [{:id "test-model-1"
+                                       :locality :cloud
+                                       :latency-tier :low
+                                       :cost-tier :low}]}}}))
+      ;; Reset registry to its initial defonce state (catalog = nil),
+      ;; simulating a fresh JVM where resolve-model is called before init!.
+      (reset! (var-get (resolve 'psi.ai.model-registry/registry-state))
+              {:catalog nil :auth {} :load-error nil})
+      (with-redefs [model-registry/default-user-models-path (fn [] (.getAbsolutePath tmp))]
+        (let [model (app-runtime/resolve-model :testprov/test-model-1)]
+          (is (= :testprov (:provider model)))
+          (is (= "test-model-1" (:id model)))))
+      (finally
+        (.delete tmp)
+        ;; Restore registry to a clean built-in-only state
+        (model-registry/init! {})))))
 
 
 
