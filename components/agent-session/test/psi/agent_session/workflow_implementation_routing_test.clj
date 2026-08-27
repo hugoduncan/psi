@@ -1,11 +1,14 @@
 (ns psi.agent-session.workflow-implementation-routing-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
    [psi.agent-session.workflow.core :as workflow-core]
    [psi.deterministic-operation-registry.registry]
+   [psi.workflow-loader.compiler :as workflow-compiler]
+   [psi.workflow-loader.parser :as workflow-parser]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.terminal-contract :as terminal-contract]))
 
@@ -58,20 +61,46 @@
                     :args {:route "DONE"}}
             :on {"DONE" {:goto :done}}}]})
 (defn- create-implement-task-run!
-  [ctx run-id]
+  [ctx definition run-id task-path]
   (swap! (:state* ctx)
          (fn [state]
-           (let [[s _ _] (workflow-runtime/create-run state {:definition implement-task-definition
+           (let [[s _ _] (workflow-runtime/create-run state {:definition definition
                                                              :run-id run-id
-                                                             :workflow-input {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"}})]
+                                                             :workflow-input {:input task-path}})]
              s))))
+
+(defn- checked-in-implement-task-definition
+  [worktree]
+  (let [path (str worktree "/.psi/workflows/implement-task.edn")
+        parsed (workflow-parser/parse-edn-workflow-file (slurp path))
+        {:keys [definition error]} (workflow-compiler/compile-workflow-file
+                                    (assoc parsed :source-path path))]
+    (when error
+      (throw (ex-info "Checked-in implement-task definition did not compile"
+                      {:error error})))
+    ;; The definition is checked in and compiled as production does; this
+    ;; state-based fixture has no project-profile registry, so remove only the
+    ;; environment-dependent session-profile selection before execution.
+    (update definition :steps
+            (fn [steps]
+              (mapv #(if (= "implement-pass" (:name %))
+                       (dissoc % :session-profile)
+                       %)
+                    steps)))))
+
+(defn- artifact-content
+  [block]
+  (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+       "- blocker: " (:blocker block) "\n"
+       "- required-human-action: " (:required-human-action block) "\n"
+       "<!-- IMPLEMENTATION_BLOCKER: END -->\n"))
 
 (deftest implement-task-implementation-complete-routes-to-final-summary-test
   (testing "IMPLEMENTATION_COMPLETE terminates the implementation loop deterministically"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           prompts* (atom [])]
       (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx "run-implement-complete")
+      (create-implement-task-run! ctx implement-task-definition "run-implement-complete" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
@@ -104,7 +133,7 @@
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           prompts* (atom [])]
       (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx "run-implement-blocked")
+      (create-implement-task-run! ctx implement-task-definition "run-implement-blocked" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx _child-session-id prompt]
                       (swap! prompts* conj prompt)
@@ -129,6 +158,74 @@
                   "Blocked summary"]
                  @prompts*)))))))
 
+(deftest checked-in-implement-task-blocked-route-validates-persisted-blocker-test
+  ;; Tests the checked-in topology validates its artifact before its only blocked handback.
+  (test-support/with-temp-worktree-session
+    (fn [worktree ctx session-id]
+      (let [task-path "munera/open/230-x"
+            run-id "checked-in-implement-blocked"
+            replies* (atom 0)]
+        (test-support/write-task-artifact!
+         worktree task-path "implementation.md"
+         (artifact-content {:blocker "awaiting product decision"
+                            :required-human-action "choose the retention policy"}))
+        (register-review-routing-ops! ctx)
+        (create-implement-task-run! ctx
+                                    (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                    run-id task-path)
+        (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                      (fn [_ctx _child-session-id _prompt]
+                        {:execution-result/assistant-message
+                         {:role "assistant"
+                          :content [{:type :text
+                                     :text (case (swap! replies* inc)
+                                             1 "PASS_STATUS: IMPLEMENTATION_BLOCKED"
+                                             2 "blocked handback")}]
+                          :stop-reason :stop}})]
+          (let [result (workflow-execution/execute-run! ctx session-id run-id)
+                run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+            (is (= :completed (:status result)) (pr-str run))
+            (is (= {:outcome :completed :step-id "final-summary-blocked"}
+                   (select-keys (:terminal-outcome run) [:outcome :step-id :reason])))
+            (is (= 1 (count (get-in run [:step-runs "implement-pass" :attempts]))))
+            (is (= 1 (count (get-in run [:step-runs "validate-implementation-blocker" :attempts]))))
+            (is (= 1 (count (get-in run [:step-runs "final-summary-blocked" :attempts]))))
+            (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))))
+            (is (= "final-summary-blocked" (get-in run [:terminal-outcome :step-id])))
+            (is (= "blocked handback" (terminal-contract/terminal-yielded-text run)))
+            (is (= "DONE"
+                   (get-in run [:step-runs "validate-implementation-blocker"
+                                :attempts 0 :judge-output :routing-result :data])))))))))
+
+(deftest checked-in-implement-task-blocked-route-rejects-invalid-blockers-test
+  ;; Tests the real blocked route fails at validation rather than inventing a handback.
+  (test-support/with-temp-worktree-session
+    (fn [worktree ctx session-id]
+      (doseq [[label content] [["missing" "implementation notes only"]
+                               ["malformed"
+                                "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing action\n<!-- IMPLEMENTATION_BLOCKER: END -->\n"]]]
+        (let [task-path "munera/open/230-x"
+              run-id (str "checked-in-implement-blocked-" label)]
+          (test-support/write-task-artifact! worktree task-path "implementation.md" content)
+          (register-review-routing-ops! ctx)
+          (create-implement-task-run! ctx
+                                      (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                      run-id task-path)
+          (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                        (fn [_ctx _child-session-id _prompt]
+                          {:execution-result/assistant-message
+                           {:role "assistant"
+                            :content [{:type :text :text "PASS_STATUS: IMPLEMENTATION_BLOCKED"}]
+                            :stop-reason :stop}})]
+            (let [result (workflow-execution/execute-run! ctx session-id run-id)
+                  run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+              (is (= :failed (:status result)) label)
+              (is (= :missing-final-complete-block
+                     (get-in run [:terminal-outcome :reason])) label)
+              (is (= 1 (count (get-in run [:step-runs "validate-implementation-blocker" :attempts]))) label)
+              (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts]))) label)
+              (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))) label))))))))
+
 (deftest implement-task-invalid-statuses-and-repeat-limit-fail-test
   ;; Tests invalid implementation markers fail at the authored exact-marker gate
   ;; and the existing repeat bound remains twenty passes.
@@ -140,7 +237,7 @@
       (let [[ctx session-id] (support/create-session-context {:persist? false})
             run-id (str "run-implement-" label)]
         (register-review-routing-ops! ctx)
-        (create-implement-task-run! ctx run-id)
+        (create-implement-task-run! ctx implement-task-definition run-id "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
         (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                       (fn [_ctx _child-session-id _prompt]
                         {:execution-result/assistant-message
@@ -157,7 +254,7 @@
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           run-id "run-implement-repeat-limit"]
       (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx run-id)
+      (create-implement-task-run! ctx implement-task-definition run-id "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx _child-session-id _prompt]
                       {:execution-result/assistant-message
@@ -178,7 +275,7 @@
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           prompts* (atom [])]
       (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx "run-implement-more-work")
+      (create-implement-task-run! ctx implement-task-definition "run-implement-more-work" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx child-session-id prompt]
                       (swap! prompts* conj {:session-id child-session-id :prompt prompt})
