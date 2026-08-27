@@ -62,6 +62,8 @@
 
 ## Implementation review follow-up
 
+- [ ] Make `IMPLEMENTATION_BLOCKED` validation prove that the current `implement-pass` appended a new complete `IMPLEMENTATION_BLOCKER` record, rather than accepting a stale final-complete record from an earlier blocked attempt; add an execution-level regression test for a blocked pass that leaves an existing valid record unchanged.
+
 - [x] Add an execution-level proof using the checked-in `implement-task` definition that supplies a persisted complete `IMPLEMENTATION_BLOCKER` record, emits `PASS_STATUS: IMPLEMENTATION_BLOCKED`, and proves the validation gate runs before only `final-summary-blocked`; keep the existing missing/malformed-record failure cases observable from that same workflow route rather than only testing the operation and a synthetic topology separately.
   - `bb clojure:test --focus psi.agent-session.workflow-implementation-routing-test` — 6 tests, 54 assertions passed.
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_implementation_routing_test.clj` and `git diff --check` — passed.
