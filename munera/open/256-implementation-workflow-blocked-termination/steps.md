@@ -57,4 +57,5 @@
 - [x] Inspect the final diff against every acceptance criterion, confirming generic runtime loop semantics and `workflow/pass-status-routing` remain unchanged unless a separately recorded defect required reconciliation.
   - The new resolver-backed validation operation is generic syntax/artifact validation; status vocabulary and branch topology remain authored. Loop and pass-status routing are unchanged.
 - [x] Update `implementation.md` with concise implementation decisions, verification commands/results, and any remaining risks; mark completed checklist items accurately.
-- [ ] Commit the documentation and final task-artifact synchronization without staging unrelated worktree changes.
+- [x] Commit the documentation and final task-artifact synchronization without staging unrelated worktree changes.
+  - `4fd82c8ca ⚒ Validate blocked implementation handbacks`.
