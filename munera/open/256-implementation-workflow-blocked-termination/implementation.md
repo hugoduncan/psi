@@ -7,3 +7,4 @@ No implementation has started. The existing implementation loop currently recogn
 - architectural review added 1 new design step
 - ambiguity review added 2 new design steps
 - inconsistency review added 1 new design step
+- For the design-step resolution, inspect `.psi/workflows/implement-task.edn`, `.psi/workflows/task-lifecycle.edn`, `components/agent-session/src/psi/agent_session/workflow/routing.clj`, and `components/agent-session/src/psi/agent_session/workflow/execution.clj`; preserve authored-policy ownership, deterministic routing, and the no-generic-runtime-blocker constraint.
