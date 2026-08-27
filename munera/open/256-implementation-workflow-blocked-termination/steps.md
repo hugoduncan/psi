@@ -79,4 +79,6 @@
   - `bb clojure:test --focus psi.agent-session.scope-question-gate-operation-test` — 9 tests, 22 assertions passed.
   - `clj-kondo --lint components/agent-session/src/psi/agent_session/workflow/core.clj components/agent-session/test/psi/agent_session/scope_question_gate_operation_test.clj` and `git diff --check` — passed.
 
-- [ ] Add checked-in `implement-task` execution coverage for `MORE_WORK_REMAINS → IMPLEMENTATION_COMPLETE`, including its artifact-capture loop edge and the normal terminal summary projection/export, rather than proving those outcomes only through the synthetic topology; acceptance criterion 8 requires execution-routing proof for all three implementation outcomes.
+- [x] Add checked-in `implement-task` execution coverage for `MORE_WORK_REMAINS → IMPLEMENTATION_COMPLETE`, including its artifact-capture loop edge and the normal terminal summary projection/export, rather than proving those outcomes only through the synthetic topology; acceptance criterion 8 requires execution-routing proof for all three implementation outcomes.
+  - `bb clojure:test --focus psi.agent-session.workflow-implementation-routing-test` — 7 tests, 63 assertions passed.
+  - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_implementation_routing_test.clj` and `git diff --check` — passed.

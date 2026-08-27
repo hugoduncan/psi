@@ -302,30 +302,40 @@
           (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))))
           (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts])))))))))
 
-(deftest implement-task-more-work-repeats-then-completes-test
-  ;; Tests the implementation loop retains its authored repeat behavior.
-  (testing "implementation loop routing continues accepting implementation PASS_STATUS tokens"
-    (let [[ctx session-id] (support/create-session-context {:persist? false})
-          prompts* (atom [])]
-      (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx implement-task-definition "run-implement-more-work" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
-      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                    (fn [_ctx child-session-id prompt]
-                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
-                      {:execution-result/assistant-message
-                       {:role "assistant"
-                        :content [{:type :text
-                                   :text (case (count @prompts*)
-                                           1 "PASS_STATUS: MORE_WORK_REMAINS"
-                                           2 "PASS_STATUS: IMPLEMENTATION_COMPLETE"
-                                           "Complete summary")}]
-                        :stop-reason :stop}})]
-        (let [result (workflow-execution/execute-run! ctx session-id "run-implement-more-work")
-              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-implement-more-work")]
-          (is (= :completed (:status result)))
-          (is (= :completed (:status run)))
-          (is (= 2 (count (get-in run [:step-runs "implement-pass" :attempts]))))
-          (is (= {:status :ok :data "MORE_WORK_REMAINS" :summary "MORE_WORK_REMAINS"}
-                 (get-in run [:step-runs "implement-pass" :attempts 0 :judge-output :routing-result])))
-          (is (= {:status :ok :data "IMPLEMENTATION_COMPLETE" :summary "IMPLEMENTATION_COMPLETE"}
-                 (get-in run [:step-runs "implement-pass" :attempts 1 :judge-output :routing-result]))))))))
+(deftest checked-in-implement-task-more-work-repeats-then-completes-test
+  ;; Tests the checked-in artifact-capture loop and normal terminal contract.
+  (test-support/with-temp-worktree-session
+    (fn [worktree ctx session-id]
+      (let [task-path "munera/open/230-x"
+            run-id "checked-in-implement-more-work"
+            replies* (atom 0)]
+        (test-support/write-task-artifact! worktree task-path "implementation.md" "initial notes\n")
+        (register-review-routing-ops! ctx)
+        (create-implement-task-run! ctx
+                                    (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                    run-id task-path)
+        (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                      (fn [_ctx _child-session-id _prompt]
+                        {:execution-result/assistant-message
+                         {:role "assistant"
+                          :content [{:type :text
+                                     :text (case (swap! replies* inc)
+                                             1 "PASS_STATUS: MORE_WORK_REMAINS"
+                                             2 "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                                             3 "complete handback")}]
+                          :stop-reason :stop}})]
+          (let [result (workflow-execution/execute-run! ctx session-id run-id)
+                run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+            (is (= :completed (:status result)) (pr-str run))
+            (is (= :completed (:status run)) (pr-str run))
+            (is (= 2 (count (get-in run [:step-runs "capture-implementation-before-pass" :attempts]))))
+            (is (= 2 (count (get-in run [:step-runs "implement-pass" :attempts]))))
+            (is (= {:status :ok :data "MORE_WORK_REMAINS" :summary "MORE_WORK_REMAINS"}
+                   (get-in run [:step-runs "implement-pass" :attempts 0 :judge-output :routing-result])))
+            (is (= {:status :ok :data "IMPLEMENTATION_COMPLETE" :summary "IMPLEMENTATION_COMPLETE"}
+                   (get-in run [:step-runs "implement-pass" :attempts 1 :judge-output :routing-result])))
+            (is (= 1 (count (get-in run [:step-runs "final-summary-complete" :attempts]))))
+            (is (zero? (count (get-in run [:step-runs "validate-implementation-blocker" :attempts]))))
+            (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts]))))
+            (is (= "final-summary-complete" (get-in run [:terminal-outcome :step-id])))
+            (is (= "complete handback" (terminal-contract/terminal-yielded-text run)))))))))
