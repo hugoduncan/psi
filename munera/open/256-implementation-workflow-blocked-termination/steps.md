@@ -59,3 +59,7 @@
 - [x] Update `implementation.md` with concise implementation decisions, verification commands/results, and any remaining risks; mark completed checklist items accurately.
 - [x] Commit the documentation and final task-artifact synchronization without staging unrelated worktree changes.
   - `4fd82c8ca ⚒ Validate blocked implementation handbacks`.
+
+## Implementation review follow-up
+
+- [ ] Remove the extra trailing blank line from `components/agent-session/test/psi/agent_session/workflow_implementation_routing_test.clj` so the task diff passes `git diff --check`.
