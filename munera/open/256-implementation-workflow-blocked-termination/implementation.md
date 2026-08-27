@@ -6,3 +6,4 @@ No implementation has started. The existing implementation loop currently recogn
 
 - architectural review added 1 new design step
 - ambiguity review added 2 new design steps
+- inconsistency review added 1 new design step
