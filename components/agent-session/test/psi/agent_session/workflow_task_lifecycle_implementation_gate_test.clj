@@ -110,6 +110,31 @@
   [worktree]
   (checked-in-workflow-definition worktree "implement-task-in-worktree"))
 
+(defn- checked-in-gh-issue-implement-gate-definition
+  [worktree]
+  (let [definition (checked-in-workflow-definition worktree "gh-issue-implement")
+        steps (:steps definition)
+        gate-start (first (keep-indexed (fn [index step]
+                                          (when (= "implement" (:name step)) index))
+                                        steps))]
+    (-> definition
+        (assoc :definition-id "gh-issue-implement-gate-proof"
+               :name "gh-issue-implement-gate-proof")
+        (assoc :steps (mapv (fn [step]
+                              (case (:name step)
+                                "implement" (assoc step :prompt-string "implement" :context [])
+                                "review" (assoc step :context [])
+                                "push" (assoc step :context [])
+                                "implementation-blocked" (assoc step
+                                                                :contributions [{:type :template
+                                                                                 :text "outer blocked handback"}])
+                                "edit-labels" (assoc step :args {:number 1
+                                                                 :remove ["implement"]
+                                                                 :add ["review"]
+                                                                 :target "pr"})
+                                step))
+                            (subvec steps gate-start))))))
+
 (defn- register-definitions!
   [ctx implementation-status]
   (let [definitions [(child-definition "implement-task-proof" implementation-status)
@@ -421,6 +446,43 @@
                (get-in run [:terminal-outcome :step-id])))
         (is (= 1 (count (get-in run [:step-runs "summary-implementation-blocked" :attempts]))))
         (is (zero? (count (get-in run [:step-runs "summary" :attempts]))))))))
+
+(deftest checked-in-gh-issue-implement-blocked-route-test
+  ;; Tests the checked-in outer orchestration consumes the wrapper's blocked
+  ;; export and terminates before review, push, or label editing.
+  (let [[ctx session-id] (support/create-session-context {:persist? false})
+        source-worktree (System/getProperty "user.dir")
+        definition (checked-in-gh-issue-implement-gate-definition source-worktree)
+        wrapper (child-definition "implement-task-in-worktree"
+                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+        review (child-definition "review-implementation-in-worktree" "review ran")
+        builder (child-definition "builder" "push ran")
+        run-id "checked-in-gh-issue-implement-blocked"]
+    (register-routing-ops! ctx)
+    (swap! (:state* ctx)
+           (fn [state]
+             (reduce (fn [next-state child-definition]
+                       (first (workflow-registry/register-definition next-state child-definition)))
+                     state
+                     [wrapper review builder definition])))
+    (create-lifecycle-run! ctx definition run-id {})
+    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                  (fn [_ctx _child-session-id prompt]
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :text
+                                 :text (if (.contains prompt "Produce the user-facing blocked handback")
+                                         "outer blocked handback"
+                                         prompt)}]
+                      :stop-reason :stop}})]
+      (let [result (workflow-execution/execute-run! ctx session-id run-id)
+            run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+        (is (= :completed (:status result)) (pr-str run))
+        (is (= "implementation-blocked" (get-in run [:terminal-outcome :step-id])))
+        (is (= 1 (count (get-in run [:step-runs "implementation-blocked" :attempts]))))
+        (is (zero? (count (get-in run [:step-runs "review" :attempts]))))
+        (is (zero? (count (get-in run [:step-runs "push" :attempts]))))
+        (is (zero? (count (get-in run [:step-runs "edit-labels" :attempts]))))))))
 
 (deftest invalid-exported-implementation-statuses-fail-before-lifecycle-branches-test
   ;; Tests malformed, duplicate, missing, and unsupported delegate exports do

@@ -998,12 +998,14 @@ caller gates the delegated terminal export before its normal downstream work. `t
 for `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE`; its blocked handback
 preserves the final blocker record and requires fresh `task-lifecycle` invocation.
 `implement-task-in-worktree` likewise routes blocked output to its own handback
-rather than its success summary. The incidental- and architecture-complexity
-workflows route blocked output to terminal handbacks before, respectively,
-implementation review or validation capture. In every blocked route, the human
-must resolve the recorded action and freshly invoke the caller; implementation
-review, validation, extraction, proof synchronization, and success summaries do
-not run.
+rather than its success summary, and exports the matching terminal status to its
+callers. `gh-issue-implement` gates that status before review and push; its
+blocked handback also leaves PR labels unchanged. The incidental- and
+architecture-complexity workflows route blocked output to terminal handbacks
+before, respectively, implementation review or validation capture. In every
+blocked route, the human must resolve the recorded action and freshly invoke the
+caller; implementation review, validation, extraction, proof synchronization,
+push, label editing, and success summaries do not run.
 
 `task-lifecycle` gates its final extraction stage after
 `review-task-implementation`. It runs `extract-task-knowledge` only when the

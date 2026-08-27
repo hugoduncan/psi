@@ -62,6 +62,20 @@
    :context
    [{:type :source, :from :workflow-original}
     {:type :source, :from {:step "design", :yield :text}}]}
+  {:name "check-implementation-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/exact-marker-routing",
+    :args
+    {:text {:from {:step "implement", :yield :text}},
+     :marker-label "IMPLEMENTATION_STATUS",
+     :allowed-routes ["IMPLEMENTATION_COMPLETE" "IMPLEMENTATION_BLOCKED"]}},
+   :on
+   {"IMPLEMENTATION_COMPLETE" {:goto "review"},
+    "IMPLEMENTATION_BLOCKED" {:goto "implementation-blocked"}}}
   {:name "review",
    :type :delegate,
    :target "review-implementation-in-worktree",
@@ -85,6 +99,22 @@
     {:type :source, :from {:step "design", :yield :text}}
     {:type :source, :from {:step "implement", :yield :text}}
     {:type :source, :from {:step "review", :yield :text}}]}
+  {:name "implementation-blocked",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "design", :yield :text}}
+    {:type :source, :from {:step "implement", :yield :text}}
+    {:type :template,
+     :text
+     "Produce the user-facing blocked handback for the PR implementation workflow. Implementation stopped blocked; do not present it as reviewed, pushed, or completed. Preserve the delegated implementation blocker and required human action, summarize completed work and verification, state that review, push, and label editing did not run, and instruct the human to resolve the blocker before freshly re-invoking `gh-issue-implement`.",
+     :vars {}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/constant-routing",
+    :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
   {:name "edit-labels",
    :type :invoke,
    :operation "github/edit-labels",

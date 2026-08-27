@@ -49,6 +49,7 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 review step: blocker-record parsing now rejects whitespace-only field values; focused parser and resolver-backed operation tests, clj-kondo, and `git diff --check` pass.
 - added 1 step to be addressed
 - addressed 1 review step
+- addressed 1 review step
 - added 1 step to be addressed
 - addressed 1 review step: capture `implementation.md` before each implementation pass and require a fresh complete blocker record after `IMPLEMENTATION_BLOCKED`; checked-in workflow execution rejects an unchanged valid prior record. Focused routing and migration-validation tests, clj-kondo, and `git diff --check` pass.
 - added 1 step to be addressed
