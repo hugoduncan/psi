@@ -44,3 +44,4 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 review step: removed the trailing blank lines from `workflow_implementation_routing_test.clj`; `git diff --check` passes.
 - added 1 step to be addressed
 - addressed 1 review step: blocker-record parsing now rejects whitespace-only field values; focused parser and resolver-backed operation tests, clj-kondo, and `git diff --check` pass.
+- added 1 step to be addressed

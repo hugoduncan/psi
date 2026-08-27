@@ -62,6 +62,8 @@
 
 ## Implementation review follow-up
 
+- [ ] Add an execution-level proof using the checked-in `implement-task` definition that supplies a persisted complete `IMPLEMENTATION_BLOCKER` record, emits `PASS_STATUS: IMPLEMENTATION_BLOCKED`, and proves the validation gate runs before only `final-summary-blocked`; keep the existing missing/malformed-record failure cases observable from that same workflow route rather than only testing the operation and a synthetic topology separately.
+
 - [x] Remove the extra trailing blank line from `components/agent-session/test/psi/agent_session/workflow_implementation_routing_test.clj` so the task diff passes `git diff --check`.
 - [x] Reject whitespace-only `IMPLEMENTATION_BLOCKER` field values in `workflow/final-complete-block-routing` and its parser, so the required non-empty `blocker` and `required-human-action` contract cannot validate a blank handback.
   - `bb clojure:test --focus psi.agent-session.workflow.routing-test` — 11 tests, 257 assertions passed.
