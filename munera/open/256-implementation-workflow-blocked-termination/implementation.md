@@ -23,3 +23,4 @@ No implementation has started. The existing implementation loop currently recogn
 - 2026-08-24 plan-review follow-up: the confidently identified immediately preceding review batch is `3da18f361..0d03bc83e`, with baseline `6fecb083`. Its task-scoped `steps.md` diff adds no checklist lines, so there are no attributable current unchecked follow-ups to execute; pre-existing Slice 1–4 items remain untouched.
 - no new ambiguity review feedback
 - no new inconsistency review feedback
+- Design-step implementation: validate the final `IMPLEMENTATION_BLOCKER` record deterministically before blocked summaries run; preserve authored status/topology ownership and keep malformed or missing records distinct from a clean `IMPLEMENTATION_BLOCKED` handback. Relevant non-task files: `components/agent-session/src/psi/agent_session/workflow/routing.clj`, `.psi/workflows/implement-task.edn`, and `components/agent-session/test/psi/agent_session/workflow_migration_validation_test.clj`.
