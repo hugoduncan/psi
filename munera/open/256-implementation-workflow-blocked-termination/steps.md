@@ -37,11 +37,14 @@
 - [x] Extend task-lifecycle loader/definition tests to prove gate placement, marker source, allowed routes, route destinations, and blocked handback contract.
   - `bb clojure:test --focus psi.workflow-loader.task-lifecycle-definitions-test` — 1 test, 56 assertions passed.
   - `clj-kondo --lint components/workflow-loader/test/psi/workflow_loader/task_lifecycle_definitions_test.clj` — no findings.
-- [ ] Extend observable lifecycle execution tests to prove completion reaches implementation review and blocked execution reaches the blocked handback without starting implementation review or `extract-task-knowledge`.
-- [ ] Add lifecycle tests proving malformed, duplicate, missing, and unsupported exported `IMPLEMENTATION_STATUS` markers fail rather than route as blocked or complete.
-- [ ] Run focused task-lifecycle loader and agent-session execution tests.
+- [x] Extend observable lifecycle execution tests to prove completion reaches implementation review and blocked execution reaches the blocked handback without starting implementation review or `extract-task-knowledge`.
+- [x] Add lifecycle tests proving malformed, duplicate, missing, and unsupported exported `IMPLEMENTATION_STATUS` markers fail rather than route as blocked or complete.
+- [x] Run focused task-lifecycle loader and agent-session execution tests.
+  - `bb clojure:test --focus psi.agent-session.workflow-task-lifecycle-implementation-gate-test` — 3 tests, 32 assertions passed.
+  - `bb clojure:test --focus psi.workflow-loader.task-lifecycle-definitions-test` — 1 test, 56 assertions passed.
+  - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_task_lifecycle_implementation_gate_test.clj` — no findings.
 - [ ] Commit the Slice 3 lifecycle workflow and proof changes without staging unrelated worktree changes.
-  - Partial Slice 3 gate topology and loader proof are ready; observable execution and exported-marker rejection proof remain before this slice is complete.
+  - Slice 3 gate topology, loader proof, observable execution, and exported-marker rejection proof are ready; commit them before beginning Slice 4.
 
 ## Slice 4 — Documentation and integrated verification
 
