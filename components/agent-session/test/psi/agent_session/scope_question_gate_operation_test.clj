@@ -24,10 +24,21 @@
    :proceed-route "DONE"
    :open-route "SCOPE_QUESTION_OPEN"})
 
+(def ^:private blocker-routing-args
+  {:artifact "implementation.md"
+   :start-delimiter "<!-- IMPLEMENTATION_BLOCKER: START -->"
+   :field-prefixes ["- blocker: " "- required-human-action: "]
+   :end-delimiter "<!-- IMPLEMENTATION_BLOCKER: END -->"
+   :valid-route "DONE"})
+
+(defn- write-task-artifact!
+  [worktree task-dir artifact content]
+  (test-support/write-task-artifact! worktree task-dir artifact content))
+
 (defn- write-design-steps!
   "Write `content` as the task's design-steps.md (the artifact this gate reads)."
   [worktree task-dir content]
-  (test-support/write-task-artifact! worktree task-dir "design-steps.md" content))
+  (write-task-artifact! worktree task-dir "design-steps.md" content))
 
 (defn- invoke-gate
   "Invoke the registered gate operation with a caller-supplied invocation map.
@@ -56,6 +67,41 @@
   {:ctx ctx
    :session-id session-id
    :args (assoc default-args :task-path task-path)})
+
+(deftest final-complete-block-routing-reads-last-valid-block-test
+  ;; Tests the production artifact-resolver seam rejects invalid blocker records.
+  (test-support/with-temp-worktree-session
+    (fn [worktree ctx sid]
+      (let [operation-id "workflow/final-complete-block-routing"]
+        (registry/register-operation-in!
+         (:deterministic-operation-registry ctx)
+         {:id operation-id :handler workflow-core/final-complete-block-routing})
+        (write-task-artifact! worktree "munera/open/230-x" "implementation.md"
+                              (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                                   "- blocker: stale\n"
+                                   "- required-human-action: ignore\n"
+                                   "<!-- IMPLEMENTATION_BLOCKER: END -->\n"
+                                   "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                                   "- blocker: current decision\n"
+                                   "- required-human-action: choose an API\n"
+                                   "<!-- IMPLEMENTATION_BLOCKER: END -->\n"))
+        (let [result (registry/invoke-operation-in
+                      (:deterministic-operation-registry ctx) operation-id
+                      {:ctx ctx :session-id sid
+                       :args (assoc blocker-routing-args :task-path "munera/open/230-x")}
+                      runtime/invoke-operation)]
+          (is (= "DONE" (:data result)) (pr-str result))
+          (is (= {"- blocker: " "current decision"
+                  "- required-human-action: " "choose an API"}
+                 (get-in result [:details :record])) (pr-str result)))
+        (write-task-artifact! worktree "munera/open/230-x" "implementation.md"
+                              "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing action\n<!-- IMPLEMENTATION_BLOCKER: END -->")
+        (is (= :missing-final-complete-block
+               (:reason (registry/invoke-operation-in
+                         (:deterministic-operation-registry ctx) operation-id
+                         {:ctx ctx :session-id sid
+                          :args (assoc blocker-routing-args :task-path "munera/open/230-x")}
+                         runtime/invoke-operation))))))))
 
 (deftest gate-open-on-unchecked-scope-question-test
   ;; AC-1: an unchecked SCOPE_QUESTION halts (open route) and names the concern.

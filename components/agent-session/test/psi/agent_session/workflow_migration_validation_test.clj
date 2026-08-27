@@ -181,6 +181,7 @@
           implement-pass (get step-by-name "implement-pass")
           complete-summary (get step-by-name "final-summary-complete")
           blocked-summary (get step-by-name "final-summary-blocked")
+          blocker-validation (get step-by-name "validate-implementation-blocker")
           blocked-prompt (get-in blocked-summary [:contributions 2 :text])]
       (is (= "workflow/exact-marker-routing" (get-in implement-pass [:judge :operation])))
       (is (= {:marker-label "PASS_STATUS"
@@ -191,8 +192,12 @@
                           [:marker-label :allowed-routes])))
       (is (= {"MORE_WORK_REMAINS" {:goto "implement-pass" :max-iterations 20}
               "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"}
-              "IMPLEMENTATION_BLOCKED" {:goto "final-summary-blocked"}}
+              "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}
              (:on implement-pass)))
+      (is (= "workflow/final-complete-block-routing"
+             (get-in blocker-validation [:judge :operation])))
+      (is (= {"DONE" {:goto "final-summary-blocked"}}
+             (:on blocker-validation)))
       (is (some? complete-summary))
       (is (some? blocked-summary))
       (is (str/includes? (get-in complete-summary [:contributions 2 :text])

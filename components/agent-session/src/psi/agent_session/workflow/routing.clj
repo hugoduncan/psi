@@ -210,6 +210,36 @@
        :data proceed-route
        :summary proceed-route})))
 
+(defn parse-final-complete-block
+  "Return the last syntactically complete authored block in `content`.
+
+   A complete block has one start delimiter, exactly the supplied field prefixes
+   once each in order, and one end delimiter. Malformed and incomplete blocks
+   are ignored so a later complete record remains authoritative. Returns nil
+   when no complete block exists."
+  [content start-delimiter field-prefixes end-delimiter]
+  (let [lines (str/split-lines (or content ""))]
+    (loop [remaining lines
+           complete-blocks []]
+      (if-let [line (first remaining)]
+        (if (= start-delimiter line)
+          (let [field-lines (take (count field-prefixes) (rest remaining))
+                end-line (nth remaining (inc (count field-prefixes)) nil)
+                values (mapv (fn [prefix field-line]
+                               (when (and field-line
+                                          (str/starts-with? field-line prefix))
+                                 (let [value (subs field-line (count prefix))]
+                                   (when (seq value) value))))
+                             field-prefixes field-lines)
+                complete? (and (= end-delimiter end-line)
+                               (= (count field-prefixes) (count values))
+                               (every? some? values))]
+            (recur (rest remaining)
+                   (cond-> complete-blocks
+                     complete? (conj (zipmap field-prefixes values)))))
+          (recur (rest remaining) complete-blocks))
+        (peek complete-blocks)))))
+
 (defn- route-token? [value]
   (and (string? value)
        (boolean (re-matches route-token-pattern value))))

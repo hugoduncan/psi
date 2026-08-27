@@ -970,6 +970,35 @@ and proceeds. Detection is a deterministic content scan (no LLM): the workflow
 `workflow/scope-question-gate-routing` operation reads the artifact through a
 resolver and routes on the checkbox state.
 
+`implement-task` owns three exact `PASS_STATUS` outcomes. `MORE_WORK_REMAINS`
+re-enters the bounded implementation pass (at most 20 entries), and
+`IMPLEMENTATION_COMPLETE` reaches its normal terminal handback. A pass that
+cannot safely progress autonomously instead appends this exact complete record
+to the task's `implementation.md` before returning
+`PASS_STATUS: IMPLEMENTATION_BLOCKED`:
+
+```text
+<!-- IMPLEMENTATION_BLOCKER: START -->
+- blocker: <concise concrete blocker>
+- required-human-action: <safe action or decision>
+<!-- IMPLEMENTATION_BLOCKER: END -->
+```
+
+The blocked route deterministically validates that a complete record exists;
+missing or malformed records fail rather than producing an invented handback.
+When several attempts exist, summaries use the final complete record in file
+order. Its standalone blocked handback reports that record, completed work, and
+verification, then directs the human to resolve the action and freshly invoke
+`implement-task`. The normal and blocked terminal summaries export exactly one
+branch-matching `IMPLEMENTATION_STATUS` marker.
+
+Immediately after delegating `implement-task`, `task-lifecycle` parses that
+exported marker. Only `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE` advances
+to `review-task-implementation`. `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED`
+reaches a lifecycle handback that preserves the final blocker record and tells
+the human to resolve it and freshly invoke `task-lifecycle`; implementation
+review and knowledge extraction do not run on this route.
+
 `task-lifecycle` gates its final extraction stage after
 `review-task-implementation`. It runs `extract-task-knowledge` only when the
 immediately preceding implementation-review yielded text contains

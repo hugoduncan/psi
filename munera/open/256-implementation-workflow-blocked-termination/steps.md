@@ -19,7 +19,8 @@
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_migration_validation_test.clj` — no findings.
 - [x] Extend execution-routing tests to prove valid repeat, completion, and blocked outcomes; blocked does not re-enter `implement-pass`; malformed, duplicated, and unsupported markers fail; and the repeat limit remains bounded.
   - `workflow-review-step-routing-test` now proves malformed, duplicate, and unsupported `PASS_STATUS` replies fail before either summary, and 20 `MORE_WORK_REMAINS` passes exhaust the existing iteration guard before a twenty-first pass.
-- [ ] Add observable execution tests with multiple complete and malformed/incomplete blocker blocks to prove the final complete record alone is summarized and absent valid records do not yield an invented blocked handback.
+- [x] Add observable execution tests with multiple complete and malformed/incomplete blocker blocks to prove the final complete record alone is summarized and absent valid records do not yield an invented blocked handback.
+  - Added the resolver-backed `workflow/final-complete-block-routing` seam; its state-based proof selects the final valid record and rejects missing/incomplete records.
 - [x] Add terminal-result tests that declare terminal steps in a non-authoritative order and prove `:terminal-outcome :step-id` projects the executed normal or blocked summary for standalone output and delegated yielded text.
   - Standalone projection is covered with the blocked terminal declared before the complete terminal; delegated yield remains.
 - [x] Run focused workflow-loader and agent-session routing/execution tests for standalone `implement-task`.
@@ -43,14 +44,17 @@
   - `bb clojure:test --focus psi.agent-session.workflow-task-lifecycle-implementation-gate-test` — 3 tests, 32 assertions passed.
   - `bb clojure:test --focus psi.workflow-loader.task-lifecycle-definitions-test` — 1 test, 56 assertions passed.
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_task_lifecycle_implementation_gate_test.clj` — no findings.
-- [ ] Commit the Slice 3 lifecycle workflow and proof changes without staging unrelated worktree changes.
-  - Slice 3 gate topology, loader proof, observable execution, and exported-marker rejection proof are ready; commit them before beginning Slice 4.
+- [x] Commit the Slice 3 lifecycle workflow and proof changes without staging unrelated worktree changes.
+  - Committed in `e3c3e5894 ⚒ Prove blocked lifecycle implementation gate`.
 
 ## Slice 4 — Documentation and integrated verification
 
-- [ ] Update `doc/workflows.md` wherever it describes `implement-task` or the task-lifecycle implementation boundary so it documents the third pass outcome, exact blocker record, exported terminal statuses, blocked handback, fresh re-invocation, and no-review/no-extraction lifecycle gate.
-- [ ] Run all affected workflow-loader, routing, execution, migration-validation, and lifecycle test namespaces through the repository's focused Scry/test commands.
-- [ ] Run `clj-kondo` on every changed Clojure test or source file and repair formatting/delimiters where required.
-- [ ] Inspect the final diff against every acceptance criterion, confirming generic runtime loop semantics and `workflow/pass-status-routing` remain unchanged unless a separately recorded defect required reconciliation.
-- [ ] Update `implementation.md` with concise implementation decisions, verification commands/results, and any remaining risks; mark completed checklist items accurately.
+- [x] Update `doc/workflows.md` wherever it describes `implement-task` or the task-lifecycle implementation boundary so it documents the third pass outcome, exact blocker record, exported terminal statuses, blocked handback, fresh re-invocation, and no-review/no-extraction lifecycle gate.
+- [x] Run all affected workflow-loader, routing, execution, migration-validation, and lifecycle test namespaces through the repository's focused Scry/test commands.
+  - Focused routing, artifact-gate operation, migration-validation, standalone implementation, lifecycle gate, lifecycle-definition, and review-step routing tests pass.
+- [x] Run `clj-kondo` on every changed Clojure test or source file and repair formatting/delimiters where required.
+  - `clj-paren-repair` and `clj-kondo` passed for all changed Clojure files.
+- [x] Inspect the final diff against every acceptance criterion, confirming generic runtime loop semantics and `workflow/pass-status-routing` remain unchanged unless a separately recorded defect required reconciliation.
+  - The new resolver-backed validation operation is generic syntax/artifact validation; status vocabulary and branch topology remain authored. Loop and pass-status routing are unchanged.
+- [x] Update `implementation.md` with concise implementation decisions, verification commands/results, and any remaining risks; mark completed checklist items accurately.
 - [ ] Commit the documentation and final task-artifact synchronization without staging unrelated worktree changes.

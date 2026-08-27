@@ -147,6 +147,41 @@
                          :psi.munera/artifact-name artifact})))]
         (routing/parse-scope-question-gate content marker proceed-route open-route)))))
 
+(defn final-complete-block-routing
+  "Read one task artifact and route only when it contains a complete authored
+   block. The caller supplies all syntax and route policy."
+  [{:keys [args ctx parent-session-id session-id]}]
+  (let [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route]} args
+        valid-args? (and (string? task-path)
+                         (string? artifact)
+                         (string? start-delimiter)
+                         (vector? field-prefixes)
+                         (every? string? field-prefixes)
+                         (string? end-delimiter)
+                         (string? valid-route))]
+    (if-not valid-args?
+      {:status :error
+       :reason :invalid-final-complete-block-routing-args
+       :message "workflow/final-complete-block-routing args are invalid"
+       :details {:args args}}
+      (let [owning-session-id (or parent-session-id session-id)
+            task-dir (routing/normalize-open-task-path task-path)
+            content (when task-dir
+                      (:psi.munera/task-artifact-content
+                       (resolvers/query-in
+                        ctx
+                        [:psi.munera/task-artifact-content]
+                        {:psi.agent-session/session-id owning-session-id
+                         :psi.munera/task-path task-dir
+                         :psi.munera/artifact-name artifact})))
+            record (routing/parse-final-complete-block content start-delimiter field-prefixes end-delimiter)]
+        (if record
+          {:status :ok :data valid-route :summary valid-route :details {:record record}}
+          {:status :error
+           :reason :missing-final-complete-block
+           :message "Required complete artifact block is missing"
+           :details {:task-path task-path :artifact artifact}})))))
+
 (defn- register-built-in-deterministic-operations!
   [api]
   (when-let [register-operation (:register-operation api)]
@@ -181,7 +216,11 @@
      {:id "workflow/scope-question-gate-routing"
       :description (str "Deterministically gate the task lifecycle on unchecked "
                         "SCOPE_QUESTION items in a task artifact (content scan, no LLM).")
-      :handler scope-question-gate-routing})))
+      :handler scope-question-gate-routing})
+    (register-operation
+     {:id "workflow/final-complete-block-routing"
+      :description "Deterministically require the final complete authored block in a task artifact."
+      :handler final-complete-block-routing})))
 
 (declare refresh-widgets!)
 

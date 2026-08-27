@@ -14,7 +14,7 @@ Key decisions:
 
 - Status vocabulary, branch topology, blocker syntax, and handback policy remain in authored workflow definitions/prompts; do not add an implementation-blocked runtime primitive or modify `workflow/pass-status-routing`.
 - Use `workflow/exact-marker-routing` for both new gates because their raw route names are authored policy rather than the fixed `DONE`/`REPEAT` family.
-- Treat the last complete blocker block in file order as authoritative. Missing, incomplete, malformed, duplicated, or unsupported output must fail validation rather than be inferred from prose.
+- Treat the last complete blocker block in file order as authoritative. Missing or incomplete records must fail validation rather than be inferred from prose. A generic resolver-backed final-complete-block gate accepts caller-authored delimiters, field prefixes, and route so the workflow owns blocker syntax and policy.
 - Preserve the existing `MORE_WORK_REMAINS` maximum of 20 iterations and the current normal completion behavior.
 - Characterize and rely on existing `:terminal-outcome :step-id` result projection. Change generic runtime code only if executable proof reveals that the documented existing behavior is defective; any such finding must be reconciled with the design before proceeding.
 - Assert observable workflow state and yielded text, not child-session interaction counts alone.

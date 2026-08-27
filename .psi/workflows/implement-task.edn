@@ -15,7 +15,21 @@
    :on
    {"MORE_WORK_REMAINS" {:goto "implement-pass", :max-iterations 20},
     "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"},
-    "IMPLEMENTATION_BLOCKED" {:goto "final-summary-blocked"}}}
+    "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}}
+  {:name "validate-implementation-blocker",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/final-complete-block-routing",
+    :args {:task-path {:from :workflow-input, :path [:input]},
+           :artifact "implementation.md",
+           :start-delimiter "<!-- IMPLEMENTATION_BLOCKER: START -->",
+           :field-prefixes ["- blocker: " "- required-human-action: "],
+           :end-delimiter "<!-- IMPLEMENTATION_BLOCKER: END -->",
+           :valid-route "DONE"}},
+   :on {"DONE" {:goto "final-summary-blocked"}}}
   {:name "final-summary-complete",
    :type :session,
    :tools ["read" "bash"],

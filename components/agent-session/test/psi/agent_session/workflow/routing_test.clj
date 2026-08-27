@@ -31,6 +31,33 @@
   (is (= expected-reason (:reason result)) (pr-str result))
   result)
 
+(deftest final-complete-block-parser-test
+  ;; Tests the final syntactically complete block wins over stale or malformed attempts.
+  (testing "last complete block is authoritative"
+    (is (= {"- blocker: " "current access decision"
+            "- required-human-action: " "grant repository access"}
+           (routing/parse-final-complete-block
+            (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                 "- blocker: stale choice\n"
+                 "- required-human-action: decide stale choice\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                 "- blocker: incomplete\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                 "- blocker: current access decision\n"
+                 "- required-human-action: grant repository access\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->\n")
+            "<!-- IMPLEMENTATION_BLOCKER: START -->"
+            ["- blocker: " "- required-human-action: "]
+            "<!-- IMPLEMENTATION_BLOCKER: END -->"))))
+  (testing "absent or malformed records are rejected"
+    (is (nil? (routing/parse-final-complete-block
+               "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: \n<!-- IMPLEMENTATION_BLOCKER: END -->"
+               "<!-- IMPLEMENTATION_BLOCKER: START -->"
+               ["- blocker: " "- required-human-action: "]
+               "<!-- IMPLEMENTATION_BLOCKER: END -->")))))
+
 (deftest pass-status-routing-parser-test
   ;; Tests pure PASS_STATUS final-reply routing grammar without workflow runtime
   ;; or delegate harness setup.
