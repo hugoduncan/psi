@@ -36,6 +36,21 @@
    :on
    {"DONE" {:goto "review-task-design"},
     "REPEAT" {:goto "terminal-stop-malformed-task-path"}}}
+  {:name "terminal-stop-implementation-blocked"
+   :type :session
+   :tools ["read" "bash"]
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :template,
+     :text
+     "Produce the terminal blocked handback for `reduce-incidental-complexity` at {{input}}. Read the committed task artifacts, especially `implementation.md`, and the `implement-task` handback. Implementation stopped blocked; do not describe it as completed. Reproduce the final complete `IMPLEMENTATION_BLOCKER` record's `blocker` and `required-human-action`, summarize completed work and verification, and say that a human must resolve the recorded action before freshly re-invoking `reduce-incidental-complexity`. Do not run or claim validation, implementation review, proof synchronization, or final summary ran.",
+     :vars {"input" {:from {:step "extract-task-path", :yield :text}}}}]
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}}
+   :on {"DONE" {:goto :done}}}
   {:name "terminal-stop-malformed-task-path",
    :type :session,
    :tools ["read" "bash"],
@@ -310,6 +325,18 @@
     {:type :source, :from {:step "select-and-create", :yield :text}}
     {:type :source, :from {:step "extract-task-path", :yield :text}}
     {:type :source, :from {:step "diff-gate", :yield :text}}]}
+  {:name "check-implementation-status"
+   :type :invoke
+   :operation "workflow/constant-routing"
+   :args {:route "DONE"}
+   :judge {:type :invoke
+           :operation "workflow/exact-marker-routing"
+           :args {:text {:from {:step "implement-task", :yield :text}}
+                  :marker-label "IMPLEMENTATION_STATUS"
+                  :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                                   "IMPLEMENTATION_BLOCKED"]}}
+   :on {"IMPLEMENTATION_COMPLETE" {:goto "review-task-implementation"}
+        "IMPLEMENTATION_BLOCKED" {:goto "terminal-stop-implementation-blocked"}}}
   {:name "review-task-implementation",
    :type :delegate,
    :target "review-task-implementation",

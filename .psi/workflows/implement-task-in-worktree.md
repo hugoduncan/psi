@@ -20,6 +20,18 @@ advertise: false
                           :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}
           :context [{:type :source
                      :from :workflow-original}]}
+         {:name "check-implementation-status"
+          :type :invoke
+          :operation "workflow/constant-routing"
+          :args {:route "DONE"}
+          :judge {:type :invoke
+                  :operation "workflow/exact-marker-routing"
+                  :args {:text {:from {:step "implement" :yield :text}}
+                         :marker-label "IMPLEMENTATION_STATUS"
+                         :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                                          "IMPLEMENTATION_BLOCKED"]}}
+          :on {"IMPLEMENTATION_COMPLETE" {:goto "summary"}
+               "IMPLEMENTATION_BLOCKED" {:goto "summary-implementation-blocked"}}}
          {:name "summary"
           :type :session
           :tools ["read" "bash"]
@@ -29,7 +41,25 @@ advertise: false
                            :from {:step "implement" :yield :text}}
                           {:type :template
                            :text "Produce the user-facing final result for the Munera task. Independently inspect that specific task's artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, and use the prior step outputs as supporting context.\n\nOutput requirements:\n- Output a compact Markdown summary with these headings exactly:\n  - `## Implementation Outcome`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Implementation Outcome`, summarize:\n  - whether the implementation loop completed cleanly\n  - the main implementation work completed in this run\n  - the task artifact files updated\n  - any remaining notes or risks explicitly recorded in the task artifacts\n  - any commit ids created during the run that are evident from the provided step outputs\n- Under `## Verification`, summarize the verification performed in this run.\n- Under `## Handoff Data`, include machine-friendly bullet lines for every field you can determine from the provided context and inspected task artifacts. Include these when available:\n  - `pr_number:`\n  - `pr_url:`\n  - `pr_branch:`\n  - `worktree_path:`\n  - `munera_task_path:`\n  - `deviation_summary:`\n\nIf a field is not available, omit it rather than inventing it."
-                           :vars {}}]}]}
+                           :vars {}}]
+          :judge {:type :invoke
+                  :operation "workflow/constant-routing"
+                  :args {:route "DONE"}}
+          :on {"DONE" {:goto :done}}}
+         {:name "summary-implementation-blocked"
+          :type :session
+          :tools ["read" "bash"]
+          :contributions [{:type :source
+                           :from :workflow-original}
+                          {:type :source
+                           :from {:step "implement" :yield :text}}
+                          {:type :template
+                           :text "Produce the user-facing blocked handback for the Munera task. Independently inspect that specific task's `design.md`, `plan.md`, `steps.md`, and `implementation.md`. Implementation stopped blocked; do not present it as successful or completed. Reproduce the final complete `IMPLEMENTATION_BLOCKER` record's `blocker` and `required-human-action` fields, summarize completed work and verification, and state that the human must resolve the recorded action before freshly re-invoking `implement-task-in-worktree`. Do not claim downstream summary processing occurred."
+                           :vars {}}]
+          :judge {:type :invoke
+                  :operation "workflow/constant-routing"
+                  :args {:route "DONE"}}
+          :on {"DONE" {:goto :done}}}]}
 
 Wraps `implement-task` for pipeline use where the input is a structured handoff blob containing `worktree_path:` and `munera_task_path:` fields.
 

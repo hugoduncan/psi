@@ -9,6 +9,7 @@
   [{:filename "reduce-incidental-complexity.edn"
     :name "reduce-incidental-complexity"
     :validation-step "incidental-validation-capture"
+    :implementation-downstream-step "review-task-implementation"
     :review-reentry-step "review-task-implementation"
     :validation-recapture-step "incidental-validation-capture"
     :validation-artifacts ["after-local.json"
@@ -24,6 +25,7 @@
    {:filename "reduce-architectural-complexity.edn"
     :name "reduce-architectural-complexity"
     :validation-step "validation-capture"
+    :implementation-downstream-step "validation-capture"
     :review-reentry-step "review-implementation-tests"
     :validation-recapture-step "validation-capture"
     :validation-artifacts ["after-diagnose.edn"
@@ -219,11 +221,34 @@
      (fn [steps]
        (let [by-name (step-by-name steps)
              validation-step-name (:validation-step workflow)
+             implementation-gate (by-name "check-implementation-status")
+             blocked-handback (by-name "terminal-stop-implementation-blocked")
              validation (by-name validation-step-name)
              validation-disposition (by-name "validation-capture-disposition")
              proof-sync (by-name "proof-sync")
              proof-disposition (by-name "proof-sync-disposition")
              proof-fixed-point (by-name "proof-sync-fixed-point")]
+         (testing (str (:name workflow) " blocks implementation handbacks before downstream work")
+           (is (= "workflow/exact-marker-routing" (:operation (:judge implementation-gate))))
+           (is (= {:text {:from {:step "implement-task" :yield :text}}
+                   :marker-label "IMPLEMENTATION_STATUS"
+                   :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                                    "IMPLEMENTATION_BLOCKED"]}
+                  (:args (:judge implementation-gate))))
+           (is (= {"IMPLEMENTATION_COMPLETE" {:goto (:implementation-downstream-step workflow)}
+                   "IMPLEMENTATION_BLOCKED" {:goto "terminal-stop-implementation-blocked"}}
+                  (:on implementation-gate)))
+           (is (= [["check-implementation-status" "IMPLEMENTATION_BLOCKED"]]
+                  (incoming-gotos steps "terminal-stop-implementation-blocked")))
+           (is (= ["read" "bash"] (:tools blocked-handback)))
+           (is (some #(= {:step "implement-task" :yield :text} %)
+                     (source-refs blocked-handback)))
+           (is (.contains (step-template-text blocked-handback)
+                          "Implementation stopped blocked"))
+           (is (.contains (step-template-text blocked-handback)
+                          "IMPLEMENTATION_BLOCKER"))
+           (is (.contains (step-template-text blocked-handback)
+                          "Do not run or claim validation, implementation review, proof synchronization, or final summary ran.")))
          (testing (str (:name workflow) " validation failures route via deterministic disposition")
            (is (= "validation-capture-disposition"
                   (get-in validation [:on "REPEAT" :goto])))

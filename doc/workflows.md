@@ -993,12 +993,17 @@ verification, then directs the human to resolve the action and freshly invoke
 `implement-task`. The normal and blocked terminal summaries export exactly one
 branch-matching `IMPLEMENTATION_STATUS` marker.
 
-Immediately after delegating `implement-task`, `task-lifecycle` parses that
-exported marker. Only `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE` advances
-to `review-task-implementation`. `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED`
-reaches a lifecycle handback that preserves the final blocker record and tells
-the human to resolve it and freshly invoke `task-lifecycle`; implementation
-review and knowledge extraction do not run on this route.
+Every workflow caller gates the delegated terminal export before its normal
+downstream work. `task-lifecycle` advances to `review-task-implementation` only
+for `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE`; its blocked handback
+preserves the final blocker record and requires fresh `task-lifecycle` invocation.
+`implement-task-in-worktree` likewise routes blocked output to its own handback
+rather than its success summary. The incidental- and architecture-complexity
+workflows route blocked output to terminal handbacks before, respectively,
+implementation review or validation capture. In every blocked route, the human
+must resolve the recorded action and freshly invoke the caller; implementation
+review, validation, extraction, proof synchronization, and success summaries do
+not run.
 
 `task-lifecycle` gates its final extraction stage after
 `review-task-implementation`. It runs `extract-task-knowledge` only when the

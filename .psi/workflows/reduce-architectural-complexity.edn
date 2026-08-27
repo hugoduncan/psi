@@ -203,12 +203,19 @@
     {:type :source, :from {:step "extract-task-path", :yield :text}}
     {:type :source, :from {:step "clean-baseline", :yield :text}}
     {:type :source, :from {:step "coverage-review", :yield :text}}
-    {:type :source, :from {:step "diff-gate", :yield :text}}],
-   :judge
-   {:type :invoke,
-    :operation "workflow/constant-routing",
-    :args {:route "DONE"}},
-   :on {"DONE" {:goto "validation-capture"}}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}]}
+  {:name "check-implementation-status"
+   :type :invoke
+   :operation "workflow/constant-routing"
+   :args {:route "DONE"}
+   :judge {:type :invoke
+           :operation "workflow/exact-marker-routing"
+           :args {:text {:from {:step "implement-task", :yield :text}}
+                  :marker-label "IMPLEMENTATION_STATUS"
+                  :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                                   "IMPLEMENTATION_BLOCKED"]}}
+   :on {"IMPLEMENTATION_COMPLETE" {:goto "validation-capture"}
+        "IMPLEMENTATION_BLOCKED" {:goto "terminal-stop-implementation-blocked"}}}
   {:name "validation-capture",
    :type :session,
    :tools ["read" "bash" "edit" "write"],
@@ -511,6 +518,21 @@ Input task path:
    {:type :invoke,
     :operation "workflow/constant-routing",
     :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
+  {:name "terminal-stop-implementation-blocked"
+   :type :session
+   :tools ["read" "bash"]
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :template,
+     :text
+     "Produce the terminal blocked handback for `reduce-architectural-complexity` at {{input}}. Read the committed task artifacts, especially `implementation.md`, and the `implement-task` handback. Implementation stopped blocked; do not describe it as completed. Reproduce the final complete `IMPLEMENTATION_BLOCKER` record's `blocker` and `required-human-action`, summarize completed work and verification, and say that a human must resolve the recorded action before freshly re-invoking `reduce-architectural-complexity`. Do not run or claim validation, implementation review, proof synchronization, or final summary ran.",
+     :vars {"input" {:from {:step "extract-task-path", :yield :text}}}}]
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}}
    :on {"DONE" {:goto :done}}}
   {:name "terminal-stop-malformed-task-path",
    :type :session,

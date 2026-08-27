@@ -314,6 +314,72 @@
       (is (zero? (count (get-in run [:step-runs "extract-task-knowledge" :attempts]))))
       (is (zero? (count (get-in run [:step-runs "final-summary-after-extraction" :attempts])))))))
 
+(defn- implementation-caller-definition
+  [name downstream-step]
+  {:definition-id name
+   :name name
+   :steps [{:name "implement-task"
+            :type :delegate
+            :target "implement-task-proof"
+            :prompt-string "implement task"
+            :context []}
+           {:name "check-implementation-status"
+            :type :invoke
+            :operation "workflow/constant-routing"
+            :args {:route "DONE"}
+            :judge {:type :invoke
+                    :operation "workflow/exact-marker-routing"
+                    :args {:text {:from {:step "implement-task" :yield :text}}
+                           :marker-label "IMPLEMENTATION_STATUS"
+                           :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                                            "IMPLEMENTATION_BLOCKED"]}}
+            :on {"IMPLEMENTATION_COMPLETE" {:goto downstream-step}
+                 "IMPLEMENTATION_BLOCKED" {:goto "implementation-blocked"}}}
+           {:name downstream-step
+            :type :delegate
+            :target "downstream-proof"
+            :prompt-string "downstream"
+            :context []}
+           (terminal-session-step "implementation-blocked" "blocked handback")]})
+
+(defn- execute-implementation-caller!
+  [caller-name downstream-step]
+  (let [[ctx session-id] (support/create-session-context {:persist? false})
+        definition (implementation-caller-definition caller-name downstream-step)
+        definitions [(child-definition "implement-task-proof"
+                                       "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                     (child-definition "downstream-proof" "downstream ran")
+                     definition]]
+    (register-routing-ops! ctx)
+    (swap! (:state* ctx)
+           (fn [state]
+             (reduce (fn [next-state child-definition]
+                       (first (workflow-registry/register-definition next-state child-definition)))
+                     state
+                     definitions)))
+    (create-lifecycle-run! ctx definition (str caller-name "-blocked") {})
+    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                  (fn [_ctx _child-session-id prompt]
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :text :text prompt}]
+                      :stop-reason :stop}})]
+      (let [result (workflow-execution/execute-run! ctx session-id (str caller-name "-blocked"))]
+        [result (workflow-runtime/workflow-run-in @(:state* ctx) (str caller-name "-blocked"))]))))
+
+(deftest implementation-blocked-stops-other-caller-downstream-work-test
+  ;; Tests caller status gates stop their normal summaries, validation, and review
+  ;; paths when the delegated implementation handback is explicitly blocked.
+  (doseq [[caller-name downstream-step]
+          [["implement-task-in-worktree-proof" "summary"]
+           ["reduce-architectural-complexity-proof" "validation-capture"]
+           ["reduce-incidental-complexity-proof" "review-task-implementation"]]]
+    (let [[result run] (execute-implementation-caller! caller-name downstream-step)]
+      (is (= :completed (:status result)) caller-name)
+      (is (= "implementation-blocked" (get-in run [:terminal-outcome :step-id])) caller-name)
+      (is (= 1 (count (get-in run [:step-runs "implementation-blocked" :attempts]))) caller-name)
+      (is (zero? (count (get-in run [:step-runs downstream-step :attempts]))) caller-name))))
+
 (deftest invalid-exported-implementation-statuses-fail-before-lifecycle-branches-test
   ;; Tests malformed, duplicate, missing, and unsupported delegate exports do
   ;; not become a completion or a clean blocked handback.

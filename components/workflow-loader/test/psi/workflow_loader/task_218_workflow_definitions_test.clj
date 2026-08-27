@@ -171,6 +171,7 @@
                  "coverage-fix"
                  "diff-gate"
                  "implement-task"
+                 "check-implementation-status"
                  "validation-capture"
                  "validation-capture-disposition"
                  "review-implementation-correctness"
@@ -183,6 +184,7 @@
                  "proof-sync-disposition"
                  "proof-sync-fixed-point"
                  "final-summary"
+                 "terminal-stop-implementation-blocked"
                  "terminal-stop-malformed-task-path"
                  "terminal-stop-clean-baseline"
                  "terminal-stop-coverage-disposition"
@@ -273,7 +275,8 @@
            disposition (by-name "coverage-disposition")
            fix (by-name "coverage-fix")
            diff (by-name "diff-gate")
-           implement (by-name "implement-task")
+           implementation-status (by-name "check-implementation-status")
+           blocked-handback (by-name "terminal-stop-implementation-blocked")
            validation (by-name "validation-capture")
            validation-disposition (by-name "validation-capture-disposition")
            proof-sync (by-name "proof-sync")
@@ -316,8 +319,17 @@
          (is (.contains (step-template-text fix) "minimal testability seams"))
          (is (.contains (step-template-text diff) "Compare committed changes since the baseline HEAD"))
          (is (.contains (step-template-text diff) "premature simplification/refactor")))
-       (testing "validation capture immediately follows implementation and precedes reviews"
-         (is (= "validation-capture" (get-in implement [:on "DONE" :goto])))
+       (testing "implementation status gates validation and review"
+         (is (= "workflow/exact-marker-routing" (:operation (:judge implementation-status))))
+         (is (= {:text {:from {:step "implement-task" :yield :text}}
+                 :marker-label "IMPLEMENTATION_STATUS"
+                 :allowed-routes ["IMPLEMENTATION_COMPLETE" "IMPLEMENTATION_BLOCKED"]}
+                (:args (:judge implementation-status))))
+         (is (= {"IMPLEMENTATION_COMPLETE" {:goto "validation-capture"}
+                 "IMPLEMENTATION_BLOCKED" {:goto "terminal-stop-implementation-blocked"}}
+                (:on implementation-status)))
+         (is (= "terminal-stop-implementation-blocked" (:name blocked-handback)))
+         (is (.contains (step-template-text blocked-handback) "Implementation stopped blocked"))
          (is (= "review-implementation-correctness" (get-in validation [:on "DONE" :goto])))
          (is (= "validation-capture-disposition" (get-in validation [:on "REPEAT" :goto])))
          (is (= (pass-status-judge "validation-capture") (:judge validation)))
