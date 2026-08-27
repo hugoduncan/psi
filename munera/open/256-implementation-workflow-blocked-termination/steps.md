@@ -31,14 +31,17 @@
 
 ## Slice 3 — Task-lifecycle implementation gate
 
-- [ ] Insert a gate immediately after the `implement-task` delegate in `.psi/workflows/task-lifecycle.edn` that reads its yielded text and uses `workflow/exact-marker-routing` for exactly `IMPLEMENTATION_COMPLETE` and `IMPLEMENTATION_BLOCKED`.
-- [ ] Route only `IMPLEMENTATION_COMPLETE` to `review-task-implementation`; route `IMPLEMENTATION_BLOCKED` to a dedicated lifecycle blocked handback terminal step.
-- [ ] Author the lifecycle blocked handback to inspect the final complete blocker record, summarize completed work and verification, state that review and extraction did not run, and instruct the human to resolve the blocker and freshly re-invoke `task-lifecycle`.
-- [ ] Extend task-lifecycle loader/definition tests to prove gate placement, marker source, allowed routes, route destinations, and blocked handback contract.
+- [x] Insert a gate immediately after the `implement-task` delegate in `.psi/workflows/task-lifecycle.edn` that reads its yielded text and uses `workflow/exact-marker-routing` for exactly `IMPLEMENTATION_COMPLETE` and `IMPLEMENTATION_BLOCKED`.
+- [x] Route only `IMPLEMENTATION_COMPLETE` to `review-task-implementation`; route `IMPLEMENTATION_BLOCKED` to a dedicated lifecycle blocked handback terminal step.
+- [x] Author the lifecycle blocked handback to inspect the final complete blocker record, summarize completed work and verification, state that review and extraction did not run, and instruct the human to resolve the blocker and freshly re-invoke `task-lifecycle`.
+- [x] Extend task-lifecycle loader/definition tests to prove gate placement, marker source, allowed routes, route destinations, and blocked handback contract.
+  - `bb clojure:test --focus psi.workflow-loader.task-lifecycle-definitions-test` — 1 test, 56 assertions passed.
+  - `clj-kondo --lint components/workflow-loader/test/psi/workflow_loader/task_lifecycle_definitions_test.clj` — no findings.
 - [ ] Extend observable lifecycle execution tests to prove completion reaches implementation review and blocked execution reaches the blocked handback without starting implementation review or `extract-task-knowledge`.
 - [ ] Add lifecycle tests proving malformed, duplicate, missing, and unsupported exported `IMPLEMENTATION_STATUS` markers fail rather than route as blocked or complete.
 - [ ] Run focused task-lifecycle loader and agent-session execution tests.
 - [ ] Commit the Slice 3 lifecycle workflow and proof changes without staging unrelated worktree changes.
+  - Partial Slice 3 gate topology and loader proof are ready; observable execution and exported-marker rejection proof remain before this slice is complete.
 
 ## Slice 4 — Documentation and integrated verification
 

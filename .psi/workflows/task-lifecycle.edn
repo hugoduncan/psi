@@ -63,6 +63,19 @@
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
    :context [{:type :source, :from :workflow-original}]}
+  {:name "check-implementation-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/exact-marker-routing",
+    :args {:text {:from {:step "implement-task", :yield :text}},
+           :marker-label "IMPLEMENTATION_STATUS",
+           :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                            "IMPLEMENTATION_BLOCKED"]}},
+   :on {"IMPLEMENTATION_COMPLETE" {:goto "review-task-implementation"},
+        "IMPLEMENTATION_BLOCKED" {:goto "final-summary-implementation-blocked"}}}
   {:name "review-task-implementation",
    :type :delegate,
    :target "review-task-implementation-core",
@@ -142,6 +155,29 @@
     {:type :source, :from {:step "review-task-plan", :yield :text}}
     {:type :template,
      :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when the plan review did not converge. Explain that the lifecycle stopped at the plan stage because `review-task-plan` did not reach a clean plan (it yielded `PASS_STATUS: ACTIONABLE_FEEDBACK`), summarise the unresolved plan feedback from the review yield, and hand control back to the human for further plan work before implementation. Do not proceed to implementation and do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
+  {:name "final-summary-implementation-blocked",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :template,
+     :text "Produce the user-facing blocked handback for the Munera task lifecycle described by {{input}}. Independently inspect the specific task artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, and preserve the `implement-task` yielded handback as supporting context. The lifecycle stopped because implementation yielded `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED`; it did not complete implementation.
+
+In `implementation.md`, locate `<!-- IMPLEMENTATION_BLOCKER: START -->` through `<!-- IMPLEMENTATION_BLOCKER: END -->` blocks. A complete record has exactly these non-empty field lines between its delimiters:
+- blocker: <text>
+- required-human-action: <text>
+Use only the last complete record in file order. Ignore incomplete or malformed blocks. If no complete record exists, fail rather than inventing a blocker. Reproduce that record's `blocker` and `required-human-action` values verbatim.
+
+Output a compact Markdown summary with headings `## Implementation Blocked`, `## Completed Work and Verification`, and `## Required Human Action`. State completed work, current checklist state, task artifacts updated, and verification already performed. Explicitly state that `review-task-implementation` and `extract-task-knowledge` did not run. Tell the human to take the recorded required action and then freshly re-invoke `task-lifecycle`; do not resolve, guess, or bypass the blocker and do not write mementum knowledge here.
+
+Input:
+{{input}}",
      :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge {:type :invoke,
            :operation "workflow/constant-routing",

@@ -37,6 +37,8 @@
            scope-question-open-step (get step-by-name "final-summary-scope-question-open")
            design-gate-step (get step-by-name "check-design-review-status")
            plan-gate-step (get step-by-name "check-plan-review-status")
+           implementation-gate-step (get step-by-name "check-implementation-status")
+           implementation-blocked-step (get step-by-name "final-summary-implementation-blocked")
            status-step (get step-by-name "check-implementation-review-status")
            extraction-step (get step-by-name "extract-task-knowledge")
            success-summary-step (get step-by-name "final-summary-after-extraction")
@@ -44,8 +46,8 @@
            design-not-converged-step (get step-by-name "final-summary-design-not-converged")
            plan-not-converged-step (get step-by-name "final-summary-plan-not-converged")
            skip-summary-text (step-template-text skip-summary-step)]
-       (testing "has 15 steps, with the pre-plan scope-question gate, design/plan review gates, and extraction guarded after implementation review"
-         (is (= 15 (count steps)))
+       (testing "has 17 steps, with an implementation-status gate before review and extraction guarded after implementation review"
+         (is (= 17 (count steps)))
          (is (= ["review-task-design"
                  "check-scope-question-status"
                  "check-design-review-status"
@@ -53,6 +55,7 @@
                  "review-task-plan"
                  "check-plan-review-status"
                  "implement-task"
+                 "check-implementation-status"
                  "review-task-implementation"
                  "check-implementation-review-status"
                  "extract-task-knowledge"
@@ -60,10 +63,11 @@
                  "final-summary-without-extraction"
                  "final-summary-design-not-converged"
                  "final-summary-plan-not-converged"
+                 "final-summary-implementation-blocked"
                  "final-summary-scope-question-open"]
                 (mapv :name steps)))
-         (is (= [:delegate :invoke :invoke :delegate :delegate :invoke :delegate :delegate
-                 :invoke :delegate :session :session :session :session :session]
+         (is (= [:delegate :invoke :invoke :delegate :delegate :invoke :delegate :invoke
+                 :delegate :invoke :delegate :session :session :session :session :session :session]
                 (mapv :type steps))))
        (testing "the lifecycle delegate steps target their workflows in order"
          (is (= ["review-task-design-core"
@@ -109,6 +113,27 @@
          (is (= {"DONE" {:goto "implement-task"}
                  "REPEAT" {:goto "final-summary-plan-not-converged"}}
                 (:on plan-gate-step))))
+       (testing "the implementation-status gate permits review only after a completed implementation"
+         (is (= {:type :invoke
+                 :operation "workflow/exact-marker-routing"
+                 :args {:text {:from {:step "implement-task"
+                                      :yield :text}}
+                        :marker-label "IMPLEMENTATION_STATUS"
+                        :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                                         "IMPLEMENTATION_BLOCKED"]}}
+                (:judge implementation-gate-step)))
+         (is (= {"IMPLEMENTATION_COMPLETE" {:goto "review-task-implementation"}
+                 "IMPLEMENTATION_BLOCKED" {:goto "final-summary-implementation-blocked"}}
+                (:on implementation-gate-step))))
+       (testing "the implementation-blocked handback stops before review and extraction"
+         (is (= ["read" "bash"] (:tools implementation-blocked-step)))
+         (is (some #(= {:type :source :from {:step "implement-task" :yield :text}} %)
+                   (:contributions implementation-blocked-step)))
+         (let [text (step-template-text implementation-blocked-step)]
+           (is (.contains text "last complete record in file order"))
+           (is (.contains text "review-task-implementation` and `extract-task-knowledge` did not run"))
+           (is (.contains text "re-invoke `task-lifecycle`")))
+         (is (= {"DONE" {:goto :done}} (:on implementation-blocked-step))))
        (testing "the status step owns the extraction gate"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"
@@ -185,5 +210,5 @@
                 (:judge scope-question-open-step)))
          (is (= {"DONE" {:goto :done}} (:on scope-question-open-step))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 15 {})
+         (is (= (repeat 17 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
