@@ -1,11 +1,14 @@
 (ns psi.agent-session.workflow-task-lifecycle-implementation-gate-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.test-support :as test-support]
    [psi.agent-session.turn]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
    [psi.agent-session.workflow.core :as workflow-core]
    [psi.deterministic-operation-registry.registry]
+   [psi.workflow-loader.compiler :as workflow-compiler]
+   [psi.workflow-loader.parser :as workflow-parser]
    [psi.workflow-registry.registry :as workflow-registry]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
@@ -76,6 +79,17 @@
    :name name
    :steps [(session-step "run" prompt)]})
 
+(defn- checked-in-lifecycle-definition
+  [worktree]
+  (let [path (str worktree "/.psi/workflows/task-lifecycle.edn")
+        parsed (workflow-parser/parse-edn-workflow-file (slurp path))
+        {:keys [definition error]} (workflow-compiler/compile-workflow-file
+                                    (assoc parsed :source-path path))]
+    (when error
+      (throw (ex-info "Checked-in task-lifecycle definition did not compile"
+                      {:error error})))
+    definition))
+
 (defn- register-definitions!
   [ctx implementation-status]
   (let [definitions [(child-definition "implement-task-proof" implementation-status)
@@ -90,13 +104,45 @@
                      definitions)))))
 
 (defn- create-lifecycle-run!
-  [ctx run-id]
+  [ctx definition run-id workflow-input]
   (swap! (:state* ctx)
          (fn [state]
            (first (workflow-runtime/create-run state
-                                               {:definition lifecycle-definition
+                                               {:definition definition
                                                 :run-id run-id
-                                                :workflow-input {}})))))
+                                                :workflow-input workflow-input})))))
+
+(defn- execute-checked-in-blocked-lifecycle!
+  [ctx session-id]
+  (let [definition (checked-in-lifecycle-definition (System/getProperty "user.dir"))
+        run-id "checked-in-lifecycle-blocked"
+        task-path "munera/open/256-implementation-workflow-blocked-termination"
+        definitions [(child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (child-definition "create-task-plan" "plan created")
+                     (child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (child-definition "implement-task" "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                     (child-definition "review-task-implementation-core" "implementation reviewed")
+                     (child-definition "extract-task-knowledge" "knowledge extracted")
+                     definition]]
+    (register-routing-ops! ctx)
+    (swap! (:state* ctx)
+           (fn [state]
+             (reduce (fn [next-state child-definition]
+                       (first (workflow-registry/register-definition next-state child-definition)))
+                     state
+                     definitions)))
+    (create-lifecycle-run! ctx definition run-id {:input task-path})
+    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                  (fn [_ctx _child-session-id prompt]
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :text
+                                 :text (if (.contains prompt "Produce the user-facing blocked handback")
+                                         "lifecycle blocked handback"
+                                         prompt)}]
+                      :stop-reason :stop}})]
+      (let [result (workflow-execution/execute-run! ctx session-id run-id)]
+        [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
 
 (defn- execute-lifecycle!
   [implementation-status]
@@ -104,7 +150,7 @@
         run-id (str "lifecycle-" implementation-status)]
     (register-routing-ops! ctx)
     (register-definitions! ctx implementation-status)
-    (create-lifecycle-run! ctx run-id)
+    (create-lifecycle-run! ctx lifecycle-definition run-id {})
     (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                   (fn [_ctx _child-session-id prompt]
                     {:execution-result/assistant-message
@@ -117,6 +163,26 @@
                       :stop-reason :stop}})]
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
+
+(deftest checked-in-lifecycle-blocked-route-stops-before-review-and-extraction-test
+  ;; Tests the compiled authored lifecycle definition, rather than a synthetic
+  ;; topology, routes a blocked implementation handback before either delegate.
+  (test-support/with-temp-worktree-session
+    (fn [worktree ctx session-id]
+      (test-support/write-task-artifact! worktree
+                                         "munera/open/256-implementation-workflow-blocked-termination"
+                                         "design-steps.md"
+                                         "- [x] SCOPE_QUESTION: resolved\n")
+      (let [[result run] (execute-checked-in-blocked-lifecycle! ctx session-id)]
+        (is (= :completed (:status result)) (pr-str run))
+        (is (= 1 (count (get-in run [:step-runs "implement-task" :attempts]))))
+        (is (= 1 (count (get-in run [:step-runs "check-implementation-status" :attempts]))))
+        (is (= 1 (count (get-in run [:step-runs "final-summary-implementation-blocked" :attempts]))))
+        (is (zero? (count (get-in run [:step-runs "review-task-implementation" :attempts]))))
+        (is (zero? (count (get-in run [:step-runs "extract-task-knowledge" :attempts]))))
+        (is (zero? (count (get-in run [:step-runs "final-summary-after-extraction" :attempts]))))
+        (is (= "final-summary-implementation-blocked"
+               (get-in run [:terminal-outcome :step-id])))))))
 
 (deftest implementation-complete-reaches-review-and-extraction-test
   ;; Tests the lifecycle observes the delegated terminal status and permits its

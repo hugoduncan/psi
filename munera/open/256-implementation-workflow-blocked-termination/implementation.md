@@ -53,3 +53,4 @@ No implementation has started. The existing implementation loop currently recogn
 
 - addressed 1 review step: checked-in `implement-task` execution now proves the capture → `MORE_WORK_REMAINS` loop → capture → `IMPLEMENTATION_COMPLETE` route, normal terminal projection, and skipped blocked branch; focused routing test, clj-kondo, and `git diff --check` pass.
 - added 1 step to be addressed
+- addressed 1 review step: compiled the checked-in `task-lifecycle.edn` and proved `IMPLEMENTATION_BLOCKED` reaches only its handback, never implementation review or knowledge extraction.

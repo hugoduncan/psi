@@ -83,4 +83,6 @@
   - `bb clojure:test --focus psi.agent-session.workflow-implementation-routing-test` — 7 tests, 63 assertions passed.
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_implementation_routing_test.clj` and `git diff --check` — passed.
 
-- [ ] Add an execution-level lifecycle regression test compiled from the checked-in `.psi/workflows/task-lifecycle.edn`, proving its `IMPLEMENTATION_BLOCKED` branch reaches only the blocked handback and never starts implementation review or knowledge extraction; the current execution test uses a synthetic topology, so it cannot detect drift in the authored workflow definition.
+- [x] Add an execution-level lifecycle regression test compiled from the checked-in `.psi/workflows/task-lifecycle.edn`, proving its `IMPLEMENTATION_BLOCKED` branch reaches only the blocked handback and never starts implementation review or knowledge extraction; the current execution test uses a synthetic topology, so it cannot detect drift in the authored workflow definition.
+  - `bb clojure:test --focus psi.agent-session.workflow-task-lifecycle-implementation-gate-test` — 4 tests, 40 assertions passed.
+  - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_task_lifecycle_implementation_gate_test.clj` and `git diff --check` — passed.
