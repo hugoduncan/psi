@@ -210,17 +210,11 @@
        :data proceed-route
        :summary proceed-route})))
 
-(defn parse-final-complete-block
-  "Return the last syntactically complete authored block in `content`.
-
-   A complete block has one start delimiter, exactly the supplied field prefixes
-   once each in order, and one end delimiter. Malformed and incomplete blocks
-   are ignored so a later complete record remains authoritative. Returns nil
-   when no complete block exists."
+(defn- complete-authored-blocks
   [content start-delimiter field-prefixes end-delimiter]
   (let [lines (str/split-lines (or content ""))]
     (loop [remaining lines
-           complete-blocks []]
+           blocks []]
       (if-let [line (first remaining)]
         (if (= start-delimiter line)
           (let [field-lines (take (count field-prefixes) (rest remaining))
@@ -235,22 +229,32 @@
                                (= (count field-prefixes) (count values))
                                (every? some? values))]
             (recur (rest remaining)
-                   (cond-> complete-blocks
+                   (cond-> blocks
                      complete? (conj (zipmap field-prefixes values)))))
-          (recur (rest remaining) complete-blocks))
-        (peek complete-blocks)))))
+          (recur (rest remaining) blocks))
+        blocks))))
+
+(defn parse-final-complete-block
+  "Return the last syntactically complete authored block in `content`.
+
+   A complete block has one start delimiter, exactly the supplied field prefixes
+   once each in order, and one end delimiter. Malformed and incomplete blocks
+   are ignored so a later complete record remains authoritative. Returns nil
+   when no complete block exists."
+  [content start-delimiter field-prefixes end-delimiter]
+  (peek (complete-authored-blocks content start-delimiter field-prefixes end-delimiter)))
 
 (defn final-complete-block-appended?
-  "True when `content` preserves `before-content` and appends a complete authored
-   block after it. This proves a blocked pass produced a fresh record instead of
-   reusing a record from an earlier attempt."
+  "True when `content` preserves `before-content` and appends exactly one complete
+   authored block after it. This proves a blocked pass produced one fresh record
+   instead of reusing an earlier record or appending multiple records."
   [before-content content start-delimiter field-prefixes end-delimiter]
   (and (string? before-content)
        (string? content)
        (str/starts-with? content before-content)
-       (some? (parse-final-complete-block
-               (subs content (count before-content))
-               start-delimiter field-prefixes end-delimiter))))
+       (= 1 (count (complete-authored-blocks
+                    (subs content (count before-content))
+                    start-delimiter field-prefixes end-delimiter)))))
 
 (defn- route-token? [value]
   (and (string? value)

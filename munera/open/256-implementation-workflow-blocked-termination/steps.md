@@ -93,6 +93,8 @@
 
 ## Implementation review follow-up
 
-- [ ] Make fresh blocker validation enforce the implementation-pass contract's exactly-one newly appended complete `IMPLEMENTATION_BLOCKER` record. `workflow/final-complete-block-appended?` currently accepts any suffix containing a complete record, so a blocked pass that appends two complete records is accepted despite the prompt's “exactly once” requirement; add a regression test for that suffix.
+- [x] Make fresh blocker validation enforce the implementation-pass contract's exactly-one newly appended complete `IMPLEMENTATION_BLOCKER` record. `workflow/final-complete-block-appended?` currently accepts any suffix containing a complete record, so a blocked pass that appends two complete records is accepted despite the prompt's “exactly once” requirement; add a regression test for that suffix.
+  - `workflow/final-complete-block-appended?` now accepts exactly one complete appended block; parser and operation-seam regression tests reject a two-record suffix. `bb clojure:test --focus psi.agent-session.workflow.routing-test` — 12 tests, 259 assertions passed; `bb clojure:test --focus psi.agent-session.scope-question-gate-operation-test` — 9 tests, 24 assertions passed; clj-kondo and `git diff --check` passed.
 
-- [ ] Reconcile `design-steps.md` with the implemented blocker-validation seam: its still-unchecked validation/terminal-handling design follow-up is satisfied by `workflow/fresh-final-complete-block-routing`, the blocked route, and their tests. Mark it complete or restore the missing implementation work, with an accurate resolution note.
+- [x] Reconcile `design-steps.md` with the implemented blocker-validation seam: its still-unchecked validation/terminal-handling design follow-up is satisfied by `workflow/fresh-final-complete-block-routing`, the blocked route, and their tests. Mark it complete or restore the missing implementation work, with an accurate resolution note.
+  - Marked the satisfied design follow-up complete with its implemented validation route, failure result, and existing checked-in proof coverage.

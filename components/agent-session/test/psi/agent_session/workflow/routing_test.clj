@@ -61,6 +61,23 @@
                  ["- blocker: " "- required-human-action: "]
                  "<!-- IMPLEMENTATION_BLOCKER: END -->"))))))
 
+(deftest final-complete-block-appended-test
+  ;; A blocked pass must append exactly one complete record after its capture.
+  (let [start "<!-- IMPLEMENTATION_BLOCKER: START -->"
+        fields ["- blocker: " "- required-human-action: "]
+        end "<!-- IMPLEMENTATION_BLOCKER: END -->"
+        before "prior implementation notes\n"
+        block (str start "\n"
+                   "- blocker: awaiting a decision\n"
+                   "- required-human-action: choose the policy\n"
+                   end "\n")]
+    (testing "one newly appended complete block is accepted"
+      (is (routing/final-complete-block-appended?
+           before (str before block) start fields end)))
+    (testing "two newly appended complete blocks are rejected"
+      (is (not (routing/final-complete-block-appended?
+                before (str before block block) start fields end))))))
+
 (deftest pass-status-routing-parser-test
   ;; Tests pure PASS_STATUS final-reply routing grammar without workflow runtime
   ;; or delegate harness setup.

@@ -119,7 +119,21 @@
         result (#'workflow-core/fresh-final-complete-block-routing-result
                 args current-content)]
     (is (= :ok (:status result)) (pr-str result))
-    (is (= "DONE" (:data result)) (pr-str result))))
+    (is (= "DONE" (:data result)) (pr-str result)))
+  (testing "two newly appended complete blocks are rejected"
+    (let [before-content "prior implementation notes\n"
+          block (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                     "- blocker: current decision\n"
+                     "- required-human-action: choose an API\n"
+                     "<!-- IMPLEMENTATION_BLOCKER: END -->\n")
+          args (assoc blocker-routing-args
+                      :task-path "munera/open/230-x"
+                      :before-content before-content)
+          result (#'workflow-core/fresh-final-complete-block-routing-result
+                  args (str before-content block block))]
+      (is (= :error (:status result)) (pr-str result))
+      (is (= :missing-fresh-final-complete-block (:reason result))
+          (pr-str result)))))
 
 (deftest gate-open-on-unchecked-scope-question-test
   ;; AC-1: an unchecked SCOPE_QUESTION halts (open route) and names the concern.
