@@ -58,3 +58,4 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 review step: compiled the checked-in `task-lifecycle.edn` and proved `IMPLEMENTATION_BLOCKED` reaches only its handback, never implementation review or knowledge extraction.
 - added 1 step to be addressed
 - addressed 2 review steps: fresh blocker validation now requires exactly one complete appended record, and the satisfied `design-steps.md` validation/terminal-handling follow-up is marked complete. Focused routing and operation tests, clj-kondo, and `git diff --check` pass.
+- added 1 step to be addressed

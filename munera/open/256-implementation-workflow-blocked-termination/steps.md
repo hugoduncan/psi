@@ -98,3 +98,7 @@
 
 - [x] Reconcile `design-steps.md` with the implemented blocker-validation seam: its still-unchecked validation/terminal-handling design follow-up is satisfied by `workflow/fresh-final-complete-block-routing`, the blocked route, and their tests. Mark it complete or restore the missing implementation work, with an accurate resolution note.
   - Marked the satisfied design follow-up complete with its implemented validation route, failure result, and existing checked-in proof coverage.
+
+## Implementation review follow-up
+
+- [ ] Gate every remaining workflow caller of `implement-task` on its exported `IMPLEMENTATION_STATUS` before downstream work. `implement-task-in-worktree.md`, `reduce-architectural-complexity.edn`, and `reduce-incidental-complexity.edn` currently continue to their normal summary, validation, or review paths unconditionally, so an `IMPLEMENTATION_BLOCKED` handback can be misrepresented as successful work or trigger review/validation despite the explicit blocked boundary. Add branch-specific blocked handbacks and observable routing tests that prove neither downstream path starts on blocked output.
