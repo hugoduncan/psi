@@ -37,6 +37,20 @@ Required procedure:
    Avoid adding duplicate information already in the task files.
 9. Commit any changes made during this pass with an appropriate commit message.
 
+If safe autonomous progress is blocked by a human decision, missing external information, unavailable access, or another concrete blocker, record the blocker before ending the pass. Append this complete block exactly once to the task's `implementation.md`, replacing both placeholders with concise non-empty text:
+
+```text
+<!-- IMPLEMENTATION_BLOCKER: START -->
+- blocker: <concise concrete blocker>
+- required-human-action: <safe action or decision>
+<!-- IMPLEMENTATION_BLOCKER: END -->
+```
+
+Do not use `IMPLEMENTATION_BLOCKED` for a runtime failure, cancellation, malformed status, iteration-limit exhaustion, or a blocker that could safely be resolved autonomously. Preserve completed work and accurate checklist state before handing back.
+
 End your final response with exactly one of:
 PASS_STATUS: MORE_WORK_REMAINS
 PASS_STATUS: IMPLEMENTATION_COMPLETE
+PASS_STATUS: IMPLEMENTATION_BLOCKED
+
+When returning `PASS_STATUS: IMPLEMENTATION_BLOCKED`, append the complete `IMPLEMENTATION_BLOCKER` block above before emitting that final status line.

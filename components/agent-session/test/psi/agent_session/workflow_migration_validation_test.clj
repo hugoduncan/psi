@@ -149,3 +149,24 @@
       (is (every? #(contains? files-by-name-and-kind %) all-required)
           (str "Required sample workflows missing from corpus: "
                (pr-str (sort (remove #(contains? files-by-name-and-kind %) all-required))))))))
+
+(deftest implement-task-implementation-pass-declares-blocked-handback-contract-test
+  ;; Tests the authored pass prompt owns the implementation-blocked policy.
+  (testing "the implementation pass permits three statuses and requires a durable actionable blocker record"
+    (let [prompt (slurp ".psi/workflows/implement-task-implement-pass.md")
+          status-lines (->> (str/split-lines prompt)
+                            (filter #(str/starts-with? % "PASS_STATUS: "))
+                            vec)]
+      (is (= ["PASS_STATUS: MORE_WORK_REMAINS"
+              "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+              "PASS_STATUS: IMPLEMENTATION_BLOCKED"]
+             status-lines))
+      (is (str/includes? prompt "<!-- IMPLEMENTATION_BLOCKER: START -->"))
+      (is (str/includes? prompt "- blocker: <concise concrete blocker>"))
+      (is (str/includes? prompt "- required-human-action: <safe action or decision>"))
+      (is (str/includes? prompt "<!-- IMPLEMENTATION_BLOCKER: END -->"))
+      (is (str/includes? prompt "concise non-empty text"))
+      (is (< (.indexOf prompt "IMPLEMENTATION_BLOCKER: START")
+             (.indexOf prompt "PASS_STATUS: IMPLEMENTATION_BLOCKED")))
+      (is (str/includes? prompt
+                         "append the complete `IMPLEMENTATION_BLOCKER` block above before emitting that final status line")))))

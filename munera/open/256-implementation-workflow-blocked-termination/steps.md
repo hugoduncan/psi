@@ -2,10 +2,12 @@
 
 ## Slice 1 — Implementation-pass blocked contract
 
-- [ ] Update `.psi/workflows/implement-task-implement-pass.md` to permit exactly `MORE_WORK_REMAINS`, `IMPLEMENTATION_COMPLETE`, and `IMPLEMENTATION_BLOCKED`, and require the exact complete two-field `IMPLEMENTATION_BLOCKER` append before emitting the blocked status.
-- [ ] Extend workflow definition tests to verify the implementation-pass prompt owns the three-status contract, exact blocker delimiters and fields, non-empty field requirement, and append-before-status requirement.
-- [ ] Run the focused workflow-loader definition tests for the implementation-pass contract.
-- [ ] Commit the Slice 1 prompt and proof changes without staging unrelated worktree changes.
+- [x] Update `.psi/workflows/implement-task-implement-pass.md` to permit exactly `MORE_WORK_REMAINS`, `IMPLEMENTATION_COMPLETE`, and `IMPLEMENTATION_BLOCKED`, and require the exact complete two-field `IMPLEMENTATION_BLOCKER` append before emitting the blocked status.
+- [x] Extend workflow definition tests to verify the implementation-pass prompt owns the three-status contract, exact blocker delimiters and fields, non-empty field requirement, and append-before-status requirement.
+- [x] Run the focused workflow-loader definition tests for the implementation-pass contract.
+  - `bb clojure:test:scry --namespace psi.agent-session.workflow-migration-validation-test` — 6 tests, 40 assertions passed.
+  - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_migration_validation_test.clj` — no findings.
+- [x] Commit the Slice 1 prompt and proof changes without staging unrelated worktree changes.
 
 ## Slice 2 — Standalone implement-task routing and terminal handbacks
 
