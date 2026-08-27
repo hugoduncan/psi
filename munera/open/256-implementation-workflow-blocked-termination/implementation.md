@@ -43,6 +43,7 @@ No implementation has started. The existing implementation loop currently recogn
 
 - addressed 1 review step: removed the trailing blank lines from `workflow_implementation_routing_test.clj`; `git diff --check` passes.
 - added 1 step to be addressed
+- addressed 1 review step: checked-in `task-lifecycle` now delegates the checked-in `implement-task` in an execution proof for both terminal branches; the lifecycle gate consumes each executed terminal `IMPLEMENTATION_STATUS` and selects the matching branch.
 - addressed 1 review step: fresh blocker validation resolves `implementation.md` once, then derives both final-record validity and append freshness from that same content; focused operation test, clj-kondo, and `git diff --check` pass.
 - addressed 1 review step: blocker-record parsing now rejects whitespace-only field values; focused parser and resolver-backed operation tests, clj-kondo, and `git diff --check` pass.
 - added 1 step to be addressed

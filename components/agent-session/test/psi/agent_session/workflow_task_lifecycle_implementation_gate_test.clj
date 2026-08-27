@@ -79,16 +79,32 @@
    :name name
    :steps [(session-step "run" prompt)]})
 
-(defn- checked-in-lifecycle-definition
-  [worktree]
-  (let [path (str worktree "/.psi/workflows/task-lifecycle.edn")
+(defn- checked-in-workflow-definition
+  [worktree workflow-name]
+  (let [path (str worktree "/.psi/workflows/" workflow-name ".edn")
         parsed (workflow-parser/parse-edn-workflow-file (slurp path))
         {:keys [definition error]} (workflow-compiler/compile-workflow-file
                                     (assoc parsed :source-path path))]
     (when error
-      (throw (ex-info "Checked-in task-lifecycle definition did not compile"
+      (throw (ex-info (str "Checked-in " workflow-name " definition did not compile")
                       {:error error})))
     definition))
+
+(defn- checked-in-lifecycle-definition
+  [worktree]
+  (checked-in-workflow-definition worktree "task-lifecycle"))
+
+(defn- checked-in-implement-task-definition
+  [worktree]
+  ;; The test context intentionally has no project profile registry, unlike
+  ;; production startup. Session-profile choice is unrelated to delegation.
+  (update (checked-in-workflow-definition worktree "implement-task")
+          :steps
+          (fn [steps]
+            (mapv #(if (= "implement-pass" (:name %))
+                     (dissoc % :session-profile)
+                     %)
+                  steps))))
 
 (defn- register-definitions!
   [ctx implementation-status]
@@ -163,6 +179,96 @@
                       :stop-reason :stop}})]
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
+
+(defn- implementation-blocker-record
+  []
+  (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+       "- blocker: awaiting product decision\n"
+       "- required-human-action: choose the retention policy\n"
+       "<!-- IMPLEMENTATION_BLOCKER: END -->\n"))
+
+(defn- execute-checked-in-lifecycle-with-implement-task!
+  [worktree ctx session-id outcome]
+  (let [source-worktree (System/getProperty "user.dir")
+        lifecycle (checked-in-lifecycle-definition source-worktree)
+        implement-task (checked-in-implement-task-definition source-worktree)
+        run-id (str "checked-in-lifecycle-" (name outcome))
+        task-path "munera/open/256-implementation-workflow-blocked-termination"
+        reply-number* (atom 0)
+        definitions [(child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (child-definition "create-task-plan" "plan created")
+                     (child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     implement-task
+                     (child-definition "review-task-implementation-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (child-definition "extract-task-knowledge" "knowledge extracted")
+                     lifecycle]]
+    (register-routing-ops! ctx)
+    (swap! (:state* ctx)
+           (fn [state]
+             (reduce (fn [next-state definition]
+                       (first (workflow-registry/register-definition next-state definition)))
+                     state
+                     definitions)))
+    (create-lifecycle-run! ctx lifecycle run-id {:input task-path})
+    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                  (fn [_ctx _child-session-id prompt]
+                    (let [reply-number (swap! reply-number* inc)
+                          text (cond
+                                 (= 4 reply-number)
+                                 (do (when (= :blocked outcome)
+                                       (spit (str worktree "/" task-path "/implementation.md")
+                                             (str "initial notes\n" (implementation-blocker-record))))
+                                     (str "PASS_STATUS: " (if (= :blocked outcome)
+                                                            "IMPLEMENTATION_BLOCKED"
+                                                            "IMPLEMENTATION_COMPLETE")))
+
+                                 (.contains prompt "Produce the user-facing blocked handback for the specific Munera task")
+                                 "implement blocked terminal\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+
+                                 (.contains prompt "Produce the user-facing final result for the specific Munera task")
+                                 "implement complete terminal\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
+
+                                 (.contains prompt "Produce the user-facing blocked handback for the Munera task lifecycle")
+                                 "lifecycle blocked handback"
+
+                                 :else prompt)]
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text :text text}]
+                        :stop-reason :stop}}))]
+      (let [result (workflow-execution/execute-run! ctx session-id run-id)]
+        [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
+
+(deftest checked-in-task-lifecycle-delegates-checked-in-implement-task-terminal-status-test
+  ;; Tests the real nested workflow delegation exports the callee's executed
+  ;; terminal summary to the lifecycle marker gate for both terminal branches.
+  (test-support/with-temp-worktree-session
+    (fn [worktree ctx session-id]
+      (test-support/write-task-artifact! worktree
+                                         "munera/open/256-implementation-workflow-blocked-termination"
+                                         "design-steps.md"
+                                         "- [x] SCOPE_QUESTION: resolved\n")
+      (test-support/write-task-artifact! worktree
+                                         "munera/open/256-implementation-workflow-blocked-termination"
+                                         "implementation.md"
+                                         "initial notes\n")
+      (doseq [[outcome expected-status expected-terminal skipped-step]
+              [[:complete "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
+                "final-summary-after-extraction" "final-summary-implementation-blocked"]
+               [:blocked "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+                "final-summary-implementation-blocked" "review-task-implementation"]]]
+        (let [[result run] (execute-checked-in-lifecycle-with-implement-task! worktree ctx session-id outcome)]
+          (is (= :completed (:status result)) (pr-str run))
+          (is (= expected-terminal (get-in run [:terminal-outcome :step-id])) (pr-str run))
+          (is (.contains (get-in run [:step-runs "implement-task" :accepted-result :outputs :final-llm-reply])
+                         expected-status)
+              (pr-str run))
+          (is (= (subs expected-status (count "IMPLEMENTATION_STATUS: "))
+                 (get-in run [:step-runs "check-implementation-status" :attempts 0
+                              :judge-output :routing-result :data]))
+              (pr-str run))
+          (is (zero? (count (get-in run [:step-runs skipped-step :attempts])))
+              (pr-str run)))))))
 
 (deftest checked-in-lifecycle-blocked-route-stops-before-review-and-extraction-test
   ;; Tests the compiled authored lifecycle definition, rather than a synthetic

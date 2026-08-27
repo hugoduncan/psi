@@ -87,4 +87,6 @@
   - `bb clojure:test --focus psi.agent-session.workflow-task-lifecycle-implementation-gate-test` — 4 tests, 40 assertions passed.
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_task_lifecycle_implementation_gate_test.clj` and `git diff --check` — passed.
 
-- [ ] Add an integration execution test that delegates the checked-in `implement-task` workflow from the checked-in `task-lifecycle` workflow for both terminal branches, proving the executed normal/blocked terminal summary—not a synthetic child yield—is exported through delegation as the lifecycle gate's `IMPLEMENTATION_STATUS` input and selects the corresponding lifecycle branch.
+- [x] Add an integration execution test that delegates the checked-in `implement-task` workflow from the checked-in `task-lifecycle` workflow for both terminal branches, proving the executed normal/blocked terminal summary—not a synthetic child yield—is exported through delegation as the lifecycle gate's `IMPLEMENTATION_STATUS` input and selects the corresponding lifecycle branch.
+  - `bb clojure:test --focus psi.agent-session.workflow-task-lifecycle-implementation-gate-test` — 5 tests, 50 assertions passed.
+  - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_task_lifecycle_implementation_gate_test.clj` and `git diff --check` — passed.
