@@ -229,7 +229,7 @@
                                (when (and field-line
                                           (str/starts-with? field-line prefix))
                                  (let [value (subs field-line (count prefix))]
-                                   (when (seq value) value))))
+                                   (when (seq (str/trim value)) value))))
                              field-prefixes field-lines)
                 complete? (and (= end-delimiter end-line)
                                (= (count field-prefixes) (count values))

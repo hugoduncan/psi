@@ -51,12 +51,15 @@
             "<!-- IMPLEMENTATION_BLOCKER: START -->"
             ["- blocker: " "- required-human-action: "]
             "<!-- IMPLEMENTATION_BLOCKER: END -->"))))
-  (testing "absent or malformed records are rejected"
-    (is (nil? (routing/parse-final-complete-block
-               "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: \n<!-- IMPLEMENTATION_BLOCKER: END -->"
-               "<!-- IMPLEMENTATION_BLOCKER: START -->"
-               ["- blocker: " "- required-human-action: "]
-               "<!-- IMPLEMENTATION_BLOCKER: END -->")))))
+  (testing "absent, malformed, or whitespace-only records are rejected"
+    (doseq [content ["<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: \n<!-- IMPLEMENTATION_BLOCKER: END -->"
+                     "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker:   \t\n- required-human-action: choose access\n<!-- IMPLEMENTATION_BLOCKER: END -->"
+                     "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing access\n- required-human-action:  \t \n<!-- IMPLEMENTATION_BLOCKER: END -->"]]
+      (is (nil? (routing/parse-final-complete-block
+                 content
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->"
+                 ["- blocker: " "- required-human-action: "]
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->"))))))
 
 (deftest pass-status-routing-parser-test
   ;; Tests pure PASS_STATUS final-reply routing grammar without workflow runtime

@@ -94,14 +94,16 @@
           (is (= {"- blocker: " "current decision"
                   "- required-human-action: " "choose an API"}
                  (get-in result [:details :record])) (pr-str result)))
-        (write-task-artifact! worktree "munera/open/230-x" "implementation.md"
-                              "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing action\n<!-- IMPLEMENTATION_BLOCKER: END -->")
-        (is (= :missing-final-complete-block
-               (:reason (registry/invoke-operation-in
-                         (:deterministic-operation-registry ctx) operation-id
-                         {:ctx ctx :session-id sid
-                          :args (assoc blocker-routing-args :task-path "munera/open/230-x")}
-                         runtime/invoke-operation))))))))
+        (doseq [content ["<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing action\n<!-- IMPLEMENTATION_BLOCKER: END -->"
+                         "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker:   \n- required-human-action: choose access\n<!-- IMPLEMENTATION_BLOCKER: END -->"
+                         "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing access\n- required-human-action: \t \n<!-- IMPLEMENTATION_BLOCKER: END -->"]]
+          (write-task-artifact! worktree "munera/open/230-x" "implementation.md" content)
+          (is (= :missing-final-complete-block
+                 (:reason (registry/invoke-operation-in
+                           (:deterministic-operation-registry ctx) operation-id
+                           {:ctx ctx :session-id sid
+                            :args (assoc blocker-routing-args :task-path "munera/open/230-x")}
+                           runtime/invoke-operation)))))))))
 
 (deftest gate-open-on-unchecked-scope-question-test
   ;; AC-1: an unchecked SCOPE_QUESTION halts (open route) and names the concern.
