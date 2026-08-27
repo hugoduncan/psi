@@ -6,7 +6,8 @@
    [psi.agent-session.workflow-execution-test-support :as support]
    [psi.agent-session.workflow.core :as workflow-core]
    [psi.deterministic-operation-registry.registry]
-   [psi.workflow-runtime.core :as workflow-runtime]))
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.terminal-contract :as terminal-contract]))
 
 (def review-step-definition
   {:definition-id "review-step-proof"
@@ -73,14 +74,31 @@
                              :text "Implement {{input}}"
                              :vars {"input" {:from :workflow-input :path [:input]}}}]
             :judge {:type :invoke
-                    :operation "workflow/pass-status-routing"
-                    :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}}}
-            :on {"REPEAT" {:goto "implement-pass" :max-iterations 20}
-                 "DONE" {:goto "final-summary"}}}
-           {:name "final-summary"
+                    :operation "workflow/exact-marker-routing"
+                    :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}
+                           :marker-label "PASS_STATUS"
+                           :allowed-routes ["MORE_WORK_REMAINS"
+                                            "IMPLEMENTATION_COMPLETE"
+                                            "IMPLEMENTATION_BLOCKED"]}}
+            :on {"MORE_WORK_REMAINS" {:goto "implement-pass" :max-iterations 20}
+                 "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"}
+                 "IMPLEMENTATION_BLOCKED" {:goto "final-summary-blocked"}}}
+           ;; Deliberately before the complete summary: terminal projection must
+           ;; use the executed terminal step rather than declaration order.
+           {:name "final-summary-blocked"
             :type :session
-            :contributions [{:type :template :text "Final summary"}]}]})
-
+            :contributions [{:type :template :text "Blocked summary"}]
+            :judge {:type :invoke
+                    :operation "workflow/constant-routing"
+                    :args {:route "DONE"}}
+            :on {"DONE" {:goto :done}}}
+           {:name "final-summary-complete"
+            :type :session
+            :contributions [{:type :template :text "Complete summary"}]
+            :judge {:type :invoke
+                    :operation "workflow/constant-routing"
+                    :args {:route "DONE"}}
+            :on {"DONE" {:goto :done}}}]})
 (defn- create-implement-task-run!
   [ctx run-id]
   (swap! (:state* ctx)
@@ -112,20 +130,52 @@
                                            "Implement munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"
                                            "No work remains\n\nPASS_STATUS: IMPLEMENTATION_COMPLETE"
 
-                                           "Final summary"
-                                           "final summary")}]
+                                           "Complete summary"
+                                           "complete summary")}]
                         :stop-reason :stop}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-implement-complete")
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-implement-complete")]
           (is (= :completed (:status result)))
           (is (= :completed (:status run)))
           (is (= 1 (count (get-in run [:step-runs "implement-pass" :attempts]))))
-          (is (= 1 (count (get-in run [:step-runs "final-summary" :attempts]))))
-          (is (= {:status :ok :data "DONE" :summary "DONE"}
+          (is (= 1 (count (get-in run [:step-runs "final-summary-complete" :attempts]))))
+          (is (= {:status :ok :data "IMPLEMENTATION_COMPLETE" :summary "IMPLEMENTATION_COMPLETE"}
                  (get-in run [:step-runs "implement-pass" :attempts 0 :judge-output :routing-result])))
           (is (= ["Implement munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"
-                  "Final summary"]
+                  "Complete summary"]
                  (mapv :prompt @prompts*))))))))
+
+(deftest implement-task-implementation-blocked-routes-to-blocked-summary-test
+  ;; Tests the authored blocked route terminates without another pass and that
+  ;; terminal projection selects this earlier-declared terminal branch.
+  (testing "IMPLEMENTATION_BLOCKED reaches the blocked handback"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          prompts* (atom [])]
+      (register-review-routing-ops! ctx)
+      (create-implement-task-run! ctx "run-implement-blocked")
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx _child-session-id prompt]
+                      (swap! prompts* conj prompt)
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text
+                                   :text (case prompt
+                                           "Implement munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"
+                                           "Need a human decision\nPASS_STATUS: IMPLEMENTATION_BLOCKED"
+                                           "Blocked summary"
+                                           "blocked handback")}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-implement-blocked")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-implement-blocked")]
+          (is (= :completed (:status result)))
+          (is (= 1 (count (get-in run [:step-runs "implement-pass" :attempts]))))
+          (is (= 1 (count (get-in run [:step-runs "final-summary-blocked" :attempts]))))
+          (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))))
+          (is (= "final-summary-blocked" (get-in run [:terminal-outcome :step-id])))
+          (is (= "blocked handback" (terminal-contract/terminal-yielded-text run)))
+          (is (= ["Implement munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"
+                  "Blocked summary"]
+                 @prompts*)))))))
 
 (deftest review-step-invalid-implementation-status-fails-before-follow-up-test
   (testing "implementation-only PASS_STATUS tokens are invalid for generic review-step routing"
@@ -590,16 +640,16 @@
                                    :text (case (count @prompts*)
                                            1 "PASS_STATUS: MORE_WORK_REMAINS"
                                            2 "PASS_STATUS: IMPLEMENTATION_COMPLETE"
-                                           "Final summary")}]
+                                           "Complete summary")}]
                         :stop-reason :stop}})]
         (let [result (workflow-execution/execute-run! ctx session-id "run-implement-more-work")
               run (workflow-runtime/workflow-run-in @(:state* ctx) "run-implement-more-work")]
           (is (= :completed (:status result)))
           (is (= :completed (:status run)))
           (is (= 2 (count (get-in run [:step-runs "implement-pass" :attempts]))))
-          (is (= {:status :ok :data "REPEAT" :summary "REPEAT"}
+          (is (= {:status :ok :data "MORE_WORK_REMAINS" :summary "MORE_WORK_REMAINS"}
                  (get-in run [:step-runs "implement-pass" :attempts 0 :judge-output :routing-result])))
-          (is (= {:status :ok :data "DONE" :summary "DONE"}
+          (is (= {:status :ok :data "IMPLEMENTATION_COMPLETE" :summary "IMPLEMENTATION_COMPLETE"}
                  (get-in run [:step-runs "implement-pass" :attempts 1 :judge-output :routing-result]))))))))
 
 (deftest design-review-full-pass-routing-test
