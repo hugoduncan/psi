@@ -90,3 +90,9 @@
 - [x] Add an integration execution test that delegates the checked-in `implement-task` workflow from the checked-in `task-lifecycle` workflow for both terminal branches, proving the executed normal/blocked terminal summary—not a synthetic child yield—is exported through delegation as the lifecycle gate's `IMPLEMENTATION_STATUS` input and selects the corresponding lifecycle branch.
   - `bb clojure:test --focus psi.agent-session.workflow-task-lifecycle-implementation-gate-test` — 5 tests, 50 assertions passed.
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_task_lifecycle_implementation_gate_test.clj` and `git diff --check` — passed.
+
+## Implementation review follow-up
+
+- [ ] Make fresh blocker validation enforce the implementation-pass contract's exactly-one newly appended complete `IMPLEMENTATION_BLOCKER` record. `workflow/final-complete-block-appended?` currently accepts any suffix containing a complete record, so a blocked pass that appends two complete records is accepted despite the prompt's “exactly once” requirement; add a regression test for that suffix.
+
+- [ ] Reconcile `design-steps.md` with the implemented blocker-validation seam: its still-unchecked validation/terminal-handling design follow-up is satisfied by `workflow/fresh-final-complete-block-routing`, the blocked route, and their tests. Mark it complete or restore the missing implementation work, with an accurate resolution note.

@@ -51,6 +51,7 @@ No implementation has started. The existing implementation loop currently recogn
 - added 1 step to be addressed
 - addressed 1 review step: capture `implementation.md` before each implementation pass and require a fresh complete blocker record after `IMPLEMENTATION_BLOCKED`; checked-in workflow execution rejects an unchanged valid prior record. Focused routing and migration-validation tests, clj-kondo, and `git diff --check` pass.
 - added 1 step to be addressed
+- added 2 steps to be addressed
 
 - addressed 1 review step: checked-in `implement-task` execution now proves the capture → `MORE_WORK_REMAINS` loop → capture → `IMPLEMENTATION_COMPLETE` route, normal terminal projection, and skipped blocked branch; focused routing test, clj-kondo, and `git diff --check` pass.
 - added 1 step to be addressed
