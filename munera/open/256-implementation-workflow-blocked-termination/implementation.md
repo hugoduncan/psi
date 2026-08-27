@@ -14,3 +14,6 @@ No implementation has started. The existing implementation loop currently recogn
 - no architectural review feedback
 - no ambiguity review feedback
 - no inconsistency review feedback
+
+- Follow-up implementation seam: retain generic routing/terminal projection; confine the new status vocabulary and branch topology to `.psi/workflows/implement-task.edn` and `task-lifecycle.edn`. Runtime touchpoints are `components/agent-session/src/psi/agent_session/workflow/routing.clj` and `workflow_execution.clj`; definition validation coverage is in `components/agent-session/test/psi/agent_session/workflow_migration_validation_test.clj`.
+- ambiguity review added 1 new design step
