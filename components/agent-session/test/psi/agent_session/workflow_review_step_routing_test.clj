@@ -177,6 +177,49 @@
                   "Blocked summary"]
                  @prompts*)))))))
 
+(deftest implement-task-invalid-statuses-and-repeat-limit-fail-test
+  ;; Tests invalid implementation markers fail at the authored exact-marker gate
+  ;; and the existing repeat bound remains twenty passes.
+  (testing "malformed, duplicate, and unsupported PASS_STATUS markers fail without a summary"
+    (doseq [[label reply reason]
+            [["malformed" "PASS_STATUS:IMPLEMENTATION_BLOCKED" :malformed-route-marker]
+             ["duplicate" "PASS_STATUS: IMPLEMENTATION_COMPLETE\nPASS_STATUS: IMPLEMENTATION_BLOCKED" :ambiguous-route-marker]
+             ["unsupported" "PASS_STATUS: UNKNOWN_OUTCOME" :unsupported-route-marker]]]
+      (let [[ctx session-id] (support/create-session-context {:persist? false})
+            run-id (str "run-implement-" label)]
+        (register-review-routing-ops! ctx)
+        (create-implement-task-run! ctx run-id)
+        (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                      (fn [_ctx _child-session-id _prompt]
+                        {:execution-result/assistant-message
+                         {:role "assistant"
+                          :content [{:type :text :text reply}]
+                          :stop-reason :stop}})]
+          (let [result (workflow-execution/execute-run! ctx session-id run-id)
+                run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+            (is (= :failed (:status result)) label)
+            (is (= reason (get-in run [:terminal-outcome :reason])) label)
+            (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))) label)
+            (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts]))) label))))))
+  (testing "the twenty-pass MORE_WORK_REMAINS bound still fails before pass twenty-one"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          run-id "run-implement-repeat-limit"]
+      (register-review-routing-ops! ctx)
+      (create-implement-task-run! ctx run-id)
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx _child-session-id _prompt]
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text :text "PASS_STATUS: MORE_WORK_REMAINS"}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id run-id)
+              run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+          (is (= :failed (:status result)))
+          (is (= :iteration-exhausted (get-in run [:terminal-outcome :reason])))
+          (is (= 20 (count (get-in run [:step-runs "implement-pass" :attempts]))))
+          (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))))
+          (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts])))))))))
+
 (deftest review-step-invalid-implementation-status-fails-before-follow-up-test
   (testing "implementation-only PASS_STATUS tokens are invalid for generic review-step routing"
     (let [[ctx session-id] (support/create-session-context {:persist? false})

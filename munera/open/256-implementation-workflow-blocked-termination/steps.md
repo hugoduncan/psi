@@ -17,8 +17,8 @@
 - [x] Extend loader/definition tests to prove the three-route table, separate terminal branches, branch-specific exported statuses, and summary blocker-selection instructions.
   - `bb clojure:test:scry --namespace psi.agent-session.workflow-migration-validation-test` — 7 tests, 49 assertions passed.
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_migration_validation_test.clj` — no findings.
-- [ ] Extend execution-routing tests to prove valid repeat, completion, and blocked outcomes; blocked does not re-enter `implement-pass`; malformed, duplicated, and unsupported markers fail; and the repeat limit remains bounded.
-  - This pass proves valid repeat/completion/blocked routing and that the blocked branch does not re-enter `implement-pass`; malformed/duplicated/unsupported and repeat-limit cases remain.
+- [x] Extend execution-routing tests to prove valid repeat, completion, and blocked outcomes; blocked does not re-enter `implement-pass`; malformed, duplicated, and unsupported markers fail; and the repeat limit remains bounded.
+  - `workflow-review-step-routing-test` now proves malformed, duplicate, and unsupported `PASS_STATUS` replies fail before either summary, and 20 `MORE_WORK_REMAINS` passes exhaust the existing iteration guard before a twenty-first pass.
 - [ ] Add observable execution tests with multiple complete and malformed/incomplete blocker blocks to prove the final complete record alone is summarized and absent valid records do not yield an invented blocked handback.
 - [x] Add terminal-result tests that declare terminal steps in a non-authoritative order and prove `:terminal-outcome :step-id` projects the executed normal or blocked summary for standalone output and delegated yielded text.
   - Standalone projection is covered with the blocked terminal declared before the complete terminal; delegated yield remains.
