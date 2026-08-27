@@ -111,3 +111,7 @@
 
 - [x] Propagate the implementation terminal status through `implement-task-in-worktree` and gate its loadable caller `.psi/workflows/gh-issue-implement.edn` before `review` and `push`. The wrapper's complete and blocked summaries currently export no `IMPLEMENTATION_STATUS`, and `gh-issue-implement` unconditionally reviews and pushes the wrapper result, so a blocked implementation can still cross the outer orchestration boundary and be treated as reviewable work. Add branch-specific outer handback routing and observable proof that blocked output starts neither review nor push.
   - Wrapper summaries export branch-matching status; the outer exact-marker gate routes blocked output to a terminal handback before review, push, or label editing, proven from the checked-in definition.
+
+## Implementation review follow-up
+
+- [ ] Make the blocked handback consume the blocker record from the same artifact snapshot that passed `workflow/fresh-final-complete-block-routing`, then propagate that validated record through caller handbacks instead of independently re-reading `implementation.md`. The current gate validates one revision, while `final-summary-blocked`, lifecycle, wrapper, and complexity-workflow prompts read the artifact again, so a concurrent or intervening edit can make the presented blocker differ from the record that authorized the blocked route. Add an observable checked-in execution proof that changes the artifact after validation and verifies every handback still reports the originally validated `blocker` and `required-human-action` values.
