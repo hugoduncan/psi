@@ -10,3 +10,5 @@ No implementation has started. The existing implementation loop currently recogn
 - For the design-step resolution, inspect `.psi/workflows/implement-task.edn`, `.psi/workflows/task-lifecycle.edn`, `components/agent-session/src/psi/agent_session/workflow/routing.clj`, and `components/agent-session/src/psi/agent_session/workflow/execution.clj`; preserve authored-policy ownership, deterministic routing, and the no-generic-runtime-blocker constraint.
 
 - 2026-08-24 design follow-up: resolved all four items from review batch `d11b08d4a..495c8f2c2`. Existing `:terminal-outcome :step-id` selects the executed terminal branch for standalone text and delegate handoff; `workflow/exact-marker-routing` accepts authored raw routes, unlike the fixed DONE/REPEAT pass-status router. Implementation must prove that projection and use `IMPLEMENTATION_STATUS` in the terminal summaries as the lifecycle delegate contract. Blocked summaries must read only the final complete `IMPLEMENTATION_BLOCKER` block in `implementation.md`; absent or malformed records are invalid output, not a reason to infer a blocker.
+
+- no architectural review feedback
