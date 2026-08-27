@@ -105,6 +105,22 @@
                             :args (assoc blocker-routing-args :task-path "munera/open/230-x")}
                            runtime/invoke-operation)))))))))
 
+(deftest fresh-final-complete-block-routing-uses-one-artifact-revision-test
+  ;; The fresh gate must derive validity and freshness from one resolved content.
+  (let [before-content "prior implementation notes\n"
+        current-content (str before-content
+                             "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                             "- blocker: current decision\n"
+                             "- required-human-action: choose an API\n"
+                             "<!-- IMPLEMENTATION_BLOCKER: END -->\n")
+        args (assoc blocker-routing-args
+                    :task-path "munera/open/230-x"
+                    :before-content before-content)
+        result (#'workflow-core/fresh-final-complete-block-routing-result
+                args current-content)]
+    (is (= :ok (:status result)) (pr-str result))
+    (is (= "DONE" (:data result)) (pr-str result))))
+
 (deftest gate-open-on-unchecked-scope-question-test
   ;; AC-1: an unchecked SCOPE_QUESTION halts (open route) and names the concern.
   (test-support/with-temp-worktree-session

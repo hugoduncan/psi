@@ -75,4 +75,6 @@
   - `bb clojure:test --focus psi.agent-session.scope-question-gate-operation-test` — 8 tests, 20 assertions passed.
   - `clj-kondo --lint` and `git diff --check` — passed.
 
-- [ ] Read `implementation.md` once in `workflow/fresh-final-complete-block-routing` and use that same resolved content for both final-record and freshness validation; the current two resolver reads can validate the final record from one artifact revision and freshness from another.
+- [x] Read `implementation.md` once in `workflow/fresh-final-complete-block-routing` and use that same resolved content for both final-record and freshness validation; the current two resolver reads can validate the final record from one artifact revision and freshness from another.
+  - `bb clojure:test --focus psi.agent-session.scope-question-gate-operation-test` — 9 tests, 22 assertions passed.
+  - `clj-kondo --lint components/agent-session/src/psi/agent_session/workflow/core.clj components/agent-session/test/psi/agent_session/scope_question_gate_operation_test.clj` and `git diff --check` — passed.

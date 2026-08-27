@@ -147,10 +147,19 @@
                          :psi.munera/artifact-name artifact})))]
         (routing/parse-scope-question-gate content marker proceed-route open-route)))))
 
-(defn final-complete-block-routing
-  "Read one task artifact and route only when it contains a complete authored
-   block. The caller supplies all syntax and route policy."
-  [{:keys [args ctx parent-session-id session-id]}]
+(defn- read-task-artifact-content
+  [ctx session-id task-path artifact]
+  (when-let [task-dir (routing/normalize-open-task-path task-path)]
+    (:psi.munera/task-artifact-content
+     (resolvers/query-in
+      ctx
+      [:psi.munera/task-artifact-content]
+      {:psi.agent-session/session-id session-id
+       :psi.munera/task-path task-dir
+       :psi.munera/artifact-name artifact}))))
+
+(defn- final-complete-block-routing-result
+  [args content]
   (let [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route]} args
         valid-args? (and (string? task-path)
                          (string? artifact)
@@ -164,23 +173,22 @@
        :reason :invalid-final-complete-block-routing-args
        :message "workflow/final-complete-block-routing args are invalid"
        :details {:args args}}
-      (let [owning-session-id (or parent-session-id session-id)
-            task-dir (routing/normalize-open-task-path task-path)
-            content (when task-dir
-                      (:psi.munera/task-artifact-content
-                       (resolvers/query-in
-                        ctx
-                        [:psi.munera/task-artifact-content]
-                        {:psi.agent-session/session-id owning-session-id
-                         :psi.munera/task-path task-dir
-                         :psi.munera/artifact-name artifact})))
-            record (routing/parse-final-complete-block content start-delimiter field-prefixes end-delimiter)]
-        (if record
-          {:status :ok :data valid-route :summary valid-route :details {:record record}}
-          {:status :error
-           :reason :missing-final-complete-block
-           :message "Required complete artifact block is missing"
-           :details {:task-path task-path :artifact artifact}})))))
+      (if-let [record (routing/parse-final-complete-block
+                       content start-delimiter field-prefixes end-delimiter)]
+        {:status :ok :data valid-route :summary valid-route :details {:record record}}
+        {:status :error
+         :reason :missing-final-complete-block
+         :message "Required complete artifact block is missing"
+         :details {:task-path task-path :artifact artifact}}))))
+
+(defn final-complete-block-routing
+  "Read one task artifact and route only when it contains a complete authored
+   block. The caller supplies all syntax and route policy."
+  [{:keys [args ctx parent-session-id session-id]}]
+  (let [owning-session-id (or parent-session-id session-id)
+        content (read-task-artifact-content ctx owning-session-id
+                                            (:task-path args) (:artifact args))]
+    (final-complete-block-routing-result args content)))
 
 (defn task-artifact-content-read
   "Read a task artifact as an invoke-step value for authored workflow policy."
@@ -197,29 +205,27 @@
                      :psi.munera/artifact-name artifact})))]
     {:status :ok :data content :summary "DONE"}))
 
-(defn fresh-final-complete-block-routing
-  "Require a complete authored block newly appended since the captured artifact."
-  [{:keys [args ctx parent-session-id session-id]}]
+(defn- fresh-final-complete-block-routing-result
+  [args content]
   (let [{:keys [before-content] :as args} args
-        result (final-complete-block-routing {:args (dissoc args :before-content)
-                                              :ctx ctx
-                                              :parent-session-id parent-session-id
-                                              :session-id session-id})]
+        result (final-complete-block-routing-result (dissoc args :before-content)
+                                                    content)]
     (if (and (= :ok (:status result))
              (routing/final-complete-block-appended?
-              before-content
-              (get-in (resolvers/query-in
-                       ctx [:psi.munera/task-artifact-content]
-                       {:psi.agent-session/session-id (or parent-session-id session-id)
-                        :psi.munera/task-path (routing/normalize-open-task-path (:task-path args))
-                        :psi.munera/artifact-name (:artifact args)})
-                      [:psi.munera/task-artifact-content])
+              before-content content
               (:start-delimiter args) (:field-prefixes args) (:end-delimiter args)))
       result
       {:status :error
        :reason :missing-fresh-final-complete-block
        :message "Required complete artifact block was not newly appended"
        :details {:task-path (:task-path args) :artifact (:artifact args)}})))
+
+(defn fresh-final-complete-block-routing
+  "Require a complete authored block newly appended since the captured artifact."
+  [{:keys [args ctx parent-session-id session-id]}]
+  (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
+                                            (:task-path args) (:artifact args))]
+    (fresh-final-complete-block-routing-result args content)))
 
 (defn- register-built-in-deterministic-operations!
   [api]
