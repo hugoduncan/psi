@@ -167,21 +167,28 @@
             replies* (atom 0)]
         (test-support/write-task-artifact!
          worktree task-path "implementation.md"
-         (artifact-content {:blocker "awaiting product decision"
-                            :required-human-action "choose the retention policy"}))
+         (artifact-content {:blocker "earlier decision"
+                            :required-human-action "ignore this record"}))
         (register-review-routing-ops! ctx)
         (create-implement-task-run! ctx
                                     (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                     run-id task-path)
         (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                       (fn [_ctx _child-session-id _prompt]
-                        {:execution-result/assistant-message
-                         {:role "assistant"
-                          :content [{:type :text
-                                     :text (case (swap! replies* inc)
-                                             1 "PASS_STATUS: IMPLEMENTATION_BLOCKED"
-                                             2 "blocked handback")}]
-                          :stop-reason :stop}})]
+                        (let [reply-number (swap! replies* inc)]
+                          (when (= 1 reply-number)
+                            (spit (str worktree "/" task-path "/implementation.md")
+                                  (str (artifact-content {:blocker "earlier decision"
+                                                          :required-human-action "ignore this record"})
+                                       (artifact-content {:blocker "awaiting product decision"
+                                                          :required-human-action "choose the retention policy"}))))
+                          {:execution-result/assistant-message
+                           {:role "assistant"
+                            :content [{:type :text
+                                       :text (case reply-number
+                                               1 "PASS_STATUS: IMPLEMENTATION_BLOCKED"
+                                               2 "blocked handback")}]
+                            :stop-reason :stop}}))]
           (let [result (workflow-execution/execute-run! ctx session-id run-id)
                 run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
             (is (= :completed (:status result)) (pr-str run))
@@ -196,6 +203,32 @@
             (is (= "DONE"
                    (get-in run [:step-runs "validate-implementation-blocker"
                                 :attempts 0 :judge-output :routing-result :data])))))))))
+
+(deftest checked-in-implement-task-blocked-route-rejects-stale-blocker-test
+  (test-support/with-temp-worktree-session
+    (fn [worktree ctx session-id]
+      (let [task-path "munera/open/230-x"
+            run-id "checked-in-implement-stale-blocker"
+            content (artifact-content {:blocker "earlier decision"
+                                       :required-human-action "ignore this record"})]
+        (test-support/write-task-artifact! worktree task-path "implementation.md" content)
+        (register-review-routing-ops! ctx)
+        (create-implement-task-run! ctx
+                                    (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                    run-id task-path)
+        (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                      (fn [_ctx _child-session-id _prompt]
+                        {:execution-result/assistant-message
+                         {:role "assistant"
+                          :content [{:type :text :text "PASS_STATUS: IMPLEMENTATION_BLOCKED"}]
+                          :stop-reason :stop}})]
+          (let [result (workflow-execution/execute-run! ctx session-id run-id)
+                run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+            (is (= :failed (:status result)) (pr-str run))
+            (is (= :missing-fresh-final-complete-block
+                   (get-in run [:terminal-outcome :reason])) (pr-str run))
+            (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts])))
+                (pr-str run))))))))
 
 (deftest checked-in-implement-task-blocked-route-rejects-invalid-blockers-test
   ;; Tests the real blocked route fails at validation rather than inventing a handback.
@@ -220,7 +253,7 @@
             (let [result (workflow-execution/execute-run! ctx session-id run-id)
                   run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
               (is (= :failed (:status result)) label)
-              (is (= :missing-final-complete-block
+              (is (= :missing-fresh-final-complete-block
                      (get-in run [:terminal-outcome :reason])) label)
               (is (= 1 (count (get-in run [:step-runs "validate-implementation-blocker" :attempts]))) label)
               (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts]))) label)

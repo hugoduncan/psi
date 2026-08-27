@@ -240,6 +240,18 @@
           (recur (rest remaining) complete-blocks))
         (peek complete-blocks)))))
 
+(defn final-complete-block-appended?
+  "True when `content` preserves `before-content` and appends a complete authored
+   block after it. This proves a blocked pass produced a fresh record instead of
+   reusing a record from an earlier attempt."
+  [before-content content start-delimiter field-prefixes end-delimiter]
+  (and (string? before-content)
+       (string? content)
+       (str/starts-with? content before-content)
+       (some? (parse-final-complete-block
+               (subs content (count before-content))
+               start-delimiter field-prefixes end-delimiter))))
+
 (defn- route-token? [value]
   (and (string? value)
        (boolean (re-matches route-token-pattern value))))

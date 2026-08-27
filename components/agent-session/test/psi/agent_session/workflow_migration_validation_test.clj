@@ -190,11 +190,11 @@
                                "IMPLEMENTATION_BLOCKED"]}
              (select-keys (get-in implement-pass [:judge :args])
                           [:marker-label :allowed-routes])))
-      (is (= {"MORE_WORK_REMAINS" {:goto "implement-pass" :max-iterations 20}
+      (is (= {"MORE_WORK_REMAINS" {:goto "capture-implementation-before-pass" :max-iterations 20}
               "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"}
               "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}
              (:on implement-pass)))
-      (is (= "workflow/final-complete-block-routing"
+      (is (= "workflow/fresh-final-complete-block-routing"
              (get-in blocker-validation [:judge :operation])))
       (is (= {"DONE" {:goto "final-summary-blocked"}}
              (:on blocker-validation)))

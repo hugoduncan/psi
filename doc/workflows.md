@@ -984,10 +984,11 @@ to the task's `implementation.md` before returning
 <!-- IMPLEMENTATION_BLOCKER: END -->
 ```
 
-The blocked route deterministically validates that a complete record exists;
-missing or malformed records fail rather than producing an invented handback.
-When several attempts exist, summaries use the final complete record in file
-order. Its standalone blocked handback reports that record, completed work, and
+The blocked route captures `implementation.md` before every implementation pass
+and deterministically validates that the current blocked pass appended a complete
+record. Missing, malformed, or stale records from an earlier attempt fail rather
+than producing an invented handback. When several attempts exist, summaries use
+the final complete record in file order. Its standalone blocked handback reports that record, completed work, and
 verification, then directs the human to resolve the action and freshly invoke
 `implement-task`. The normal and blocked terminal summaries export exactly one
 branch-matching `IMPLEMENTATION_STATUS` marker.

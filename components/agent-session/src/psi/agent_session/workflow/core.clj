@@ -182,6 +182,45 @@
            :message "Required complete artifact block is missing"
            :details {:task-path task-path :artifact artifact}})))))
 
+(defn task-artifact-content-read
+  "Read a task artifact as an invoke-step value for authored workflow policy."
+  [{:keys [args ctx parent-session-id session-id]}]
+  (let [{:keys [task-path artifact]} args
+        task-dir (routing/normalize-open-task-path task-path)
+        content (when task-dir
+                  (:psi.munera/task-artifact-content
+                   (resolvers/query-in
+                    ctx
+                    [:psi.munera/task-artifact-content]
+                    {:psi.agent-session/session-id (or parent-session-id session-id)
+                     :psi.munera/task-path task-dir
+                     :psi.munera/artifact-name artifact})))]
+    {:status :ok :data content :summary "DONE"}))
+
+(defn fresh-final-complete-block-routing
+  "Require a complete authored block newly appended since the captured artifact."
+  [{:keys [args ctx parent-session-id session-id]}]
+  (let [{:keys [before-content] :as args} args
+        result (final-complete-block-routing {:args (dissoc args :before-content)
+                                              :ctx ctx
+                                              :parent-session-id parent-session-id
+                                              :session-id session-id})]
+    (if (and (= :ok (:status result))
+             (routing/final-complete-block-appended?
+              before-content
+              (get-in (resolvers/query-in
+                       ctx [:psi.munera/task-artifact-content]
+                       {:psi.agent-session/session-id (or parent-session-id session-id)
+                        :psi.munera/task-path (routing/normalize-open-task-path (:task-path args))
+                        :psi.munera/artifact-name (:artifact args)})
+                      [:psi.munera/task-artifact-content])
+              (:start-delimiter args) (:field-prefixes args) (:end-delimiter args)))
+      result
+      {:status :error
+       :reason :missing-fresh-final-complete-block
+       :message "Required complete artifact block was not newly appended"
+       :details {:task-path (:task-path args) :artifact (:artifact args)}})))
+
 (defn- register-built-in-deterministic-operations!
   [api]
   (when-let [register-operation (:register-operation api)]
@@ -220,7 +259,15 @@
     (register-operation
      {:id "workflow/final-complete-block-routing"
       :description "Deterministically require the final complete authored block in a task artifact."
-      :handler final-complete-block-routing})))
+      :handler final-complete-block-routing})
+    (register-operation
+     {:id "workflow/task-artifact-content-read"
+      :description "Read a task artifact for authored workflow policy."
+      :handler task-artifact-content-read})
+    (register-operation
+     {:id "workflow/fresh-final-complete-block-routing"
+      :description "Deterministically require a complete authored block newly appended since a captured artifact."
+      :handler fresh-final-complete-block-routing})))
 
 (declare refresh-widgets!)
 

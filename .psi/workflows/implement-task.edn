@@ -1,6 +1,11 @@
 {:terminal-contract {:handoff {:type :markdown-handoff-data}},
  :steps
- [{:name "implement-pass",
+ [{:name "capture-implementation-before-pass",
+   :type :invoke,
+   :operation "workflow/task-artifact-content-read",
+   :args {:task-path {:from :workflow-input, :path [:input]}
+          :artifact "implementation.md"}}
+  {:name "implement-pass",
    :type :session,
    :prompt-workflow "implement-task-implement-pass.md",
    :session-profile :implementing,
@@ -13,7 +18,7 @@
                             "IMPLEMENTATION_COMPLETE"
                             "IMPLEMENTATION_BLOCKED"]}},
    :on
-   {"MORE_WORK_REMAINS" {:goto "implement-pass", :max-iterations 20},
+   {"MORE_WORK_REMAINS" {:goto "capture-implementation-before-pass", :max-iterations 20},
     "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"},
     "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}}
   {:name "validate-implementation-blocker",
@@ -22,9 +27,10 @@
    :args {:route "DONE"},
    :judge
    {:type :invoke,
-    :operation "workflow/final-complete-block-routing",
+    :operation "workflow/fresh-final-complete-block-routing",
     :args {:task-path {:from :workflow-input, :path [:input]},
            :artifact "implementation.md",
+           :before-content {:from {:step "capture-implementation-before-pass", :output :data}},
            :start-delimiter "<!-- IMPLEMENTATION_BLOCKER: START -->",
            :field-prefixes ["- blocker: " "- required-human-action: "],
            :end-delimiter "<!-- IMPLEMENTATION_BLOCKER: END -->",
