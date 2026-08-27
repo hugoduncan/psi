@@ -41,4 +41,4 @@ No implementation has started. The existing implementation loop currently recogn
 
 - 2026-08-24 blocker-record validation and documentation: added generic `workflow/final-complete-block-routing`, a resolver-backed gate whose caller authors delimiters, field prefixes, and valid route. `implement-task` now validates `implementation.md` after `IMPLEMENTATION_BLOCKED` and before its handback; the parser selects only the final syntactically complete two-field record and fails absent/incomplete records. State-based operation proof uses real task-artifact resolution; routing, migration, standalone, lifecycle, definition, and review-step focused tests passed, as did clj-kondo. `doc/workflows.md` now documents blocker storage, terminal export, and lifecycle stopping. Generic loop semantics and `workflow/pass-status-routing` remain unchanged. Committed as `4fd82c8ca ⚒ Validate blocked implementation handbacks`.
 
-- added 1 step to be addressed
+- addressed 1 review step: removed the trailing blank lines from `workflow_implementation_routing_test.clj`; `git diff --check` passes.

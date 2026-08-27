@@ -199,5 +199,3 @@
                  (get-in run [:step-runs "implement-pass" :attempts 0 :judge-output :routing-result])))
           (is (= {:status :ok :data "IMPLEMENTATION_COMPLETE" :summary "IMPLEMENTATION_COMPLETE"}
                  (get-in run [:step-runs "implement-pass" :attempts 1 :judge-output :routing-result]))))))))
-
-
