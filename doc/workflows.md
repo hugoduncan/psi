@@ -77,7 +77,6 @@ The current remaining deferred-migration markdown wrappers are:
 - `gh-issue-create-worktree.md`
 - `gh-issue-push-intent.md`
 - `gh-issue-task-intent.md`
-- `implement-task-in-worktree.md`
 
 Those files still begin with legacy EDN workflow maps and are intentionally
 tracked by the repo-corpus validation test as outstanding migration blockers,
@@ -993,8 +992,9 @@ verification, then directs the human to resolve the action and freshly invoke
 `implement-task`. The normal and blocked terminal summaries export exactly one
 branch-matching `IMPLEMENTATION_STATUS` marker.
 
-Every workflow caller gates the delegated terminal export before its normal
-downstream work. `task-lifecycle` advances to `review-task-implementation` only
+`implement-task-in-worktree` is a loadable multi-step `.edn` wrapper that first
+resolves the handed-off worktree, then delegates implementation. Every workflow
+caller gates the delegated terminal export before its normal downstream work. `task-lifecycle` advances to `review-task-implementation` only
 for `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE`; its blocked handback
 preserves the final blocker record and requires fresh `task-lifecycle` invocation.
 `implement-task-in-worktree` likewise routes blocked output to its own handback

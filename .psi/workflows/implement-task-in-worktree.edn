@@ -1,9 +1,7 @@
----
-name: implement-task-in-worktree
-description: Resolve worktree from a structured handoff, then implement a Munera task via the implement-task workflow
-advertise: false
----
-{:terminal-contract {:handoff {:type :markdown-handoff-data}}
+{:name "implement-task-in-worktree"
+ :description "Resolve worktree from a structured handoff, then implement a Munera task via the implement-task workflow"
+ :advertise false
+ :terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "resolve-worktree"
           :type :session
           :tools ["read" "bash" "work-on"]
@@ -60,11 +58,3 @@ advertise: false
                   :operation "workflow/constant-routing"
                   :args {:route "DONE"}}
           :on {"DONE" {:goto :done}}}]}
-
-Wraps `implement-task` for pipeline use where the input is a structured handoff blob containing `worktree_path:` and `munera_task_path:` fields.
-
-Step 1 extracts the worktree path, calls `work-on` to set the session worktree, and emits the plain task path. Step 2 delegates to `implement-task` which inherits the resolved worktree. Step 3 produces a user-facing summary.
-
-Input shape: `{:input "structured-handoff-text-containing-worktree_path-and-munera_task_path"}`
-
-For interactive use where you're already in the right worktree, use `implement-task` directly.

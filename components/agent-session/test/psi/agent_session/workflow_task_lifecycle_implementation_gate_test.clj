@@ -106,6 +106,10 @@
                      %)
                   steps))))
 
+(defn- checked-in-implement-task-in-worktree-definition
+  [worktree]
+  (checked-in-workflow-definition worktree "implement-task-in-worktree"))
+
 (defn- register-definitions!
   [ctx implementation-status]
   (let [definitions [(child-definition "implement-task-proof" implementation-status)
@@ -368,17 +372,55 @@
         [result (workflow-runtime/workflow-run-in @(:state* ctx) (str caller-name "-blocked"))]))))
 
 (deftest implementation-blocked-stops-other-caller-downstream-work-test
-  ;; Tests caller status gates stop their normal summaries, validation, and review
-  ;; paths when the delegated implementation handback is explicitly blocked.
+  ;; Tests caller status gates stop validation and review paths when the
+  ;; delegated implementation handback is explicitly blocked.
   (doseq [[caller-name downstream-step]
-          [["implement-task-in-worktree-proof" "summary"]
-           ["reduce-architectural-complexity-proof" "validation-capture"]
+          [["reduce-architectural-complexity-proof" "validation-capture"]
            ["reduce-incidental-complexity-proof" "review-task-implementation"]]]
     (let [[result run] (execute-implementation-caller! caller-name downstream-step)]
       (is (= :completed (:status result)) caller-name)
       (is (= "implementation-blocked" (get-in run [:terminal-outcome :step-id])) caller-name)
       (is (= 1 (count (get-in run [:step-runs "implementation-blocked" :attempts]))) caller-name)
       (is (zero? (count (get-in run [:step-runs downstream-step :attempts]))) caller-name))))
+
+(deftest checked-in-implement-task-in-worktree-blocked-route-test
+  ;; Tests the loadable checked-in wrapper routes its delegated blocked export
+  ;; only to the wrapper handback, never to its normal summary.
+  (let [[ctx session-id] (support/create-session-context {:persist? false})
+        source-worktree (System/getProperty "user.dir")
+        wrapper (checked-in-implement-task-in-worktree-definition source-worktree)
+        implement-task (child-definition "implement-task"
+                                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+        run-id "checked-in-implement-task-in-worktree-blocked"]
+    (register-routing-ops! ctx)
+    (swap! (:state* ctx)
+           (fn [state]
+             (reduce (fn [next-state definition]
+                       (first (workflow-registry/register-definition next-state definition)))
+                     state
+                     [implement-task wrapper])))
+    (create-lifecycle-run! ctx wrapper run-id {:input "worktree_path: /tmp/worktree\nmunera_task_path: munera/open/256-task"})
+    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                  (fn [_ctx _child-session-id prompt]
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :text
+                                 :text (cond
+                                         (.contains prompt "Extract the worktree path")
+                                         "munera/open/256-task"
+
+                                         (.contains prompt "Produce the user-facing blocked handback")
+                                         "wrapper blocked handback"
+
+                                         :else prompt)}]
+                      :stop-reason :stop}})]
+      (let [result (workflow-execution/execute-run! ctx session-id run-id)
+            run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+        (is (= :completed (:status result)) (pr-str run))
+        (is (= "summary-implementation-blocked"
+               (get-in run [:terminal-outcome :step-id])))
+        (is (= 1 (count (get-in run [:step-runs "summary-implementation-blocked" :attempts]))))
+        (is (zero? (count (get-in run [:step-runs "summary" :attempts]))))))))
 
 (deftest invalid-exported-implementation-statuses-fail-before-lifecycle-branches-test
   ;; Tests malformed, duplicate, missing, and unsupported delegate exports do

@@ -22,6 +22,7 @@
     "prompt-build"
     "lambda-build"
     "implement-task"
+    "implement-task-in-worktree"
     "review-step"})
 
 (defn- path->workflow-name
@@ -136,8 +137,7 @@
               "gh-bug-reproduce"
               "gh-issue-create-worktree"
               "gh-issue-push-intent"
-              "gh-issue-task-intent"
-              "implement-task-in-worktree"]
+              "gh-issue-task-intent"]
              edn-bodied-md-names)
           (str "EDN-bodied markdown blockers drifted: " (pr-str edn-bodied-md-names))))))
 
