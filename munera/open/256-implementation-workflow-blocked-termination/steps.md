@@ -11,10 +11,12 @@
 
 ## Slice 2 — Standalone implement-task routing and terminal handbacks
 
-- [ ] Update `.psi/workflows/implement-task.edn` so `implement-pass` uses `workflow/exact-marker-routing` for the three authored raw routes, preserving the 20-pass `MORE_WORK_REMAINS` loop and normal completion destination.
-- [ ] Split the terminal summaries into explicit normal and blocked steps; make each inspect the task artifacts and end with exactly one matching column-zero `IMPLEMENTATION_STATUS` line.
-- [ ] Define the blocked summary contract to select and reproduce the last complete `IMPLEMENTATION_BLOCKER` block's `blocker` and `required-human-action`, report completed work and verification, distinguish blocked from completed, and require resolution plus fresh re-invocation.
-- [ ] Extend loader/definition tests to prove the three-route table, separate terminal branches, branch-specific exported statuses, and summary blocker-selection instructions.
+- [x] Update `.psi/workflows/implement-task.edn` so `implement-pass` uses `workflow/exact-marker-routing` for the three authored raw routes, preserving the 20-pass `MORE_WORK_REMAINS` loop and normal completion destination.
+- [x] Split the terminal summaries into explicit normal and blocked steps; make each inspect the task artifacts and end with exactly one matching column-zero `IMPLEMENTATION_STATUS` line.
+- [x] Define the blocked summary contract to select and reproduce the last complete `IMPLEMENTATION_BLOCKER` block's `blocker` and `required-human-action`, report completed work and verification, distinguish blocked from completed, and require resolution plus fresh re-invocation.
+- [x] Extend loader/definition tests to prove the three-route table, separate terminal branches, branch-specific exported statuses, and summary blocker-selection instructions.
+  - `bb clojure:test:scry --namespace psi.agent-session.workflow-migration-validation-test` — 7 tests, 49 assertions passed.
+  - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_migration_validation_test.clj` — no findings.
 - [ ] Extend execution-routing tests to prove valid repeat, completion, and blocked outcomes; blocked does not re-enter `implement-pass`; malformed, duplicated, and unsupported markers fail; and the repeat limit remains bounded.
 - [ ] Add observable execution tests with multiple complete and malformed/incomplete blocker blocks to prove the final complete record alone is summarized and absent valid records do not yield an invented blocked handback.
 - [ ] Add terminal-result tests that declare terminal steps in a non-authoritative order and prove `:terminal-outcome :step-id` projects the executed normal or blocked summary for standalone output and delegated yielded text.

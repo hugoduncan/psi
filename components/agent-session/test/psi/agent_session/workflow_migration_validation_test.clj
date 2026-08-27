@@ -2,6 +2,7 @@
   "Validate the checked-in workflow corpus against the finalized file-kind
    split contract for `.psi/workflows/`."
   (:require
+   [clojure.edn :as edn]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
@@ -170,3 +171,33 @@
              (.indexOf prompt "PASS_STATUS: IMPLEMENTATION_BLOCKED")))
       (is (str/includes? prompt
                          "append the complete `IMPLEMENTATION_BLOCKER` block above before emitting that final status line")))))
+
+(deftest implement-task-definition-declares-three-authored-terminal-routes-test
+  ;; Tests the checked-in workflow definition keeps blocked policy authored.
+  (testing "implement-task uses exact marker routing and distinct branch summaries"
+    (let [workflow (edn/read-string (slurp ".psi/workflows/implement-task.edn"))
+          steps (:steps workflow)
+          step-by-name (into {} (map (juxt :name identity)) steps)
+          implement-pass (get step-by-name "implement-pass")
+          complete-summary (get step-by-name "final-summary-complete")
+          blocked-summary (get step-by-name "final-summary-blocked")
+          blocked-prompt (get-in blocked-summary [:contributions 2 :text])]
+      (is (= "workflow/exact-marker-routing" (get-in implement-pass [:judge :operation])))
+      (is (= {:marker-label "PASS_STATUS"
+              :allowed-routes ["MORE_WORK_REMAINS"
+                               "IMPLEMENTATION_COMPLETE"
+                               "IMPLEMENTATION_BLOCKED"]}
+             (select-keys (get-in implement-pass [:judge :args])
+                          [:marker-label :allowed-routes])))
+      (is (= {"MORE_WORK_REMAINS" {:goto "implement-pass" :max-iterations 20}
+              "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"}
+              "IMPLEMENTATION_BLOCKED" {:goto "final-summary-blocked"}}
+             (:on implement-pass)))
+      (is (some? complete-summary))
+      (is (some? blocked-summary))
+      (is (str/includes? (get-in complete-summary [:contributions 2 :text])
+                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"))
+      (is (str/includes? blocked-prompt
+                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
+      (is (str/includes? blocked-prompt "last complete record in file order"))
+      (is (str/includes? blocked-prompt "fail rather than inventing a blocker")))))
