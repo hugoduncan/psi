@@ -26,7 +26,8 @@
   - `bb clojure:test --focus psi.agent-session.workflow-review-step-routing-test` — 13 tests, 122 assertions passed.
   - `bb clojure:test --focus psi.agent-session.workflow-migration-validation-test` — 7 tests, 49 assertions passed.
   - `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_review_step_routing_test.clj` — no findings.
-- [ ] Commit the Slice 2 workflow and proof changes without staging unrelated worktree changes.
+- [x] Commit the Slice 2 workflow and proof changes without staging unrelated worktree changes.
+  - `67dc1df04 ⚒ Prove blocked implementation marker failures` and the focused standalone routing proof added in this pass.
 
 ## Slice 3 — Task-lifecycle implementation gate
 
