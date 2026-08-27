@@ -63,3 +63,4 @@
 ## Implementation review follow-up
 
 - [x] Remove the extra trailing blank line from `components/agent-session/test/psi/agent_session/workflow_implementation_routing_test.clj` so the task diff passes `git diff --check`.
+- [ ] Reject whitespace-only `IMPLEMENTATION_BLOCKER` field values in `workflow/final-complete-block-routing` and its parser, so the required non-empty `blocker` and `required-human-action` contract cannot validate a blank handback.
