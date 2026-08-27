@@ -14,7 +14,10 @@ No implementation has started. The existing implementation loop currently recogn
 - no architectural review feedback
 - no ambiguity review feedback
 - no inconsistency review feedback
+- Blocker-record validation needs an explicit deterministic seam before either blocked summary: status-only `workflow/exact-marker-routing` cannot validate `implementation.md`. Keep record syntax/policy authored, fail missing or malformed records rather than synthesizing a handback, and distinguish that failure from authored `IMPLEMENTATION_BLOCKED`; inspect `components/agent-session/src/psi/agent_session/workflow/routing.clj` and `.psi/workflows/implement-task.edn`.
 
 - Follow-up implementation seam: retain generic routing/terminal projection; confine the new status vocabulary and branch topology to `.psi/workflows/implement-task.edn` and `task-lifecycle.edn`. Runtime touchpoints are `components/agent-session/src/psi/agent_session/workflow/routing.clj` and `workflow_execution.clj`; definition validation coverage is in `components/agent-session/test/psi/agent_session/workflow_migration_validation_test.clj`.
 - ambiguity review added 1 new design step
 - no inconsistency review feedback
+
+- 2026-08-24 plan-review follow-up: the confidently identified immediately preceding review batch is `3da18f361..0d03bc83e`, with baseline `6fecb083`. Its task-scoped `steps.md` diff adds no checklist lines, so there are no attributable current unchecked follow-ups to execute; pre-existing Slice 1–4 items remain untouched.
