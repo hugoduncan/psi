@@ -18,7 +18,7 @@ This should follow the established task-lifecycle scope-question pattern: preser
 - The blocked summary must inspect the specific task artifacts, clearly say implementation stopped blocked rather than completed, present the recorded blocker and required human decision/action, identify completed work and verification, and explain that a later re-invocation is required after the blocker is resolved.
 - Preserve the existing `MORE_WORK_REMAINS → REPEAT` loop limit and `IMPLEMENTATION_COMPLETE →` normal final-summary behavior.
 - Make the terminal result exposed by a standalone blocked `implement-task` invocation be the blocked handback summary, not an empty result or a normal completion summary.
-- Add a deterministic task-lifecycle gate immediately after its `implement-task` delegate step. It must route the implementation workflow's yielded status so `IMPLEMENTATION_COMPLETE` alone proceeds to `review-task-implementation`; `IMPLEMENTATION_BLOCKED` routes to a dedicated lifecycle blocked handback.
+- Add a deterministic task-lifecycle gate immediately after its `implement-task` delegate step. It must route the implementation workflow's terminal status so `IMPLEMENTATION_COMPLETE` alone proceeds to `review-task-implementation`; `IMPLEMENTATION_BLOCKED` routes to a dedicated lifecycle blocked handback.
 - The lifecycle blocked handback must stop before implementation review and `extract-task-knowledge`, preserve and summarize the recorded blocker, and tell the human how to resolve it and re-invoke the lifecycle.
 - Update the workflow definition/load and runtime-routing proofs for all three implementation outcomes, including that the blocked route does not start a second implementation pass, review, or extraction.
 - Update workflow documentation if it documents `implement-task` or the task-lifecycle implementation-stage contract.
@@ -33,24 +33,35 @@ This should follow the established task-lifecycle scope-question pattern: preser
 
 ## Design decisions
 
-- `IMPLEMENTATION_BLOCKED` is authored workflow policy parsed through the existing generic `workflow/pass-status-routing` operation, rather than a new generic routing operation.
-- The canonical durable blocker record is `implementation.md`, because it captures in-flight implementation discoveries and handoff information. The implementation pass owns writing it before emitting the blocked status.
-- `implement-task` uses a separate blocked final-summary step so the terminal result corresponds to the route actually taken. Place it after the normal final summary in step order if the runtime's standalone result projection selects the last executed terminal step; verify the chosen ordering against the current result projection rather than relying on step order accidentally.
-- The lifecycle gate is deterministic and reads only the yielded implementation status through the existing pass-status router. It must be placed before `review-task-implementation`, preserving the one-way stage boundary.
-- A blocked implementation is a clean authored handback, not a failed or runtime-`:blocked` workflow run. It remains distinguishable from successful implementation through its explicit status and summary.
+- `IMPLEMENTATION_BLOCKED` is authored workflow policy. `implement-pass` is judged by the existing generic `workflow/exact-marker-routing` with `:marker-label "PASS_STATUS"` and exactly the three workflow-owned allowed routes `MORE_WORK_REMAINS`, `IMPLEMENTATION_COMPLETE`, and `IMPLEMENTATION_BLOCKED`. Its authored routing table maps those raw routes respectively to the bounded repeat, normal summary, and blocked summary. This replaces use of the two-route `workflow/pass-status-routing` at this step; that operation remains unchanged for its existing DONE/REPEAT status families.
+- The implementation pass owns the durable blocker record and writes it before emitting `PASS_STATUS: IMPLEMENTATION_BLOCKED`. It appends one complete, exact block to `implementation.md`:
+
+  ```text
+  <!-- IMPLEMENTATION_BLOCKER: START -->
+  - blocker: <concise concrete blocker>
+  - required-human-action: <safe action or decision>
+  <!-- IMPLEMENTATION_BLOCKER: END -->
+  ```
+
+  Both field values are required and non-empty. When earlier blocked attempts exist, the current blocker is the last complete such block in file order; incomplete or malformed blocks are not a blocker record and must not be summarized as one. Both blocked summaries read that final complete block and reproduce its two fields rather than inferring a blocker from surrounding prose.
+- Both terminal summaries are explicit terminal steps. The runtime records the actual terminal outcome (`:terminal-outcome :step-id`) and projects that step's yielded text, so the standalone result and terminal contract select the summary on the route taken rather than the last declared step. The normal and blocked summaries therefore may be separate authored branches without depending on declaration order.
+- Each `implement-task` terminal summary ends with exactly one column-zero `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE` or `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED` line matching its branch. That terminal summary is the outer workflow's yielded text: a lifecycle delegate receives it at `{:from {:step "implement-task" :yield :text}}`. The lifecycle gate uses the existing generic `workflow/exact-marker-routing` with `:marker-label "IMPLEMENTATION_STATUS"` and exactly those two allowed routes; its authored routing table alone determines completion-to-review versus blocked handback. `MORE_WORK_REMAINS` is internal to `implement-task` and is never exported to the lifecycle.
+- The lifecycle gate is deterministic and is placed before `review-task-implementation`, preserving the one-way stage boundary.
+- A blocked implementation is a clean authored handback, not a failed or runtime-`:blocked` workflow run. It remains distinguishable from successful implementation through its explicit terminal status and summary.
 
 ## Acceptance criteria
 
-1. The implementation-pass prompt documents exactly three permitted final `PASS_STATUS` values: `MORE_WORK_REMAINS`, `IMPLEMENTATION_COMPLETE`, and `IMPLEMENTATION_BLOCKED`, and defines the artifact-recording obligation for the blocked value.
-2. A valid `IMPLEMENTATION_BLOCKED` reply routes `implement-task` to its blocked handback without re-entering `implement-pass`; the workflow completes with a user-facing blocked summary.
+1. The implementation-pass prompt documents exactly three permitted final `PASS_STATUS` values: `MORE_WORK_REMAINS`, `IMPLEMENTATION_COMPLETE`, and `IMPLEMENTATION_BLOCKED`; it defines the required blocker block for the blocked value.
+2. `implement-pass` uses generic exact-marker routing with those three authored routes. A valid `IMPLEMENTATION_BLOCKED` reply routes `implement-task` to its blocked handback without re-entering `implement-pass`; malformed, duplicated, or unsupported status markers fail rather than becoming a blocker.
 3. Existing valid completion and repeat replies retain their current routing behavior and bounded repeat limit.
-4. A standalone blocked implementation run returns the blocked handback text as its terminal result.
-5. In `task-lifecycle`, only `IMPLEMENTATION_COMPLETE` advances from implementation to implementation review; an `IMPLEMENTATION_BLOCKED` yield reaches the lifecycle blocked handback instead.
-6. The lifecycle blocked route does not invoke implementation review or knowledge extraction and explicitly explains the required human resolution and later re-invocation.
-7. Workflow loader/definition tests and execution-routing tests prove all three statuses, malformed-status rejection, and the no-review/no-extraction blocked boundary using observable workflow state/outputs rather than interaction-only assertions.
-8. Relevant user-facing workflow documentation agrees with the authored status and lifecycle behavior.
+4. A standalone blocked implementation run projects the blocked handback text from the recorded terminal outcome; a normal run projects the normal summary, independent of terminal-step declaration order.
+5. Every blocked attempt appends a complete two-field `IMPLEMENTATION_BLOCKER` record. The blocked summaries select the last complete record only and present its `blocker` and `required-human-action` fields.
+6. In `task-lifecycle`, the post-delegate exact-marker gate reads `IMPLEMENTATION_STATUS` from `implement-task`'s yielded terminal summary. Only `IMPLEMENTATION_COMPLETE` advances from implementation to implementation review; `IMPLEMENTATION_BLOCKED` reaches the lifecycle blocked handback instead.
+7. The lifecycle blocked route does not invoke implementation review or knowledge extraction and explicitly explains the required human resolution and later re-invocation.
+8. Workflow loader/definition tests and execution-routing tests prove all three pass statuses, malformed-status rejection, branch-specific terminal projection, exported terminal statuses, latest blocker-record selection, and the no-review/no-extraction blocked boundary using observable workflow state/outputs rather than interaction-only assertions.
+9. Relevant user-facing workflow documentation agrees with the authored status, blocker-record, terminal-export, and lifecycle behavior.
 
 ## Risks and open questions
 
-- The current standalone-result projection may select the last declared step rather than the last executed step; implementation must inspect and prove the actual projection behavior so the blocked handback is visible.
-- The exact wording/format for a blocker in `implementation.md` should be concise but must be sufficiently structured for the final summaries to identify it reliably without heuristic invention. Resolve this during planning by following existing task-artifact conventions.
+- The implementation must prove the existing `:terminal-outcome :step-id` projection on both branches, including through delegation, rather than relying on step declaration order.
+- The summaries must reject an absent or malformed final blocker record as invalid workflow output; they must not invent a handback from unrelated `implementation.md` prose.
