@@ -248,7 +248,6 @@
         implement-task (checked-in-implement-task-definition source-worktree)
         run-id (str "checked-in-lifecycle-" (name outcome))
         task-path "munera/open/256-implementation-workflow-blocked-termination"
-        reply-number* (atom 0)
         definitions [(child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
                      (child-definition "create-task-plan" "plan created")
                      (child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
@@ -266,9 +265,8 @@
     (create-lifecycle-run! ctx lifecycle run-id {:input task-path})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
-        (let [reply-number (swap! reply-number* inc)
-              text (cond
-                     (= 4 reply-number)
+        (let [text (cond
+                     (.contains prompt "Execute the next concrete implementation slice for the task.")
                      (do (when (= :blocked outcome)
                            (spit (str worktree "/" task-path "/implementation.md")
                                  (str "initial notes\n" (implementation-blocker-record))))

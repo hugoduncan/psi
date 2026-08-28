@@ -154,4 +154,5 @@
 
 ## Test review follow-up
 
-- [ ] Replace the `reply-number = 4` response dispatch in `execute-checked-in-lifecycle-with-implement-task!` with a locally comprehensible prompt or step-identity match. The integration test currently assumes exactly three upstream prompt executions precede `implement-pass`, so an unrelated lifecycle-stage insertion or retry can feed an implementation status to the wrong session and fail for incidental call order rather than the blocked/completed delegation contract.
+- [x] Replace the `reply-number = 4` response dispatch in `execute-checked-in-lifecycle-with-implement-task!` with a locally comprehensible prompt or step-identity match. The integration test currently assumes exactly three upstream prompt executions precede `implement-pass`, so an unrelated lifecycle-stage insertion or retry can feed an implementation status to the wrong session and fail for incidental call order rather than the blocked/completed delegation contract.
+  - Response dispatch now matches the implementation-pass procedure text rather than global prompt ordinal. Focused Scry: 12 tests, 141 assertions passed; clj-kondo and `git diff --check` passed.
