@@ -550,8 +550,10 @@
   (let [[ctx session-id] (support/create-session-context {:persist? false})
         source-worktree (System/getProperty "user.dir")
         definition (checked-in-gh-issue-implement-gate-definition source-worktree)
-        wrapper (child-definition "implement-task-in-worktree"
-                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+        blocked-yield (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                           "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                           "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+        wrapper (child-definition "implement-task-in-worktree" blocked-yield)
         review (child-definition "review-implementation-in-worktree" "review ran")
         builder (child-definition "builder" "push ran")
         run-id "checked-in-gh-issue-implement-blocked"]
@@ -568,18 +570,86 @@
                     {:execution-result/assistant-message
                      {:role "assistant"
                       :content [{:type :text
-                                 :text (if (.contains prompt "Produce the user-facing blocked handback")
-                                         "outer blocked handback"
-                                         prompt)}]
+                                 :text (if (= blocked-yield prompt)
+                                         prompt
+                                         (str "outer blocked handback\n"
+                                              "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))}]
                       :stop-reason :stop}})]
       (let [result (workflow-execution/execute-run! ctx session-id run-id)
             run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
         (is (= :completed (:status result)) (pr-str run))
         (is (= "implementation-blocked" (get-in run [:terminal-outcome :step-id])))
         (is (= 1 (count (get-in run [:step-runs "implementation-blocked" :attempts]))))
+        (is (= (str "outer blocked handback\n"
+                    "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                    "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                    "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+               (get-in run [:step-runs "implementation-blocked"
+                            :accepted-result :outputs :final-llm-reply])))
         (is (zero? (count (get-in run [:step-runs "review" :attempts]))))
         (is (zero? (count (get-in run [:step-runs "push" :attempts]))))
         (is (zero? (count (get-in run [:step-runs "edit-labels" :attempts]))))))))
+
+(deftest checked-in-gh-issue-implement-invalid-blocked-handbacks-fail-test
+  ;; Tests the checked-in outer blocked step rejects invalid exports while
+  ;; review, push, and label editing remain unreachable.
+  (doseq [[label handback reason]
+          [["missing status"
+            (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action")
+            :missing-route-marker]
+           ["malformed status"
+            (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                 "IMPLEMENTATION_STATUS:IMPLEMENTATION_BLOCKED")
+            :malformed-route-marker]
+           ["duplicate blocker"
+            (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+            :ambiguous-route-field]
+           ["snapshot mismatch"
+            (str "IMPLEMENTATION_BLOCKER: changed blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+            :mismatched-route-field]]]
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          source-worktree (System/getProperty "user.dir")
+          definition (checked-in-gh-issue-implement-gate-definition source-worktree)
+          blocked-yield (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                             "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                             "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+          wrapper (child-definition "implement-task-in-worktree" blocked-yield)
+          review (child-definition "review-implementation-in-worktree" "review ran")
+          builder (child-definition "builder" "push ran")
+          run-id (str "checked-in-gh-issue-implement-invalid-" label)]
+      (register-routing-ops! ctx)
+      (swap! (:state* ctx)
+             (fn [state]
+               (reduce (fn [next-state child-definition]
+                         (first (workflow-registry/register-definition next-state child-definition)))
+                       state
+                       [wrapper review builder definition])))
+      (create-lifecycle-run! ctx definition run-id {})
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx _child-session-id prompt]
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text
+                                   :text (if (= blocked-yield prompt)
+                                           prompt
+                                           handback)}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id run-id)
+              run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+          (is (= :failed (:status result)) label)
+          (is (= reason (get-in run [:terminal-outcome :reason])) label)
+          (is (zero? (count (get-in run [:step-runs "review" :attempts]))) label)
+          (is (zero? (count (get-in run [:step-runs "push" :attempts]))) label)
+          (is (zero? (count (get-in run [:step-runs "edit-labels" :attempts]))) label))))))
 
 (deftest invalid-exported-implementation-statuses-fail-before-lifecycle-branches-test
   ;; Tests malformed, duplicate, missing, and unsupported delegate exports do

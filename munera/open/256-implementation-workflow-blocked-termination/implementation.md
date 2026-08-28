@@ -43,6 +43,7 @@ No implementation has started. The existing implementation loop currently recogn
 
 - addressed 1 review step: removed the trailing blank lines from `workflow_implementation_routing_test.clj`; `git diff --check` passes.
 - added 1 step to be addressed
+- addressed 1 review step: `gh-issue-implement` now validates and exports the blocked terminal status plus snapshot-matching blocker/action fields; checked-in execution proof covers accepted and invalid outputs while downstream PR work remains skipped.
 - addressed 1 review step: all remaining `implement-task` callers now exact-marker-gate its exported status, route blocked output to terminal handbacks, and have observable proof that blocked output skips normal summary, validation, and implementation review.
 - addressed 1 review step: checked-in `task-lifecycle` now delegates the checked-in `implement-task` in an execution proof for both terminal branches; the lifecycle gate consumes each executed terminal `IMPLEMENTATION_STATUS` and selects the matching branch.
 - addressed 1 review step: fresh blocker validation resolves `implementation.md` once, then derives both final-record validity and append freshness from that same content; focused operation test, clj-kondo, and `git diff --check` pass.
@@ -68,3 +69,4 @@ No implementation has started. The existing implementation loop currently recogn
 - added 1 step to be addressed
 - addressed 1 review step: terminal handback judges now enforce exact branch status and validated blocker/action exports; checked-in standalone and delegated execution proofs assert actual yielded text and reject invalid contracts.
 - added 1 step to be addressed
+- addressed 1 review step: `gh-issue-implement` now validates and exports the blocked terminal status plus snapshot-matching blocker/action fields; checked-in execution proof covers accepted and invalid outputs while downstream PR work remains skipped.
