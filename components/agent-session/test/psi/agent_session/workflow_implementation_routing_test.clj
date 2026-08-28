@@ -4,26 +4,9 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
-   [psi.agent-session.workflow.core :as workflow-core]
-   [psi.deterministic-operation-registry.registry]
-   [psi.workflow-loader.compiler :as workflow-compiler]
-   [psi.workflow-loader.parser :as workflow-parser]
+   [psi.agent-session.workflow-implementation-test-support :as implementation-support]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.terminal-contract :as terminal-contract]))
-
-(defn- register-review-routing-ops!
-  [ctx]
-  (workflow-core/init {:register-operation (fn [operation]
-                                             (psi.deterministic-operation-registry.registry/register-operation-in!
-                                              (:deterministic-operation-registry ctx)
-                                              operation))
-                       :register-tool (fn [_] nil)
-                       :register-command (fn [& _] nil)
-                       :on (fn [& _] nil)
-                       :query (fn [& _] nil)
-                       :query-session (fn [& _] nil)
-                       :mutate (fn [& _] nil)
-                       :mutate-session (fn [& _] nil)}))
 
 (def implement-task-definition
   {:definition-id "implement-task-proof"
@@ -59,33 +42,18 @@
                     :operation "workflow/constant-routing"
                     :args {:route "DONE"}}
             :on {"DONE" {:goto :done}}}]})
-(defn- create-implement-task-run!
-  [ctx definition run-id task-path]
-  (swap! (:state* ctx)
-         (fn [state]
-           (let [[s _ _] (workflow-runtime/create-run state {:definition definition
-                                                             :run-id run-id
-                                                             :workflow-input {:input task-path}})]
-             s))))
-
 (defn- checked-in-implement-task-definition
   [worktree]
-  (let [path (str worktree "/.psi/workflows/implement-task.edn")
-        parsed (workflow-parser/parse-edn-workflow-file (slurp path))
-        {:keys [definition error]} (workflow-compiler/compile-workflow-file
-                                    (assoc parsed :source-path path))]
-    (when error
-      (throw (ex-info "Checked-in implement-task definition did not compile"
-                      {:error error})))
-    ;; The definition is checked in and compiled as production does; this
-    ;; state-based fixture has no project-profile registry, so remove only the
-    ;; environment-dependent session-profile selection before execution.
-    (update definition :steps
-            (fn [steps]
-              (mapv #(if (= "implement-pass" (:name %))
-                       (dissoc % :session-profile)
-                       %)
-                    steps)))))
+  ;; The definition is checked in and compiled as production does; this
+  ;; state-based fixture has no project-profile registry, so remove only the
+  ;; environment-dependent session-profile selection before execution.
+  (update (implementation-support/checked-in-workflow-definition worktree "implement-task")
+          :steps
+          (fn [steps]
+            (mapv #(if (= "implement-pass" (:name %))
+                     (dissoc % :session-profile)
+                     %)
+                  steps))))
 
 (defn- artifact-content
   [block]
@@ -131,8 +99,9 @@
   (testing "IMPLEMENTATION_COMPLETE terminates the implementation loop deterministically"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           prompts* (atom [])]
-      (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx implement-task-definition "run-implement-complete" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
+      (implementation-support/register-routing-ops! ctx)
+      (implementation-support/create-run! ctx implement-task-definition "run-implement-complete"
+                                          {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"})
       (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx child-session-id prompt]
           (swap! prompts* conj {:session-id child-session-id :prompt prompt})
@@ -164,8 +133,9 @@
   (testing "IMPLEMENTATION_BLOCKED reaches the blocked handback"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           prompts* (atom [])]
-      (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx implement-task-definition "run-implement-blocked" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
+      (implementation-support/register-routing-ops! ctx)
+      (implementation-support/create-run! ctx implement-task-definition "run-implement-blocked"
+                                          {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"})
       (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id prompt]
           (swap! prompts* conj prompt)
@@ -201,10 +171,10 @@
          worktree task-path "implementation.md"
          (artifact-content {:blocker "earlier decision"
                             :required-human-action "ignore this record"}))
-        (register-review-routing-ops! ctx)
-        (create-implement-task-run! ctx
-                                    (checked-in-implement-task-definition (System/getProperty "user.dir"))
-                                    run-id task-path)
+        (implementation-support/register-routing-ops! ctx)
+        (implementation-support/create-run! ctx
+                                            (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                            run-id {:input task-path})
         (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id prompt]
             (swap! prompts* conj prompt)
@@ -264,10 +234,10 @@
             content (artifact-content {:blocker "earlier decision"
                                        :required-human-action "ignore this record"})]
         (test-support/write-task-artifact! worktree task-path "implementation.md" content)
-        (register-review-routing-ops! ctx)
-        (create-implement-task-run! ctx
-                                    (checked-in-implement-task-definition (System/getProperty "user.dir"))
-                                    run-id task-path)
+        (implementation-support/register-routing-ops! ctx)
+        (implementation-support/create-run! ctx
+                                            (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                            run-id {:input task-path})
         (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id _prompt]
             {:execution-result/assistant-message
@@ -296,10 +266,10 @@
               run-id (str "checked-in-implement-blocked-" label)
               implementation-path (str worktree "/" task-path "/implementation.md")]
           (test-support/write-task-artifact! worktree task-path "implementation.md" "implementation notes only\n")
-          (register-review-routing-ops! ctx)
-          (create-implement-task-run! ctx
-                                      (checked-in-implement-task-definition (System/getProperty "user.dir"))
-                                      run-id task-path)
+          (implementation-support/register-routing-ops! ctx)
+          (implementation-support/create-run! ctx
+                                              (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                              run-id {:input task-path})
           (test-support/with-workflow-prompt-execution-result [ctx]
             (fn [_ctx _child-session-id prompt]
               (when (and appended-content (implementation-pass-prompt? prompt))
@@ -328,8 +298,9 @@
              ["unsupported" "PASS_STATUS: UNKNOWN_OUTCOME" :unsupported-route-marker]]]
       (let [[ctx session-id] (support/create-session-context {:persist? false})
             run-id (str "run-implement-" label)]
-        (register-review-routing-ops! ctx)
-        (create-implement-task-run! ctx implement-task-definition run-id "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
+        (implementation-support/register-routing-ops! ctx)
+        (implementation-support/create-run! ctx implement-task-definition run-id
+                                            {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"})
         (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id _prompt]
             {:execution-result/assistant-message
@@ -345,8 +316,9 @@
   (testing "the twenty-pass MORE_WORK_REMAINS bound still fails before pass twenty-one"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
           run-id "run-implement-repeat-limit"]
-      (register-review-routing-ops! ctx)
-      (create-implement-task-run! ctx implement-task-definition run-id "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
+      (implementation-support/register-routing-ops! ctx)
+      (implementation-support/create-run! ctx implement-task-definition run-id
+                                          {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"})
       (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id _prompt]
           {:execution-result/assistant-message
@@ -369,10 +341,10 @@
             run-id "checked-in-implement-more-work"
             implementation-pass-count* (atom 0)]
         (test-support/write-task-artifact! worktree task-path "implementation.md" "initial notes\n")
-        (register-review-routing-ops! ctx)
-        (create-implement-task-run! ctx
-                                    (checked-in-implement-task-definition (System/getProperty "user.dir"))
-                                    run-id task-path)
+        (implementation-support/register-routing-ops! ctx)
+        (implementation-support/create-run! ctx
+                                            (checked-in-implement-task-definition (System/getProperty "user.dir"))
+                                            run-id {:input task-path})
         (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id prompt]
             (let [text (case (checked-in-implement-task-prompt-type prompt)
@@ -430,11 +402,11 @@
         (let [task-path "munera/open/230-x"
               run-id (str "checked-in-terminal-" label)]
           (test-support/write-task-artifact! worktree task-path "implementation.md" "notes\n")
-          (register-review-routing-ops! ctx)
-          (create-implement-task-run! ctx
-                                      (checked-in-implement-task-definition
-                                       (System/getProperty "user.dir"))
-                                      run-id task-path)
+          (implementation-support/register-routing-ops! ctx)
+          (implementation-support/create-run! ctx
+                                              (checked-in-implement-task-definition
+                                               (System/getProperty "user.dir"))
+                                              run-id {:input task-path})
           (test-support/with-workflow-prompt-execution-result [ctx]
             (fn [_ctx _child-session-id prompt]
               {:execution-result/assistant-message

@@ -191,4 +191,5 @@
 
 ## Test review follow-up
 
-- [ ] Replace the duplicate routing-operation registration, checked-in workflow compilation, and run-creation fixtures in `workflow_implementation_routing_test.clj` with `workflow-implementation-test-support`. Keep the synthetic implementation topology and response classification local; use the same shared execution-fixture abstraction across all three blocked-workflow execution namespaces to prevent fixture drift.
+- [x] Replace the duplicate routing-operation registration, checked-in workflow compilation, and run-creation fixtures in `workflow_implementation_routing_test.clj` with `workflow-implementation-test-support`. Keep the synthetic implementation topology and response classification local; use the same shared execution-fixture abstraction across all three blocked-workflow execution namespaces to prevent fixture drift.
+  - The implementation-routing namespace now uses shared operation registration, checked-in compilation, and run creation while retaining local synthetic topology and prompt classification. Focused Scry: 9 tests/80 assertions passed; clj-kondo and `git diff --check` passed.
