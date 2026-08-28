@@ -228,11 +228,22 @@
   (let [{:keys [before-content] :as args} args
         result (final-complete-block-routing-result (dissoc args :before-content)
                                                     content)]
-    (if (and (= :ok (:status result))
-             (routing/final-complete-block-appended?
-              before-content content
-              (:start-delimiter args) (:field-prefixes args) (:end-delimiter args)))
+    (cond
+      (= :invalid-final-complete-block-routing-args (:reason result))
       result
+
+      (not (string? before-content))
+      {:status :error
+       :reason :invalid-fresh-final-complete-block-routing-args
+       :message "workflow/fresh-final-complete-block-routing args are invalid"
+       :details {:args args}}
+
+      (routing/final-complete-block-appended?
+       before-content content
+       (:start-delimiter args) (:field-prefixes args) (:end-delimiter args))
+      result
+
+      :else
       {:status :error
        :reason :missing-fresh-final-complete-block
        :message "Required complete artifact block was not newly appended"

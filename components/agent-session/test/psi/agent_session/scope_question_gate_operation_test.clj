@@ -164,7 +164,24 @@
                   args (str before-content block block))]
       (is (= :error (:status result)) (pr-str result))
       (is (= :missing-fresh-final-complete-block (:reason result))
-          (pr-str result)))))
+          (pr-str result))))
+  (testing "base schema validation failures are preserved"
+    (let [args (assoc blocker-routing-args
+                      :task-path " "
+                      :before-content "prior implementation notes\n")
+          result (#'workflow-core/fresh-final-complete-block-routing-result args "")]
+      (is (= :error (:status result)) (pr-str result))
+      (is (= :invalid-final-complete-block-routing-args (:reason result))
+          (pr-str result))))
+  (testing "before-content must be a string"
+    (doseq [before-content [nil 42]]
+      (let [args (assoc blocker-routing-args
+                        :task-path "munera/open/230-x"
+                        :before-content before-content)
+            result (#'workflow-core/fresh-final-complete-block-routing-result args "")]
+        (is (= :error (:status result)) (pr-str result))
+        (is (= :invalid-fresh-final-complete-block-routing-args (:reason result))
+            (pr-str result))))))
 
 (deftest gate-open-on-unchecked-scope-question-test
   ;; AC-1: an unchecked SCOPE_QUESTION halts (open route) and names the concern.
