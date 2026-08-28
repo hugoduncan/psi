@@ -122,3 +122,4 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 review step: final-complete-block field prefixes now reject whitespace-only authored syntax in parser and operation validation.
 - addressed 1 review step: fresh blocker validation now preserves base schema errors and classifies malformed capture content as invalid arguments before freshness checking.
 - added 1 step to be addressed
+- addressed 1 review step: complete blocker-routing schemas now validate before artifact resolution; handler regressions prove malformed arguments perform no resolver reads.

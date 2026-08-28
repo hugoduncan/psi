@@ -31,6 +31,28 @@
    :end-delimiter "<!-- IMPLEMENTATION_BLOCKER: END -->"
    :valid-route "DONE"})
 
+(def ^:private invalid-blocker-routing-overrides
+  [{:task-path ""}
+   {:task-path "   "}
+   {:artifact ""}
+   {:artifact "   "}
+   {:start-delimiter ""}
+   {:start-delimiter "   "}
+   {:end-delimiter ""}
+   {:end-delimiter "   "}
+   {:field-prefixes []}
+   {:field-prefixes ["- blocker: " "- blocker: "]}
+   {:field-prefixes ["" "- required-human-action: "]}
+   {:field-prefixes [" " "- required-human-action: "]}
+   {:field-prefixes ["\t" "- required-human-action: "]}
+   {:output-field-labels []}
+   {:output-field-labels ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_BLOCKER"]}
+   {:output-field-labels ["" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
+   {:output-field-labels ["implementation_blocker"
+                          "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
+   {:valid-route ""}
+   {:valid-route "IMPLEMENTATION BLOCKED"}])
+
 (defn- write-task-artifact!
   [worktree task-dir artifact content]
   (test-support/write-task-artifact! worktree task-dir artifact content))
@@ -107,34 +129,52 @@
 
 (deftest final-complete-block-routing-rejects-ambiguous-schema-test
   ;; The operation rejects schemas that cannot produce exact-marker-compatible fields.
-  (let [base-args (assoc blocker-routing-args :task-path "munera/open/230-x")
-        invalid-overrides [{:task-path ""}
-                           {:task-path "   "}
-                           {:artifact ""}
-                           {:artifact "   "}
-                           {:start-delimiter ""}
-                           {:start-delimiter "   "}
-                           {:end-delimiter ""}
-                           {:end-delimiter "   "}
-                           {:field-prefixes []}
-                           {:field-prefixes ["- blocker: " "- blocker: "]}
-                           {:field-prefixes ["" "- required-human-action: "]}
-                           {:field-prefixes [" " "- required-human-action: "]}
-                           {:field-prefixes ["\t" "- required-human-action: "]}
-                           {:output-field-labels []}
-                           {:output-field-labels ["IMPLEMENTATION_BLOCKER"
-                                                  "IMPLEMENTATION_BLOCKER"]}
-                           {:output-field-labels ["" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
-                           {:output-field-labels ["implementation_blocker"
-                                                  "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
-                           {:valid-route ""}
-                           {:valid-route "IMPLEMENTATION BLOCKED"}]]
-    (doseq [override invalid-overrides]
+  (let [base-args (assoc blocker-routing-args :task-path "munera/open/230-x")]
+    (doseq [override invalid-blocker-routing-overrides]
       (let [result (#'workflow-core/final-complete-block-routing-result
                     (merge base-args override) "")]
         (is (= :error (:status result)) (pr-str override result))
         (is (= :invalid-final-complete-block-routing-args (:reason result))
             (pr-str override result))))))
+
+(deftest complete-block-routing-handlers-validate-before-artifact-read-test
+  ;; Public handlers reject malformed schemas before crossing the resolver boundary.
+  (let [reads (atom [])
+        ctx {:workflow-task-artifact-content-read-fn
+             (fn [& read-args]
+               (swap! reads conj read-args)
+               nil)}
+        invocation {:ctx ctx :session-id "session-1"}]
+    (testing "final block handler rejects every malformed base schema without reading"
+      (doseq [override invalid-blocker-routing-overrides]
+        (let [args (merge blocker-routing-args
+                          {:task-path "munera/open/230-x"}
+                          override)
+              result (workflow-core/final-complete-block-routing
+                      (assoc invocation :args args))]
+          (is (= :invalid-final-complete-block-routing-args (:reason result))
+              (pr-str override result))
+          (is (empty? @reads) (pr-str override @reads)))))
+    (testing "fresh block handler rejects every malformed base schema without reading"
+      (doseq [override invalid-blocker-routing-overrides]
+        (let [args (merge blocker-routing-args
+                          {:task-path "munera/open/230-x"
+                           :before-content "prior implementation notes\n"}
+                          override)
+              result (workflow-core/fresh-final-complete-block-routing
+                      (assoc invocation :args args))]
+          (is (= :invalid-final-complete-block-routing-args (:reason result))
+              (pr-str override result))
+          (is (empty? @reads) (pr-str override @reads)))))
+    (testing "fresh block handler rejects malformed capture content without reading"
+      (let [args (assoc blocker-routing-args
+                        :task-path "munera/open/230-x"
+                        :before-content nil)
+            result (workflow-core/fresh-final-complete-block-routing
+                    (assoc invocation :args args))]
+        (is (= :invalid-fresh-final-complete-block-routing-args (:reason result))
+            (pr-str result))
+        (is (empty? @reads) (pr-str @reads))))))
 
 (deftest fresh-final-complete-block-routing-uses-one-artifact-revision-test
   ;; The fresh gate must derive validity and freshness from one resolved content.

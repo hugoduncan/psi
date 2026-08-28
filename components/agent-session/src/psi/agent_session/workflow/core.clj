@@ -150,40 +150,50 @@
 
 (defn- read-task-artifact-content
   [ctx session-id task-path artifact]
-  (when-let [task-dir (routing/normalize-open-task-path task-path)]
-    (:psi.munera/task-artifact-content
-     (resolvers/query-in
-      ctx
-      [:psi.munera/task-artifact-content]
-      {:psi.agent-session/session-id session-id
-       :psi.munera/task-path task-dir
-       :psi.munera/artifact-name artifact}))))
+  (if-let [read-fn (:workflow-task-artifact-content-read-fn ctx)]
+    (read-fn session-id task-path artifact)
+    (when-let [task-dir (routing/normalize-open-task-path task-path)]
+      (:psi.munera/task-artifact-content
+       (resolvers/query-in
+        ctx
+        [:psi.munera/task-artifact-content]
+        {:psi.agent-session/session-id session-id
+         :psi.munera/task-path task-dir
+         :psi.munera/artifact-name artifact})))))
+
+(defn- valid-final-complete-block-routing-args?
+  [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route
+           output-field-labels]}]
+  (and (string? task-path)
+       (not (str/blank? task-path))
+       (string? artifact)
+       (not (str/blank? artifact))
+       (string? start-delimiter)
+       (not (str/blank? start-delimiter))
+       (routing/valid-field-prefixes? field-prefixes)
+       (string? end-delimiter)
+       (not (str/blank? end-delimiter))
+       (routing/valid-route-token? valid-route)
+       (or (nil? output-field-labels)
+           (and (vector? output-field-labels)
+                (= (count field-prefixes) (count output-field-labels))
+                (seq output-field-labels)
+                (every? routing/valid-route-token? output-field-labels)
+                (apply distinct? output-field-labels)))))
+
+(defn- invalid-final-complete-block-routing-args-result
+  [args]
+  {:status :error
+   :reason :invalid-final-complete-block-routing-args
+   :message "workflow/final-complete-block-routing args are invalid"
+   :details {:args args}})
 
 (defn- final-complete-block-routing-result
   [args content]
   (let [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route
-                output-field-labels]} args
-        valid-args? (and (string? task-path)
-                         (not (str/blank? task-path))
-                         (string? artifact)
-                         (not (str/blank? artifact))
-                         (string? start-delimiter)
-                         (not (str/blank? start-delimiter))
-                         (routing/valid-field-prefixes? field-prefixes)
-                         (string? end-delimiter)
-                         (not (str/blank? end-delimiter))
-                         (routing/valid-route-token? valid-route)
-                         (or (nil? output-field-labels)
-                             (and (vector? output-field-labels)
-                                  (= (count field-prefixes) (count output-field-labels))
-                                  (seq output-field-labels)
-                                  (every? routing/valid-route-token? output-field-labels)
-                                  (apply distinct? output-field-labels))))]
-    (if-not valid-args?
-      {:status :error
-       :reason :invalid-final-complete-block-routing-args
-       :message "workflow/final-complete-block-routing args are invalid"
-       :details {:args args}}
+                output-field-labels]} args]
+    (if-not (valid-final-complete-block-routing-args? args)
+      (invalid-final-complete-block-routing-args-result args)
       (if-let [record (routing/parse-final-complete-block
                        content start-delimiter field-prefixes end-delimiter)]
         {:status :ok
@@ -204,10 +214,12 @@
   "Read one task artifact and route only when it contains a complete authored
    block. The caller supplies all syntax and route policy."
   [{:keys [args ctx parent-session-id session-id]}]
-  (let [owning-session-id (or parent-session-id session-id)
-        content (read-task-artifact-content ctx owning-session-id
-                                            (:task-path args) (:artifact args))]
-    (final-complete-block-routing-result args content)))
+  (if-not (valid-final-complete-block-routing-args? args)
+    (invalid-final-complete-block-routing-args-result args)
+    (let [owning-session-id (or parent-session-id session-id)
+          content (read-task-artifact-content ctx owning-session-id
+                                              (:task-path args) (:artifact args))]
+      (final-complete-block-routing-result args content))))
 
 (defn task-artifact-content-read
   "Read a task artifact as an invoke-step value for authored workflow policy."
@@ -253,9 +265,20 @@
 (defn fresh-final-complete-block-routing
   "Require a complete authored block newly appended since the captured artifact."
   [{:keys [args ctx parent-session-id session-id]}]
-  (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
-                                            (:task-path args) (:artifact args))]
-    (fresh-final-complete-block-routing-result args content)))
+  (cond
+    (not (valid-final-complete-block-routing-args? (dissoc args :before-content)))
+    (invalid-final-complete-block-routing-args-result (dissoc args :before-content))
+
+    (not (string? (:before-content args)))
+    {:status :error
+     :reason :invalid-fresh-final-complete-block-routing-args
+     :message "workflow/fresh-final-complete-block-routing args are invalid"
+     :details {:args args}}
+
+    :else
+    (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
+                                              (:task-path args) (:artifact args))]
+      (fresh-final-complete-block-routing-result args content))))
 
 (defn- register-built-in-deterministic-operations!
   [api]
