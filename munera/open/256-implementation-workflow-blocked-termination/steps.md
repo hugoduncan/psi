@@ -159,4 +159,5 @@
 
 ## Test review follow-up
 
-- [ ] Replace global callback-ordinal response dispatch in the checked-in `implement-task` execution tests with prompt/step-identity dispatch wherever the pass and terminal-summary prompts are distinguishable. In the repeat-then-complete case, count only matching implementation-pass prompts; an unrelated inserted session step must not consume a pass or summary response and make these tests fail for incidental workflow order.
+- [x] Replace global callback-ordinal response dispatch in the checked-in `implement-task` execution tests with prompt/step-identity dispatch wherever the pass and terminal-summary prompts are distinguishable. In the repeat-then-complete case, count only matching implementation-pass prompts; an unrelated inserted session step must not consume a pass or summary response and make these tests fail for incidental workflow order.
+  - Checked-in execution responses now match implementation-pass and branch-summary procedure text; only implementation-pass prompts advance the repeat counter. Focused Scry: 8 tests, 78 assertions passed; clj-kondo and `git diff --check` passed.

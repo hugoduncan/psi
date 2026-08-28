@@ -94,6 +94,18 @@
        "- required-human-action: " (:required-human-action block) "\n"
        "<!-- IMPLEMENTATION_BLOCKER: END -->\n"))
 
+(defn- implementation-pass-prompt?
+  [prompt]
+  (.contains prompt "Execute the next concrete implementation slice for the task."))
+
+(defn- complete-summary-prompt?
+  [prompt]
+  (.contains prompt "Produce the user-facing final result for the specific Munera task"))
+
+(defn- blocked-summary-prompt?
+  [prompt]
+  (.contains prompt "Produce the user-facing blocked handback for the specific Munera task"))
+
 (deftest implement-task-implementation-complete-routes-to-final-summary-test
   (testing "IMPLEMENTATION_COMPLETE terminates the implementation loop deterministically"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
@@ -163,7 +175,6 @@
     (fn [worktree ctx session-id]
       (let [task-path "munera/open/230-x"
             run-id "checked-in-implement-blocked"
-            replies* (atom 0)
             prompts* (atom [])]
         (test-support/write-task-artifact!
          worktree task-path "implementation.md"
@@ -176,27 +187,29 @@
         (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id prompt]
             (swap! prompts* conj prompt)
-            (let [reply-number (swap! replies* inc)]
-              (when (= 1 reply-number)
-                (spit (str worktree "/" task-path "/implementation.md")
-                      (str (artifact-content {:blocker "earlier decision"
-                                              :required-human-action "ignore this record"})
-                           (artifact-content {:blocker "awaiting product decision"
-                                              :required-human-action "choose the retention policy"}))))
+            (let [text (cond
+                         (implementation-pass-prompt? prompt)
+                         (do
+                           (spit (str worktree "/" task-path "/implementation.md")
+                                 (str (artifact-content {:blocker "earlier decision"
+                                                         :required-human-action "ignore this record"})
+                                      (artifact-content {:blocker "awaiting product decision"
+                                                         :required-human-action "choose the retention policy"})))
+                           "PASS_STATUS: IMPLEMENTATION_BLOCKED")
+
+                         (blocked-summary-prompt? prompt)
+                         (do
+                           (spit (str worktree "/" task-path "/implementation.md")
+                                 (artifact-content
+                                  {:blocker "intervening edit"
+                                   :required-human-action "ignore validated record"}))
+                           (str "blocked handback\n"
+                                "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
+                                "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
+                                "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")))]
               {:execution-result/assistant-message
                {:role "assistant"
-                :content [{:type :text
-                           :text (case reply-number
-                                   1 "PASS_STATUS: IMPLEMENTATION_BLOCKED"
-                                   2 (do
-                                       (spit (str worktree "/" task-path "/implementation.md")
-                                             (artifact-content
-                                              {:blocker "intervening edit"
-                                               :required-human-action "ignore validated record"}))
-                                       (str "blocked handback\n"
-                                            "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
-                                            "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
-                                            "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")))}]
+                :content [{:type :text :text text}]
                 :stop-reason :stop}}))
           (let [result (workflow-execution/execute-run! ctx session-id run-id)
                 run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
@@ -328,22 +341,26 @@
     (fn [worktree ctx session-id]
       (let [task-path "munera/open/230-x"
             run-id "checked-in-implement-more-work"
-            replies* (atom 0)]
+            implementation-pass-count* (atom 0)]
         (test-support/write-task-artifact! worktree task-path "implementation.md" "initial notes\n")
         (register-review-routing-ops! ctx)
         (create-implement-task-run! ctx
                                     (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                     run-id task-path)
         (test-support/with-workflow-prompt-execution-result [ctx]
-          (fn [_ctx _child-session-id _prompt]
-            {:execution-result/assistant-message
-             {:role "assistant"
-              :content [{:type :text
-                         :text (case (swap! replies* inc)
-                                 1 "PASS_STATUS: MORE_WORK_REMAINS"
-                                 2 "PASS_STATUS: IMPLEMENTATION_COMPLETE"
-                                 3 "complete handback\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")}]
-              :stop-reason :stop}})
+          (fn [_ctx _child-session-id prompt]
+            (let [text (cond
+                         (implementation-pass-prompt? prompt)
+                         (case (swap! implementation-pass-count* inc)
+                           1 "PASS_STATUS: MORE_WORK_REMAINS"
+                           2 "PASS_STATUS: IMPLEMENTATION_COMPLETE")
+
+                         (complete-summary-prompt? prompt)
+                         "complete handback\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")]
+              {:execution-result/assistant-message
+               {:role "assistant"
+                :content [{:type :text :text text}]
+                :stop-reason :stop}}))
           (let [result (workflow-execution/execute-run! ctx session-id run-id)
                 run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
             (is (= :completed (:status result)) (pr-str run))
@@ -385,8 +402,7 @@
     (test-support/with-temp-worktree-session
       (fn [worktree ctx session-id]
         (let [task-path "munera/open/230-x"
-              run-id (str "checked-in-terminal-" label)
-              reply-number* (atom 0)]
+              run-id (str "checked-in-terminal-" label)]
           (test-support/write-task-artifact! worktree task-path "implementation.md" "notes\n")
           (register-review-routing-ops! ctx)
           (create-implement-task-run! ctx
@@ -394,13 +410,13 @@
                                        (System/getProperty "user.dir"))
                                       run-id task-path)
           (test-support/with-workflow-prompt-execution-result [ctx]
-            (fn [_ctx _child-session-id _prompt]
+            (fn [_ctx _child-session-id prompt]
               {:execution-result/assistant-message
                {:role "assistant"
                 :content [{:type :text
-                           :text (if (= 1 (swap! reply-number* inc))
-                                   pass-reply
-                                   summary-reply)}]
+                           :text (cond
+                                   (implementation-pass-prompt? prompt) pass-reply
+                                   (complete-summary-prompt? prompt) summary-reply)}]
                 :stop-reason :stop}})
             (let [result (workflow-execution/execute-run! ctx session-id run-id)
                   run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
