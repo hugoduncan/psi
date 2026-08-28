@@ -4,40 +4,8 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
-   [psi.agent-session.workflow.core :as workflow-core]
-   [psi.deterministic-operation-registry.registry]
-   [psi.workflow-loader.compiler :as workflow-compiler]
-   [psi.workflow-loader.parser :as workflow-parser]
-   [psi.workflow-registry.registry :as workflow-registry]
+   [psi.agent-session.workflow-implementation-test-support :as implementation-support]
    [psi.workflow-runtime.core :as workflow-runtime]))
-
-(defn- register-routing-ops!
-  [ctx]
-  (workflow-core/init {:register-operation (fn [operation]
-                                             (psi.deterministic-operation-registry.registry/register-operation-in!
-                                              (:deterministic-operation-registry ctx)
-                                              operation))
-                       :register-tool (fn [_] nil)
-                       :register-command (fn [& _] nil)
-                       :on (fn [& _] nil)
-                       :query (fn [& _] nil)
-                       :query-session (fn [& _] nil)
-                       :mutate (fn [& _] nil)
-                       :mutate-session (fn [& _] nil)}))
-
-(defn- session-step
-  [name prompt]
-  {:name name
-   :type :session
-   :contributions [{:type :template :text prompt}]})
-
-(defn- terminal-session-step
-  [name prompt]
-  (assoc (session-step name prompt)
-         :judge {:type :invoke
-                 :operation "workflow/constant-routing"
-                 :args {:route "DONE"}}
-         :on {"DONE" {:goto :done}}))
 
 (def lifecycle-definition
   {:definition-id "task-lifecycle-implementation-gate-proof"
@@ -69,35 +37,18 @@
             :target "extract-task-knowledge-proof"
             :prompt-string "extract knowledge"
             :context []}
-           (terminal-session-step "final-summary-after-extraction" "complete lifecycle summary")
-           (terminal-session-step "final-summary-implementation-blocked" "blocked lifecycle handback")]})
-
-(defn- child-definition
-  [name prompt]
-  {:definition-id name
-   :name name
-   :steps [(session-step "run" prompt)]})
-
-(defn- checked-in-workflow-definition
-  [worktree workflow-name]
-  (let [path (str worktree "/.psi/workflows/" workflow-name ".edn")
-        parsed (workflow-parser/parse-edn-workflow-file (slurp path))
-        {:keys [definition error]} (workflow-compiler/compile-workflow-file
-                                    (assoc parsed :source-path path))]
-    (when error
-      (throw (ex-info (str "Checked-in " workflow-name " definition did not compile")
-                      {:error error})))
-    definition))
+           (implementation-support/terminal-session-step "final-summary-after-extraction" "complete lifecycle summary")
+           (implementation-support/terminal-session-step "final-summary-implementation-blocked" "blocked lifecycle handback")]})
 
 (defn- checked-in-lifecycle-definition
   [worktree]
-  (checked-in-workflow-definition worktree "task-lifecycle"))
+  (implementation-support/checked-in-workflow-definition worktree "task-lifecycle"))
 
 (defn- checked-in-implement-task-definition
   [worktree]
   ;; The test context intentionally has no project profile registry, unlike
   ;; production startup. Session-profile choice is unrelated to delegation.
-  (update (checked-in-workflow-definition worktree "implement-task")
+  (update (implementation-support/checked-in-workflow-definition worktree "implement-task")
           :steps
           (fn [steps]
             (mapv #(if (= "implement-pass" (:name %))
@@ -107,25 +58,11 @@
 
 (defn- register-definitions!
   [ctx implementation-status]
-  (let [definitions [(child-definition "implement-task-proof" implementation-status)
-                     (child-definition "review-task-implementation-proof" "review complete")
-                     (child-definition "extract-task-knowledge-proof" "knowledge extracted")
+  (let [definitions [(implementation-support/child-definition "implement-task-proof" implementation-status)
+                     (implementation-support/child-definition "review-task-implementation-proof" "review complete")
+                     (implementation-support/child-definition "extract-task-knowledge-proof" "knowledge extracted")
                      lifecycle-definition]]
-    (swap! (:state* ctx)
-           (fn [state]
-             (reduce (fn [next-state definition]
-                       (first (workflow-registry/register-definition next-state definition)))
-                     state
-                     definitions)))))
-
-(defn- create-lifecycle-run!
-  [ctx definition run-id workflow-input]
-  (swap! (:state* ctx)
-         (fn [state]
-           (first (workflow-runtime/create-run state
-                                               {:definition definition
-                                                :run-id run-id
-                                                :workflow-input workflow-input})))))
+    (implementation-support/register-definitions! ctx definitions)))
 
 (defn- checked-in-lifecycle-prompt-type
   [prompt]
@@ -159,23 +96,18 @@
   (let [definition (checked-in-lifecycle-definition (System/getProperty "user.dir"))
         run-id "checked-in-lifecycle-blocked"
         task-path "munera/open/256-implementation-workflow-blocked-termination"
-        definitions [(child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
-                     (child-definition "create-task-plan" "plan created")
-                     (child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
-                     (child-definition "implement-task" (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
-                                                             "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                                             "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
-                     (child-definition "review-task-implementation-core" "implementation reviewed")
-                     (child-definition "extract-task-knowledge" "knowledge extracted")
+        definitions [(implementation-support/child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (implementation-support/child-definition "create-task-plan" "plan created")
+                     (implementation-support/child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (implementation-support/child-definition "implement-task" (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                                                                    "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                                                                    "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
+                     (implementation-support/child-definition "review-task-implementation-core" "implementation reviewed")
+                     (implementation-support/child-definition "extract-task-knowledge" "knowledge extracted")
                      definition]]
-    (register-routing-ops! ctx)
-    (swap! (:state* ctx)
-           (fn [state]
-             (reduce (fn [next-state child-definition]
-                       (first (workflow-registry/register-definition next-state child-definition)))
-                     state
-                     definitions)))
-    (create-lifecycle-run! ctx definition run-id {:input task-path})
+    (implementation-support/register-routing-ops! ctx)
+    (implementation-support/register-definitions! ctx definitions)
+    (implementation-support/create-run! ctx definition run-id {:input task-path})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         (let [text (case (checked-in-lifecycle-prompt-type prompt)
@@ -198,9 +130,9 @@
   [implementation-status]
   (let [[ctx session-id] (support/create-session-context {:persist? false})
         run-id (str "lifecycle-" implementation-status)]
-    (register-routing-ops! ctx)
+    (implementation-support/register-routing-ops! ctx)
     (register-definitions! ctx implementation-status)
-    (create-lifecycle-run! ctx lifecycle-definition run-id {})
+    (implementation-support/create-run! ctx lifecycle-definition run-id {})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
@@ -228,21 +160,16 @@
         implement-task (checked-in-implement-task-definition source-worktree)
         run-id (str "checked-in-lifecycle-" (name outcome))
         task-path "munera/open/256-implementation-workflow-blocked-termination"
-        definitions [(child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
-                     (child-definition "create-task-plan" "plan created")
-                     (child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
+        definitions [(implementation-support/child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (implementation-support/child-definition "create-task-plan" "plan created")
+                     (implementation-support/child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
                      implement-task
-                     (child-definition "review-task-implementation-core" "PASS_STATUS: REVIEW_COMPLETE")
-                     (child-definition "extract-task-knowledge" "knowledge extracted")
+                     (implementation-support/child-definition "review-task-implementation-core" "PASS_STATUS: REVIEW_COMPLETE")
+                     (implementation-support/child-definition "extract-task-knowledge" "knowledge extracted")
                      lifecycle]]
-    (register-routing-ops! ctx)
-    (swap! (:state* ctx)
-           (fn [state]
-             (reduce (fn [next-state definition]
-                       (first (workflow-registry/register-definition next-state definition)))
-                     state
-                     definitions)))
-    (create-lifecycle-run! ctx lifecycle run-id {:input task-path})
+    (implementation-support/register-routing-ops! ctx)
+    (implementation-support/register-definitions! ctx definitions)
+    (implementation-support/create-run! ctx lifecycle run-id {:input task-path})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         (let [text (case (checked-in-lifecycle-prompt-type prompt)

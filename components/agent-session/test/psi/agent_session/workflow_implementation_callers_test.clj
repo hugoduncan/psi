@@ -4,65 +4,16 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
-   [psi.agent-session.workflow.core :as workflow-core]
-   [psi.deterministic-operation-registry.registry]
-   [psi.workflow-loader.compiler :as workflow-compiler]
-   [psi.workflow-loader.parser :as workflow-parser]
-   [psi.workflow-registry.registry :as workflow-registry]
+   [psi.agent-session.workflow-implementation-test-support :as implementation-support]
    [psi.workflow-runtime.core :as workflow-runtime]))
-
-(defn- register-routing-ops!
-  [ctx]
-  (workflow-core/init {:register-operation (fn [operation]
-                                             (psi.deterministic-operation-registry.registry/register-operation-in!
-                                              (:deterministic-operation-registry ctx)
-                                              operation))
-                       :register-tool (fn [_] nil)
-                       :register-command (fn [& _] nil)
-                       :on (fn [& _] nil)
-                       :query (fn [& _] nil)
-                       :query-session (fn [& _] nil)
-                       :mutate (fn [& _] nil)
-                       :mutate-session (fn [& _] nil)}))
-
-(defn- session-step
-  [name prompt]
-  {:name name
-   :type :session
-   :contributions [{:type :template :text prompt}]})
-
-(defn- terminal-session-step
-  [name prompt]
-  (assoc (session-step name prompt)
-         :judge {:type :invoke
-                 :operation "workflow/constant-routing"
-                 :args {:route "DONE"}}
-         :on {"DONE" {:goto :done}}))
-
-(defn- child-definition
-  [name prompt]
-  {:definition-id name
-   :name name
-   :steps [(session-step "run" prompt)]})
-
-(defn- checked-in-workflow-definition
-  [worktree workflow-name]
-  (let [path (str worktree "/.psi/workflows/" workflow-name ".edn")
-        parsed (workflow-parser/parse-edn-workflow-file (slurp path))
-        {:keys [definition error]} (workflow-compiler/compile-workflow-file
-                                    (assoc parsed :source-path path))]
-    (when error
-      (throw (ex-info (str "Checked-in " workflow-name " definition did not compile")
-                      {:error error})))
-    definition))
 
 (defn- checked-in-implement-task-in-worktree-definition
   [worktree]
-  (checked-in-workflow-definition worktree "implement-task-in-worktree"))
+  (implementation-support/checked-in-workflow-definition worktree "implement-task-in-worktree"))
 
 (defn- checked-in-blocked-caller-definition
   [worktree workflow-name delegate-step-name blocked-step-name]
-  (let [definition (checked-in-workflow-definition worktree workflow-name)
+  (let [definition (implementation-support/checked-in-workflow-definition worktree workflow-name)
         by-name (into {} (map (juxt :name identity)) (:steps definition))
         gate (-> (get by-name "check-implementation-status")
                  (assoc-in [:on "IMPLEMENTATION_COMPLETE" :goto] blocked-step-name))
@@ -83,7 +34,7 @@
 
 (defn- checked-in-gh-issue-implement-gate-definition
   [worktree]
-  (let [definition (checked-in-workflow-definition worktree "gh-issue-implement")
+  (let [definition (implementation-support/checked-in-workflow-definition worktree "gh-issue-implement")
         steps (:steps definition)
         gate-start (first (keep-indexed (fn [index step]
                                           (when (= "implement" (:name step)) index))
@@ -105,15 +56,6 @@
                                                                  :target "pr"})
                                 step))
                             (subvec steps gate-start))))))
-
-(defn- create-lifecycle-run!
-  [ctx definition run-id workflow-input]
-  (swap! (:state* ctx)
-         (fn [state]
-           (first (workflow-runtime/create-run state
-                                               {:definition definition
-                                                :run-id run-id
-                                                :workflow-input workflow-input})))))
 
 (defn- implementation-caller-definition
   [name downstream-step]
@@ -141,24 +83,19 @@
             :target "downstream-proof"
             :prompt-string "downstream"
             :context []}
-           (terminal-session-step "implementation-blocked" "blocked handback")]})
+           (implementation-support/terminal-session-step "implementation-blocked" "blocked handback")]})
 
 (defn- execute-implementation-caller!
   [caller-name downstream-step]
   (let [[ctx session-id] (support/create-session-context {:persist? false})
         definition (implementation-caller-definition caller-name downstream-step)
-        definitions [(child-definition "implement-task-proof"
-                                       "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-                     (child-definition "downstream-proof" "downstream ran")
+        definitions [(implementation-support/child-definition "implement-task-proof"
+                                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                     (implementation-support/child-definition "downstream-proof" "downstream ran")
                      definition]]
-    (register-routing-ops! ctx)
-    (swap! (:state* ctx)
-           (fn [state]
-             (reduce (fn [next-state child-definition]
-                       (first (workflow-registry/register-definition next-state child-definition)))
-                     state
-                     definitions)))
-    (create-lifecycle-run! ctx definition (str caller-name "-blocked") {})
+    (implementation-support/register-routing-ops! ctx)
+    (implementation-support/register-definitions! ctx definitions)
+    (implementation-support/create-run! ctx definition (str caller-name "-blocked") {})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
@@ -213,19 +150,14 @@
   (let [[ctx session-id] (support/create-session-context {:persist? false})
         source-worktree (System/getProperty "user.dir")
         wrapper (checked-in-implement-task-in-worktree-definition source-worktree)
-        implement-task (child-definition "implement-task"
-                                         (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
-                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
+        implement-task (implementation-support/child-definition "implement-task"
+                                                                (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                                                     "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                                                     "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
         run-id "checked-in-implement-task-in-worktree-blocked"]
-    (register-routing-ops! ctx)
-    (swap! (:state* ctx)
-           (fn [state]
-             (reduce (fn [next-state definition]
-                       (first (workflow-registry/register-definition next-state definition)))
-                     state
-                     [implement-task wrapper])))
-    (create-lifecycle-run! ctx wrapper run-id {:input "worktree_path: /tmp/worktree\nmunera_task_path: munera/open/256-task"})
+    (implementation-support/register-routing-ops! ctx)
+    (implementation-support/register-definitions! ctx [implement-task wrapper])
+    (implementation-support/create-run! ctx wrapper run-id {:input "worktree_path: /tmp/worktree\nmunera_task_path: munera/open/256-task"})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
@@ -261,19 +193,14 @@
   (let [[ctx session-id] (support/create-session-context {:persist? false})
         source-worktree (System/getProperty "user.dir")
         wrapper (checked-in-implement-task-in-worktree-definition source-worktree)
-        implement-task (child-definition "implement-task"
-                                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+        implement-task (implementation-support/child-definition "implement-task"
+                                                                "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
         run-id (str "checked-in-implement-task-in-worktree-complete-" run-suffix)]
-    (register-routing-ops! ctx)
-    (swap! (:state* ctx)
-           (fn [state]
-             (reduce (fn [next-state definition]
-                       (first (workflow-registry/register-definition next-state definition)))
-                     state
-                     [implement-task wrapper])))
-    (create-lifecycle-run! ctx wrapper run-id
-                           {:input (str "worktree_path: /tmp/worktree\n"
-                                        "munera_task_path: munera/open/256-task")})
+    (implementation-support/register-routing-ops! ctx)
+    (implementation-support/register-definitions! ctx [implement-task wrapper])
+    (implementation-support/create-run! ctx wrapper run-id
+                                        {:input (str "worktree_path: /tmp/worktree\n"
+                                                     "munera_task_path: munera/open/256-task")})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
@@ -346,17 +273,12 @@
           blocked-yield (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-          implementation (child-definition "implement-task" blocked-yield)
+          implementation (implementation-support/child-definition "implement-task" blocked-yield)
           run-id (str workflow-name "-blocked-snapshot")
           prompts* (atom [])]
-      (register-routing-ops! ctx)
-      (swap! (:state* ctx)
-             (fn [state]
-               (reduce (fn [next-state child-definition]
-                         (first (workflow-registry/register-definition next-state child-definition)))
-                       state
-                       [implementation definition])))
-      (create-lifecycle-run! ctx definition run-id {:input "munera/open/256-task"})
+      (implementation-support/register-routing-ops! ctx)
+      (implementation-support/register-definitions! ctx [implementation definition])
+      (implementation-support/create-run! ctx definition run-id {:input "munera/open/256-task"})
       (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id prompt]
           (swap! prompts* conj prompt)
@@ -407,18 +329,13 @@
         blocked-yield (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
                            "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
                            "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-        wrapper (child-definition "implement-task-in-worktree" blocked-yield)
-        review (child-definition "review-implementation-in-worktree" "review ran")
-        builder (child-definition "builder" "push ran")
+        wrapper (implementation-support/child-definition "implement-task-in-worktree" blocked-yield)
+        review (implementation-support/child-definition "review-implementation-in-worktree" "review ran")
+        builder (implementation-support/child-definition "builder" "push ran")
         run-id "checked-in-gh-issue-implement-blocked"]
-    (register-routing-ops! ctx)
-    (swap! (:state* ctx)
-           (fn [state]
-             (reduce (fn [next-state child-definition]
-                       (first (workflow-registry/register-definition next-state child-definition)))
-                     state
-                     [wrapper review builder definition])))
-    (create-lifecycle-run! ctx definition run-id {})
+    (implementation-support/register-routing-ops! ctx)
+    (implementation-support/register-definitions! ctx [wrapper review builder definition])
+    (implementation-support/create-run! ctx definition run-id {})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
@@ -480,18 +397,13 @@
           blocked-yield (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-          wrapper (child-definition "implement-task-in-worktree" blocked-yield)
-          review (child-definition "review-implementation-in-worktree" "review ran")
-          builder (child-definition "builder" "push ran")
+          wrapper (implementation-support/child-definition "implement-task-in-worktree" blocked-yield)
+          review (implementation-support/child-definition "review-implementation-in-worktree" "review ran")
+          builder (implementation-support/child-definition "builder" "push ran")
           run-id (str "checked-in-gh-issue-implement-invalid-" label)]
-      (register-routing-ops! ctx)
-      (swap! (:state* ctx)
-             (fn [state]
-               (reduce (fn [next-state child-definition]
-                         (first (workflow-registry/register-definition next-state child-definition)))
-                       state
-                       [wrapper review builder definition])))
-      (create-lifecycle-run! ctx definition run-id {})
+      (implementation-support/register-routing-ops! ctx)
+      (implementation-support/register-definitions! ctx [wrapper review builder definition])
+      (implementation-support/create-run! ctx definition run-id {})
       (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id prompt]
           {:execution-result/assistant-message

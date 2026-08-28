@@ -287,18 +287,23 @@
   ;; Tests the real blocked route fails at validation rather than inventing a handback.
   (test-support/with-temp-worktree-session
     (fn [worktree ctx session-id]
-      (doseq [[label content] [["missing" "implementation notes only"]
-                               ["malformed"
-                                "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing action\n<!-- IMPLEMENTATION_BLOCKER: END -->\n"]]]
+      (doseq [[label appended-content] [["missing" nil]
+                                        ["malformed"
+                                         (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                                              "- blocker: missing action\n"
+                                              "<!-- IMPLEMENTATION_BLOCKER: END -->\n")]]]
         (let [task-path "munera/open/230-x"
-              run-id (str "checked-in-implement-blocked-" label)]
-          (test-support/write-task-artifact! worktree task-path "implementation.md" content)
+              run-id (str "checked-in-implement-blocked-" label)
+              implementation-path (str worktree "/" task-path "/implementation.md")]
+          (test-support/write-task-artifact! worktree task-path "implementation.md" "implementation notes only\n")
           (register-review-routing-ops! ctx)
           (create-implement-task-run! ctx
                                       (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                       run-id task-path)
           (test-support/with-workflow-prompt-execution-result [ctx]
-            (fn [_ctx _child-session-id _prompt]
+            (fn [_ctx _child-session-id prompt]
+              (when (and appended-content (implementation-pass-prompt? prompt))
+                (spit implementation-path appended-content :append true))
               {:execution-result/assistant-message
                {:role "assistant"
                 :content [{:type :text :text "PASS_STATUS: IMPLEMENTATION_BLOCKED"}]
