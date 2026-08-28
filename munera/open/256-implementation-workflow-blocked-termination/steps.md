@@ -282,3 +282,7 @@
 
 - [x] Add an `[Unreleased]` changelog entry for the user-visible workflow terminal-projection fix: failed and cancelled workflow runs no longer expose retained or rejected terminal-step text as their yielded result. Keep the wording consistent with `doc/workflows.md` and the delegate contract that failed attempts produce no accepted result.
   - Added a Fixed entry documenting suppressed failed/cancelled terminal yields and the no-accepted-result delegate contract.
+
+## Documentation review follow-up
+
+- [ ] Correct the stale standalone non-converging review description in `doc/workflows.md`: completed workflows now project yielded text from `:terminal-outcome :step-id`, so `review-task-design` and `review-task-plan` surface the executed `final-summary-not-converged` handback rather than empty text selected from the last declared step.
