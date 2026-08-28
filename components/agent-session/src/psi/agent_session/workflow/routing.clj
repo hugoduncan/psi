@@ -23,15 +23,20 @@
 
    Open-only and anchored (full-string match), reusing the existing open-task
    grammar: a trimmed input that fully matches `munera/open/NNN-slug` is returned
-   verbatim; a bare anchored `NNN-slug` token becomes `munera/open/<token>`;
-   anything else (free text, a `munera/closed/...` path, a partial/substring
-   match) yields nil so the gate reads no content and proceeds."
+   verbatim; a bare anchored `NNN-slug` token becomes `munera/open/<token>`.
+   A leading `@` task reference marker is accepted and removed before applying
+   either form, matching workflow invocation syntax. Anything else (free text,
+   a `munera/closed/...` path, a partial/substring match) yields nil so the
+   gate reads no content and proceeds."
   [task-path]
   (when (string? task-path)
-    (let [trimmed (str/trim task-path)]
+    (let [trimmed (str/trim task-path)
+          task-token (if (str/starts-with? trimmed "@")
+                       (subs trimmed 1)
+                       trimmed)]
       (cond
-        (re-matches munera-open-task-path-pattern trimmed) trimmed
-        (re-matches bare-task-token-pattern trimmed) (str "munera/open/" trimmed)
+        (re-matches munera-open-task-path-pattern task-token) task-token
+        (re-matches bare-task-token-pattern task-token) (str "munera/open/" task-token)
         :else nil))))
 
 (defn- pass-status-line-value

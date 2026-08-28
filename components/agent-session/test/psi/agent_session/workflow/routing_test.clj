@@ -236,6 +236,13 @@
     (is (= "munera/open/230-scope-question-lifecycle-gate"
            (routing/normalize-open-task-path
             "\t230-scope-question-lifecycle-gate "))))
+  (testing "workflow @ task references normalize to the same open task path"
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "@munera/open/230-scope-question-lifecycle-gate")))
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            " @230-scope-question-lifecycle-gate "))))
   (testing "non-open, free-text, partial, malformed, and nil inputs yield nil"
     (doseq [invalid ["munera/closed/230-scope-question-lifecycle-gate"
                      "please run 230-scope-question-lifecycle-gate"

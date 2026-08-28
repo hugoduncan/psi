@@ -178,13 +178,15 @@
           (is (= :invalid-task-artifact-content-read-args (:reason result))
               (pr-str args result))
           (is (empty? @reads) (pr-str args @reads)))))
-    (testing "valid identifiers are normalized before the injectable read boundary"
-      (let [args {:task-path " 230-x " :artifact "implementation.md"}
-            result (artifact-routing/task-artifact-content-read
-                    (assoc invocation :args args))]
-        (is (= {:status :ok :data "captured content" :summary "DONE"} result))
-        (is (= [["session-1" "munera/open/230-x" "implementation.md"]]
-               @reads))))))
+    (testing "valid identifiers, including @ workflow references, normalize before the injectable read boundary"
+      (doseq [task-path [" 230-x " "@munera/open/230-x"]]
+        (reset! reads [])
+        (let [args {:task-path task-path :artifact "implementation.md"}
+              result (artifact-routing/task-artifact-content-read
+                      (assoc invocation :args args))]
+          (is (= {:status :ok :data "captured content" :summary "DONE"} result))
+          (is (= [["session-1" "munera/open/230-x" "implementation.md"]]
+                 @reads)))))))
 
 (deftest complete-block-routing-handlers-validate-before-artifact-read-test
   ;; Public handlers reject malformed schemas before crossing the resolver boundary.
