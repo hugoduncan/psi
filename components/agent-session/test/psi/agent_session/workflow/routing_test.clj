@@ -411,6 +411,26 @@
                  ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}]
       (is (= "IMPLEMENTATION_BLOCKED"
              (:data (routing/parse-exact-marker-routing args))))
+      (testing "matching direct and source-derived fields agree"
+        (is (= "IMPLEMENTATION_BLOCKED"
+               (:data (routing/parse-exact-marker-routing
+                       (assoc args :required-fields-by-route
+                              {"IMPLEMENTATION_BLOCKED"
+                               {"IMPLEMENTATION_BLOCKER" "validated blocker"}}))))))
+      (testing "conflicting direct and source-derived fields are invalid"
+        (let [result (routing/parse-exact-marker-routing
+                      (assoc args :required-fields-by-route
+                             {"IMPLEMENTATION_BLOCKED"
+                              {"IMPLEMENTATION_BLOCKER" "different blocker"}}))]
+          (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+          (is (= [{:field :required-fields-by-route
+                   :reason :conflicting-required-field-sources
+                   :route "IMPLEMENTATION_BLOCKED"
+                   :label "IMPLEMENTATION_BLOCKER"
+                   :direct-value "different blocker"
+                   :source-value "validated blocker"}]
+                 (get-in result [:details :errors]))
+              (pr-str result))))
       (doseq [blank-value ["" "   "]]
         (let [blank-source (str "IMPLEMENTATION_BLOCKER: " blank-value "\n"
                                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action")]

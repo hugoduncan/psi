@@ -210,4 +210,5 @@
 
 ## Code-shaper review follow-up
 
-- [ ] Define and enforce unambiguous overlap semantics when `workflow/exact-marker-routing` receives both `:required-fields-by-route` and `:required-field-labels-by-route`. The current `merge` silently lets a source-derived value replace a contradictory direct value for the same route/label, so the parser can accept output that violates the caller's direct requirement. Reject overlapping labels as invalid arguments, or require both sources to agree, and add focused regression coverage for conflicting and matching overlaps.
+- [x] Define and enforce unambiguous overlap semantics when `workflow/exact-marker-routing` receives both `:required-fields-by-route` and `:required-field-labels-by-route`. The current `merge` silently lets a source-derived value replace a contradictory direct value for the same route/label, so the parser can accept output that violates the caller's direct requirement. Reject overlapping labels as invalid arguments, or require both sources to agree, and add focused regression coverage for conflicting and matching overlaps.
+  - Matching direct and source-derived values compose; contradictory values return structured `:invalid-route-marker-args` before parsing. Focused Scry: 13 tests/276 assertions passed; clj-kondo and `git diff --check` passed.

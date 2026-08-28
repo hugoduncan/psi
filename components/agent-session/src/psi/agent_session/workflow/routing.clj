@@ -539,6 +539,35 @@
                      [label value])))
         labels))
 
+(defn- conflicting-required-route-fields-errors
+  [{:keys [required-fields-by-route required-field-labels-by-route
+           required-fields-source-text]}]
+  (if (and (map? required-fields-by-route)
+           (map? required-field-labels-by-route)
+           (string? required-fields-source-text))
+    (->> required-field-labels-by-route
+         (mapcat (fn [[route source-labels]]
+                   (let [direct-fields (get required-fields-by-route route)]
+                     (when (and (map? direct-fields) (vector? source-labels))
+                       (keep (fn [label]
+                               (let [direct-value (get direct-fields label)
+                                     source-value (exact-field-value
+                                                   required-fields-source-text
+                                                   label)]
+                                 (when (and (string? direct-value)
+                                            (not (str/blank? direct-value))
+                                            source-value
+                                            (not= direct-value source-value))
+                                   {:field :required-fields-by-route
+                                    :reason :conflicting-required-field-sources
+                                    :route route
+                                    :label label
+                                    :direct-value direct-value
+                                    :source-value source-value})))
+                             source-labels)))))
+         vec)
+    []))
+
 (defn- validate-required-route-fields
   [text required-fields forbidden-labels]
   (if-let [unexpected-label (some (fn [label]
@@ -593,6 +622,7 @@
   [args]
   (let [errors (into (exact-marker-routing-arg-errors args)
                      (concat (required-route-fields-errors args)
+                             (conflicting-required-route-fields-errors args)
                              (route-field-labels-errors
                               (:allowed-routes args)
                               :forbidden-field-labels-by-route
