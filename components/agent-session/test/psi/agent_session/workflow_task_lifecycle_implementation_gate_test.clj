@@ -466,6 +466,33 @@
       (is (= 1 (count (get-in run [:step-runs "implementation-blocked" :attempts]))) caller-name)
       (is (zero? (count (get-in run [:step-runs downstream-step :attempts]))) caller-name))))
 
+(defn- checked-in-outer-orchestration-prompt-type
+  [prompt delegated-yield]
+  (cond
+    (= delegated-yield prompt) :delegated-implementation
+    (= "outer blocked handback" prompt) :gh-issue-blocked-summary
+    (.contains prompt "Extract the worktree path") :wrapper-resolve
+    (.contains prompt "Produce the user-facing blocked handback for the Munera task lifecycle") :lifecycle-blocked-summary
+    (.contains prompt "Produce the user-facing final result for the Munera task") :wrapper-complete-summary
+    (.contains prompt "Produce the user-facing blocked handback for the Munera task") :wrapper-blocked-summary
+    (.contains prompt "Produce the terminal blocked handback for `reduce-architectural-complexity`") :architectural-blocked-summary
+    (.contains prompt "Produce the terminal blocked handback for `reduce-incidental-complexity`") :incidental-blocked-summary
+    (.contains prompt "Produce the user-facing blocked handback for the PR implementation workflow") :gh-issue-blocked-summary
+    :else (throw (ex-info "Unexpected checked-in outer-orchestration prompt"
+                          {:unexpected-prompt prompt}))))
+
+(deftest checked-in-outer-orchestration-prompt-dispatch-fails-fast-test
+  ;; Tests wrapper/caller topology drift exposes the unmatched authored prompt
+  ;; directly instead of returning a plausible terminal handback.
+  (let [prompt "Unexpected authored outer-orchestration step"
+        error (try
+                (checked-in-outer-orchestration-prompt-type prompt "delegated yield")
+                nil
+                (catch clojure.lang.ExceptionInfo ex
+                  ex))]
+    (is (= "Unexpected checked-in outer-orchestration prompt" (ex-message error)))
+    (is (= {:unexpected-prompt prompt} (ex-data error)))))
+
 (deftest checked-in-implement-task-in-worktree-blocked-route-test
   ;; Tests the loadable checked-in wrapper routes its delegated blocked export
   ;; only to the wrapper handback, never to its normal summary.
@@ -490,17 +517,22 @@
         {:execution-result/assistant-message
          {:role "assistant"
           :content [{:type :text
-                     :text (cond
-                             (.contains prompt "Extract the worktree path")
+                     :text (case (checked-in-outer-orchestration-prompt-type
+                                  prompt
+                                  (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                       "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                       "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
+                             :wrapper-resolve
                              "munera/open/256-task"
 
-                             (.contains prompt "Produce the user-facing blocked handback")
+                             :delegated-implementation
+                             prompt
+
+                             :wrapper-blocked-summary
                              (str "wrapper blocked handback\n"
                                   "IMPLEMENTATION_BLOCKER: validated blocker\n"
                                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-
-                             :else prompt)}]
+                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))}]
           :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id run-id)
             run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
@@ -533,14 +565,12 @@
         {:execution-result/assistant-message
          {:role "assistant"
           :content [{:type :text
-                     :text (cond
-                             (.contains prompt "Extract the worktree path")
-                             "munera/open/256-task"
-
-                             (= "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE" prompt)
-                             prompt
-
-                             :else summary-reply)}]
+                     :text (case (checked-in-outer-orchestration-prompt-type
+                                  prompt
+                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+                             :wrapper-resolve "munera/open/256-task"
+                             :delegated-implementation prompt
+                             :wrapper-complete-summary summary-reply)}]
           :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
@@ -619,8 +649,15 @@
           {:execution-result/assistant-message
            {:role "assistant"
             :content [{:type :text
-                       :text (if (= blocked-yield prompt)
+                       :text (case (checked-in-outer-orchestration-prompt-type
+                                    prompt blocked-yield)
+                               :delegated-implementation
                                prompt
+
+                               (:lifecycle-blocked-summary
+                                :wrapper-blocked-summary
+                                :architectural-blocked-summary
+                                :incidental-blocked-summary)
                                (str "blocked caller handback\n"
                                     "IMPLEMENTATION_BLOCKER: validated blocker\n"
                                     "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
@@ -673,8 +710,12 @@
         {:execution-result/assistant-message
          {:role "assistant"
           :content [{:type :text
-                     :text (if (= blocked-yield prompt)
+                     :text (case (checked-in-outer-orchestration-prompt-type
+                                  prompt blocked-yield)
+                             :delegated-implementation
                              prompt
+
+                             :gh-issue-blocked-summary
                              (str "outer blocked handback\n"
                                   "IMPLEMENTATION_BLOCKER: validated blocker\n"
                                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
@@ -742,9 +783,10 @@
           {:execution-result/assistant-message
            {:role "assistant"
             :content [{:type :text
-                       :text (if (= blocked-yield prompt)
-                               prompt
-                               handback)}]
+                       :text (case (checked-in-outer-orchestration-prompt-type
+                                    prompt blocked-yield)
+                               :delegated-implementation prompt
+                               :gh-issue-blocked-summary handback)}]
             :stop-reason :stop}})
         (let [result (workflow-execution/execute-run! ctx session-id run-id)
               run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
