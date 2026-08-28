@@ -589,20 +589,21 @@
                    (let [direct-fields (get required-fields-by-route route)]
                      (when (and (map? direct-fields) (vector? source-labels))
                        (keep (fn [label]
-                               (let [direct-value (get direct-fields label)
-                                     source-value (exact-field-value
-                                                   required-fields-source-text
-                                                   label)]
-                                 (when (and (string? direct-value)
-                                            (not (str/blank? direct-value))
-                                            source-value
-                                            (not= direct-value source-value))
-                                   {:field :required-fields-by-route
-                                    :reason :conflicting-required-field-sources
-                                    :route route
-                                    :label label
-                                    :direct-value direct-value
-                                    :source-value source-value})))
+                               (let [direct-value (get direct-fields label)]
+                                 (when (and (route-token? label)
+                                            (string? direct-value)
+                                            (not (str/blank? direct-value)))
+                                   (let [source-value (exact-field-value
+                                                       required-fields-source-text
+                                                       label)]
+                                     (when (and source-value
+                                                (not= direct-value source-value))
+                                       {:field :required-fields-by-route
+                                        :reason :conflicting-required-field-sources
+                                        :route route
+                                        :label label
+                                        :direct-value direct-value
+                                        :source-value source-value})))))
                              source-labels)))))
          vec)
     []))

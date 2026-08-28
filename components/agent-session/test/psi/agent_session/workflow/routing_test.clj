@@ -515,6 +515,22 @@
                :indices [0 1]}]
              (get-in result [:details :errors]))
           (pr-str result))))
+  (testing "malformed overlapping field labels remain structured invalid arguments"
+    (doseq [label [nil 1]]
+      (let [result (routing/parse-exact-marker-routing
+                    {:text "QUALITY_GATE: APPROVE"
+                     :marker-label "QUALITY_GATE"
+                     :allowed-routes ["APPROVE"]
+                     :required-fields-by-route {"APPROVE" {label "direct"}}
+                     :required-fields-source-text "FIELD: source"
+                     :required-field-labels-by-route {"APPROVE" [label]}})]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (some #(= :invalid-required-field-label (:reason %))
+                  (get-in result [:details :errors]))
+            (pr-str result))
+        (is (some #(= :invalid-required-field-labels (:reason %))
+                  (get-in result [:details :errors]))
+            (pr-str result)))))
   (testing "required invalid arg cases"
     (doseq [[args expected-errors]
             [[{} [{:field :text :reason :missing-text}
