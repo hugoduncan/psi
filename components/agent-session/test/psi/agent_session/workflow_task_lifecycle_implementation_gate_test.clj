@@ -350,3 +350,22 @@
       (is (zero? (count (get-in run [:step-runs "review-task-implementation" :attempts]))))
       (is (zero? (count (get-in run [:step-runs "extract-task-knowledge" :attempts]))))
       (is (zero? (count (get-in run [:step-runs "final-summary-after-extraction" :attempts])))))))
+
+(deftest invalid-exported-implementation-statuses-fail-before-lifecycle-branches-test
+  ;; Tests malformed, duplicate, missing, and unsupported delegate exports do
+  ;; not become a completion or a clean blocked handback.
+  (testing "invalid IMPLEMENTATION_STATUS exports fail at the lifecycle gate"
+    (doseq [[label status reason]
+            [["missing" "implementation summary" :missing-route-marker]
+             ["malformed" "IMPLEMENTATION_STATUS:IMPLEMENTATION_COMPLETE" :malformed-route-marker]
+             ["duplicate"
+              (str "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+              :ambiguous-route-marker]
+             ["unsupported" "IMPLEMENTATION_STATUS: UNKNOWN" :unsupported-route-marker]]]
+      (let [[result run] (execute-lifecycle! status)]
+        (is (= :failed (:status result)) label)
+        (is (= reason (get-in run [:terminal-outcome :reason])) label)
+        (is (zero? (count (get-in run [:step-runs "review-task-implementation" :attempts]))) label)
+        (is (zero? (count (get-in run [:step-runs "extract-task-knowledge" :attempts]))) label)
+        (is (zero? (count (get-in run [:step-runs "final-summary-implementation-blocked" :attempts]))) label)))))

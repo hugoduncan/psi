@@ -179,4 +179,5 @@
 
 ## Test review follow-up
 
-- [ ] Complete the in-progress caller-test namespace split: `workflow_implementation_callers_test.clj` references `lifecycle-definition` and `execute-lifecycle!` that remain private in `workflow_task_lifecycle_implementation_gate_test.clj`, while caller-only helpers remain unused in the lifecycle namespace. Move each fixture/helper with the tests that use it (or extract genuinely shared support), then prove both namespaces load and pass and run `clj-kondo` without unresolved symbols or unused private vars.
+- [x] Complete the in-progress caller-test namespace split: `workflow_implementation_callers_test.clj` references `lifecycle-definition` and `execute-lifecycle!` that remain private in `workflow_task_lifecycle_implementation_gate_test.clj`, while caller-only helpers remain unused in the lifecycle namespace. Move each fixture/helper with the tests that use it (or extract genuinely shared support), then prove both namespaces load and pass and run `clj-kondo` without unresolved symbols or unused private vars.
+  - Caller-only fixtures and tests now live in `workflow_implementation_callers_test.clj`; lifecycle fixtures and invalid-export coverage remain in `workflow_task_lifecycle_implementation_gate_test.clj`. Focused Scry: callers 8 tests/93 assertions, lifecycle 6 tests/52 assertions; clj-kondo and `git diff --check` passed.
