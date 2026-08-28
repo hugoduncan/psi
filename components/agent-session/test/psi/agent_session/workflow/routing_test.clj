@@ -404,13 +404,23 @@
                       "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
           args {:text valid
                 :marker-label "IMPLEMENTATION_STATUS"
-                :allowed-routes ["IMPLEMENTATION_BLOCKED"]
+                :allowed-routes ["IMPLEMENTATION_COMPLETE" "IMPLEMENTATION_BLOCKED"]
                 :required-fields-source-text source
                 :required-field-labels-by-route
                 {"IMPLEMENTATION_BLOCKED"
                  ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}]
       (is (= "IMPLEMENTATION_BLOCKED"
              (:data (routing/parse-exact-marker-routing args))))
+      (testing "source-derived fields belong only to their route"
+        (doseq [field ["IMPLEMENTATION_BLOCKER"
+                       "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]]
+          (let [result (routing/parse-exact-marker-routing
+                        (assoc args :text
+                               (str field ": stale\n"
+                                    "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")))]
+            (is (= :unexpected-route-field (:reason result)) (pr-str result))
+            (is (= field (get-in result [:details :field-label]))
+                (pr-str result)))))
       (testing "matching direct and source-derived fields agree"
         (is (= "IMPLEMENTATION_BLOCKED"
                (:data (routing/parse-exact-marker-routing

@@ -657,8 +657,13 @@
               (let [source-labels (get required-field-labels-by-route route [])
                     source-fields (source-required-fields required-fields-source-text source-labels)
                     required-fields (merge (get required-fields-by-route route {}) source-fields)
-                    other-route-labels (->> (vals (or required-fields-by-route {}))
-                                            (mapcat keys)
+                    required-labels-by-route
+                    (merge-with into
+                                (update-vals (or required-fields-by-route {})
+                                             (comp vec keys))
+                                (or required-field-labels-by-route {}))
+                    other-route-labels (->> (vals required-labels-by-route)
+                                            (mapcat identity)
                                             (remove #(contains? required-fields %))
                                             set)
                     forbidden-labels (into other-route-labels
