@@ -74,3 +74,4 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 review step: the worktree wrapper now validates its normal terminal export exactly; checked-in execution proof covers accepted, missing, malformed, duplicate, and branch-mismatched handbacks.
 - added 1 step to be addressed
 - addressed 1 review step: completion handbacks now reject either blocked-only blocker/action field in checked-in standalone and delegated execution.
+- added 1 step to be addressed

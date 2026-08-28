@@ -136,3 +136,7 @@
 
 - [x] Reject blocked-only `IMPLEMENTATION_BLOCKER` and `IMPLEMENTATION_REQUIRED_HUMAN_ACTION` fields from every `IMPLEMENTATION_COMPLETE` terminal handback. The normal `implement-task` and `implement-task-in-worktree` summary judges currently validate only the completion status, so they accept branch-mismatched blocker/action lines despite `doc/workflows.md` stating that branch-mismatched terminal fields fail. Extend deterministic field validation and checked-in standalone/delegated execution coverage so a clean completion export is accepted while either blocked-only field on a completion branch fails before downstream work.
   - Added authored forbidden-field labels to both completion judges and generic exact-marker enforcement; checked-in standalone and delegated execution proofs accept clean completion and reject either blocked-only field before completion/downstream work. Focused routing, implementation, lifecycle/wrapper, and migration-validation tests, clj-kondo, and `git diff --check` pass.
+
+## Implementation review follow-up
+
+- [ ] Reconcile `munera/plan.md` with the implemented task state. Task 256 is still listed under `Not yet started` and described as `Design-only`, even though all implementation slices and review follow-ups are complete; update the orchestration entry so future agents are not directed by stale status.
