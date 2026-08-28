@@ -208,21 +208,23 @@
            required-field-labels-by-route required-fields-source-text]}]
   (let [allowed-routes-set (when (vector? allowed-routes)
                              (set allowed-routes))
+        source-fields-requested? (and (map? required-field-labels-by-route)
+                                      (some seq (vals required-field-labels-by-route)))
         source-errors
         (cond
-          (and required-field-labels-by-route
+          (and source-fields-requested?
                (not (string? required-fields-source-text)))
           [{:field :required-fields-source-text
             :reason :non-string-required-fields-source-text
             :value required-fields-source-text}]
 
-          (and required-field-labels-by-route
+          (and (some? required-field-labels-by-route)
                (not (map? required-field-labels-by-route)))
           [{:field :required-field-labels-by-route
             :reason :non-map-required-field-labels-by-route
             :value required-field-labels-by-route}]
 
-          required-field-labels-by-route
+          (map? required-field-labels-by-route)
           (mapcat (fn [[route labels]]
                     (concat
                      (when (and allowed-routes-set

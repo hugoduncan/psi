@@ -469,6 +469,16 @@
       (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
       (is (= "workflow/exact-marker-routing args are invalid" (:message result))
           (pr-str result))))
+  (testing "empty source-derived required-field schemas compose as identity"
+    (doseq [required-field-labels-by-route
+            [{} {"APPROVE" []} {"APPROVE" [] "DENY" []}]]
+      (let [result (exact-marker-routing/parse-exact-marker-routing
+                    {:text "QUALITY_GATE: APPROVE"
+                     :marker-label "QUALITY_GATE"
+                     :allowed-routes ["APPROVE" "DENY"]
+                     :required-field-labels-by-route required-field-labels-by-route})]
+        (is (= :ok (:status result)) (pr-str required-field-labels-by-route result))
+        (is (= "APPROVE" (:data result)) (pr-str required-field-labels-by-route result)))))
   (testing "direct and source-derived required fields are both validated"
     (let [result (exact-marker-routing/parse-exact-marker-routing
                   {:text "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
