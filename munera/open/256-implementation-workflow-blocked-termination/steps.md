@@ -280,4 +280,5 @@
 
 ## Documentation review follow-up
 
-- [ ] Add an `[Unreleased]` changelog entry for the user-visible workflow terminal-projection fix: failed and cancelled workflow runs no longer expose retained or rejected terminal-step text as their yielded result. Keep the wording consistent with `doc/workflows.md` and the delegate contract that failed attempts produce no accepted result.
+- [x] Add an `[Unreleased]` changelog entry for the user-visible workflow terminal-projection fix: failed and cancelled workflow runs no longer expose retained or rejected terminal-step text as their yielded result. Keep the wording consistent with `doc/workflows.md` and the delegate contract that failed attempts produce no accepted result.
+  - Added a Fixed entry documenting suppressed failed/cancelled terminal yields and the no-accepted-result delegate contract.
