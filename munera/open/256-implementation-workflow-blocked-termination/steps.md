@@ -255,4 +255,5 @@
 
 ## Code-shaper review follow-up
 
-- [ ] Remove the stale `psi.agent-session.workflow.core` require from `scope_question_gate_operation_test.clj` after the artifact-routing extraction; `clj-kondo` currently reports it as unused. Re-run the focused operation test and lint the namespace.
+- [x] Remove the stale `psi.agent-session.workflow.core` require from `scope_question_gate_operation_test.clj` after the artifact-routing extraction; `clj-kondo` currently reports it as unused. Re-run the focused operation test and lint the namespace.
+  - The extraction commit already replaced the stale require with `psi.agent-session.workflow.artifact-routing`; focused Scry passed with 11 tests/146 assertions, and clj-kondo reported no findings.
