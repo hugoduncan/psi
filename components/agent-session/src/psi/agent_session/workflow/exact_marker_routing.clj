@@ -1,14 +1,10 @@
 (ns psi.agent-session.workflow.exact-marker-routing
   "Deterministic parser for authored workflow route markers and route fields."
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [psi.agent-session.workflow.authored-token :as authored-token]))
 
-(def ^:private route-token-pattern #"^[A-Z_]+$")
-
-(defn- route-token?
-  [value]
-  (and (string? value)
-       (boolean (re-matches route-token-pattern value))))
+(def ^:private route-token? authored-token/valid-route-token?)
 
 (defn- marker-label-errors
   [args]

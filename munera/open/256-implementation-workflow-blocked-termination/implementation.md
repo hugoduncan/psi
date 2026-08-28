@@ -148,3 +148,4 @@ No implementation has started. The existing implementation loop currently recogn
 - code-shaper review added 1 step to be addressed
 - addressed 1 review step: all artifact-read handlers now reject unsafe artifact filenames before the injectable read boundary; focused Scry, clj-kondo, and `git diff --check` pass.
 - code-shaper review added 1 step to be addressed
+- addressed 1 review step: authored route tokens and field labels now share one dependency-neutral validation predicate; focused producer/consumer parity proof passes.

@@ -309,4 +309,5 @@
 
 ## Code-shaper review follow-up
 
-- [ ] Give authored route tokens and field labels one shared validation predicate. `workflow.routing/valid-route-token?` and `workflow.exact-marker-routing/route-token?` independently encode the same `^[A-Z_]+$` invariant, so a future grammar change can make artifact-routing output pass its producer validation but fail exact-marker consumer validation. Move the invariant to a dependency-neutral shared namespace (or otherwise expose one authoritative predicate), use it at both boundaries, and add a focused parity regression.
+- [x] Give authored route tokens and field labels one shared validation predicate. `workflow.routing/valid-route-token?` and `workflow.exact-marker-routing/route-token?` independently encode the same `^[A-Z_]+$` invariant, so a future grammar change can make artifact-routing output pass its producer validation but fail exact-marker consumer validation. Move the invariant to a dependency-neutral shared namespace (or otherwise expose one authoritative predicate), use it at both boundaries, and add a focused parity regression.
+  - Added dependency-neutral `workflow.authored-token`; artifact routing and exact-marker routing now consume its authoritative predicate. Focused Scry: routing 14 tests/333 assertions, operation 12 tests/255 assertions; clj-kondo and `git diff --check` passed.

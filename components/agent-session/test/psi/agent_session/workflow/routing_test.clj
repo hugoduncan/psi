@@ -1,6 +1,7 @@
 (ns psi.agent-session.workflow.routing-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.workflow.authored-token :as authored-token]
    [psi.agent-session.workflow.exact-marker-routing :as exact-marker-routing]
    [psi.agent-session.workflow.routing :as routing]))
 
@@ -245,6 +246,29 @@
                      nil]]
       (is (nil? (routing/normalize-open-task-path invalid))
           (pr-str invalid)))))
+
+(deftest authored-route-token-validation-parity-test
+  ;; Producer route tokens and exact-marker route/field labels share one grammar.
+  (doseq [token ["QUALITY_GATE" "APPROVE" "ESCALATE_NOW"]]
+    (testing (str "accepts " (pr-str token) " at every authored-token boundary")
+      (is (true? (authored-token/valid-route-token? token)))
+      (is (= :ok
+             (:status
+              (exact-marker-routing/parse-exact-marker-routing
+               {:text (str token ": " token "\nFIELD_LABEL: value")
+                :marker-label token
+                :allowed-routes [token]
+                :required-fields-by-route {token {"FIELD_LABEL" "value"}}}))))))
+  (doseq [token ["lowercase" "HAS-DASH" "HAS SPACE" "TOKEN1" "" nil]]
+    (testing (str "rejects " (pr-str token) " at every authored-token boundary")
+      (is (false? (authored-token/valid-route-token? token)))
+      (is (= :invalid-route-marker-args
+             (:reason
+              (exact-marker-routing/parse-exact-marker-routing
+               {:text "QUALITY_GATE: APPROVE"
+                :marker-label "QUALITY_GATE"
+                :allowed-routes ["APPROVE"]
+                :required-fields-by-route {"APPROVE" {token "value"}}})))))))
 
 (deftest exact-marker-routing-valid-and-missing-test
   ;; Tests generic exact-marker routing accepts arbitrary workflow-owned marker

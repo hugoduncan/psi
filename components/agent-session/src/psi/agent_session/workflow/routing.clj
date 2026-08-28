@@ -5,8 +5,6 @@
 
 (def ^:private pass-status-prefix "PASS_STATUS:")
 
-(def ^:private route-token-pattern #"^[A-Z_]+$")
-
 (def ^:private known-pass-status->route
   {"REVIEW_COMPLETE" "DONE"
    "ACTIONABLE_FEEDBACK" "REPEAT"
@@ -209,12 +207,6 @@
       {:status :ok
        :data proceed-route
        :summary proceed-route})))
-
-(defn valid-route-token?
-  "True when `value` is an unambiguous authored workflow route token."
-  [value]
-  (and (string? value)
-       (boolean (re-matches route-token-pattern value))))
 
 (defn valid-field-prefixes?
   "True when `field-prefixes` is a non-empty vector of distinct, non-blank strings."

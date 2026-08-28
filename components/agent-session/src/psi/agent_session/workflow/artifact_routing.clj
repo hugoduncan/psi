@@ -3,6 +3,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.resolvers :as resolvers]
+   [psi.agent-session.workflow.authored-token :as authored-token]
    [psi.agent-session.workflow.routing :as routing]))
 
 (defn- scope-question-gate-arg-errors
@@ -82,12 +83,12 @@
        (routing/valid-field-prefixes? field-prefixes)
        (string? end-delimiter)
        (not (str/blank? end-delimiter))
-       (routing/valid-route-token? valid-route)
+       (authored-token/valid-route-token? valid-route)
        (or (nil? output-field-labels)
            (and (vector? output-field-labels)
                 (= (count field-prefixes) (count output-field-labels))
                 (seq output-field-labels)
-                (every? routing/valid-route-token? output-field-labels)
+                (every? authored-token/valid-route-token? output-field-labels)
                 (apply distinct? output-field-labels)))))
 
 (defn- invalid-final-complete-block-routing-args-result
