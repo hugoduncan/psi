@@ -139,4 +139,5 @@
 
 ## Implementation review follow-up
 
-- [ ] Reconcile `munera/plan.md` with the implemented task state. Task 256 is still listed under `Not yet started` and described as `Design-only`, even though all implementation slices and review follow-ups are complete; update the orchestration entry so future agents are not directed by stale status.
+- [x] Reconcile `munera/plan.md` with the implemented task state. Task 256 is still listed under `Not yet started` and described as `Design-only`, even though all implementation slices and review follow-ups are complete; update the orchestration entry so future agents are not directed by stale status.
+  - Moved task 256 to an implemented-awaiting-closure section and removed the stale design-only description.

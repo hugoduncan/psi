@@ -2,9 +2,12 @@
 
 ## Open tasks (suggested execution order)
 
+Implemented; awaiting task closure:
+
+- `munera/open/256-implementation-workflow-blocked-termination/` — implementation and review follow-ups complete.
+
 Not yet started:
 
-- `munera/open/256-implementation-workflow-blocked-termination/` — add an authored `IMPLEMENTATION_BLOCKED` termination and human handback to `implement-task`, and gate `task-lifecycle` before implementation review/extraction. Design-only.
 - `munera/open/249-workflow-resume-validation-error/` — clarify or improve workflow resume behavior when a run is `:running` rather than blocked. Design-only; auto-generated and pending human review.
 - `munera/open/202-document-at-bounds-in-scheduler-doc/` — (from master) document the resolved-millisecond-delay absolute `:at` bounds in `doc/scheduler.md`. NNN collides with closed `202-reusable-review-follow-up-step` (left as-is per convention).
 - `munera/open/206-emacs-buffer-local-widget-mutation-timers/` — move Emacs widget-projection mutation watchdog timers from a module-global hash into buffer-local `psi-emacs-state` and cancel them in `psi-emacs--teardown-buffer`, fixing orphaned/non-deterministic/cross-buffer timers when a psi buffer is killed mid-mutation. Design-only.
