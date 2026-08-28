@@ -176,3 +176,7 @@
 
 - [x] Make the remaining checked-in wrapper and outer-orchestration prompt-response dispatchers fail immediately on unknown prompts instead of returning `prompt`, `summary-reply`, or a branch handback from catch-all fallbacks. Cover the `implement-task-in-worktree`, direct-caller snapshot, and `gh-issue-implement` helpers with explicit expected prompt classification and one focused diagnostic-boundary assertion, so an inserted or renamed session step cannot receive a plausible terminal reply and let authored-topology drift pass indirectly.
   - Wrapper, direct-caller, and outer-PR helpers now classify exact delegated yields and authored session prompts, throwing with `:unexpected-prompt` on topology drift. Focused Scry: 14 tests, 145 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Test review follow-up
+
+- [ ] Complete the in-progress caller-test namespace split: `workflow_implementation_callers_test.clj` references `lifecycle-definition` and `execute-lifecycle!` that remain private in `workflow_task_lifecycle_implementation_gate_test.clj`, while caller-only helpers remain unused in the lifecycle namespace. Move each fixture/helper with the tests that use it (or extract genuinely shared support), then prove both namespaces load and pass and run `clj-kondo` without unresolved symbols or unused private vars.
