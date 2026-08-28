@@ -531,6 +531,24 @@
         (is (some #(= :invalid-required-field-labels (:reason %))
                   (get-in result [:details :errors]))
             (pr-str result)))))
+  (testing "a route field cannot be both required and forbidden"
+    (doseq [required-args
+            [{:required-fields-by-route {"APPROVE" {"FIELD" "value"}}}
+             {:required-fields-source-text "FIELD: value"
+              :required-field-labels-by-route {"APPROVE" ["FIELD"]}}]]
+      (let [result (routing/parse-exact-marker-routing
+                    (merge {:text "FIELD: value\nQUALITY_GATE: APPROVE"
+                            :marker-label "QUALITY_GATE"
+                            :allowed-routes ["APPROVE"]
+                            :forbidden-field-labels-by-route {"APPROVE" ["FIELD"]}}
+                           required-args))]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (= [{:field :forbidden-field-labels-by-route
+                 :reason :required-and-forbidden-route-field
+                 :route "APPROVE"
+                 :label "FIELD"}]
+               (get-in result [:details :errors]))
+            (pr-str result)))))
   (testing "required invalid arg cases"
     (doseq [[args expected-errors]
             [[{} [{:field :text :reason :missing-text}

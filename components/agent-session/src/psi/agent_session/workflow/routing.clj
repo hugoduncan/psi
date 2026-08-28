@@ -608,6 +608,34 @@
          vec)
     []))
 
+(defn- required-and-forbidden-route-fields-errors
+  [{:keys [required-fields-by-route required-field-labels-by-route
+           forbidden-field-labels-by-route]}]
+  (if (map? forbidden-field-labels-by-route)
+    (->> forbidden-field-labels-by-route
+         (mapcat (fn [[route forbidden-labels]]
+                   (when (vector? forbidden-labels)
+                     (let [direct-fields (get required-fields-by-route route)
+                           direct-labels (if (map? direct-fields)
+                                           (keys direct-fields)
+                                           [])
+                           source-labels (get required-field-labels-by-route route [])
+                           required-labels (concat direct-labels
+                                                   (if (vector? source-labels)
+                                                     source-labels
+                                                     []))]
+                       (->> required-labels
+                            (filter route-token?)
+                            distinct
+                            (keep (fn [label]
+                                    (when (some #{label} forbidden-labels)
+                                      {:field :forbidden-field-labels-by-route
+                                       :reason :required-and-forbidden-route-field
+                                       :route route
+                                       :label label}))))))))
+         vec)
+    []))
+
 (defn- validate-required-route-fields
   [text required-fields forbidden-labels]
   (if-let [unexpected-label (some (fn [label]
@@ -666,7 +694,8 @@
                              (route-field-labels-errors
                               (:allowed-routes args)
                               :forbidden-field-labels-by-route
-                              (:forbidden-field-labels-by-route args))))]
+                              (:forbidden-field-labels-by-route args))
+                             (required-and-forbidden-route-fields-errors args)))]
     (if (seq errors)
       (invalid-exact-marker-routing-args-result errors)
       (let [{:keys [text marker-label allowed-routes required-fields-by-route
