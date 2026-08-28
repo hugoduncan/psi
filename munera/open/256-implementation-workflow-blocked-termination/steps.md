@@ -217,3 +217,7 @@
 
 - [x] Treat labels required through `:required-field-labels-by-route` as branch-specific fields when validating every other route in `workflow/exact-marker-routing`. The current foreign-field set is derived only from `:required-fields-by-route`, so a multi-route judge can accept a completion handback containing fields reserved for a source-derived blocked route unless the workflow redundantly declares them under `:forbidden-field-labels-by-route`. Unify direct and source-derived route-label handling and add focused regression coverage proving the owning route accepts its exact source-derived fields while another route rejects either field.
   - Direct and source-derived required labels now share one branch-ownership map; the owning blocked route accepts its validated fields while the completion route rejects either field. Focused Scry: 13 tests/280 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Code-shaper review follow-up
+
+- [ ] Strengthen `workflow/final-complete-block-routing` argument validation so `field-prefixes`, `output-field-labels`, and `valid-route` form an unambiguous enforceable schema: require non-empty distinct prefixes, require non-blank distinct route-token output labels when supplied, and require a valid non-blank route token. Add focused operation/parser regressions for empty and duplicate values. The current string/count-only checks allow duplicate prefixes to collapse through `zipmap` and can emit required-field text that `workflow/exact-marker-routing` cannot validate reliably.
