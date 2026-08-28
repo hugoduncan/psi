@@ -146,3 +146,7 @@
 
 - [x] Replace task-added `with-redefs` of `psi.agent-session.turn/prompt-execution-result-in!` in the implementation-routing and lifecycle execution tests with the existing injectable `:workflow-prompt-execution-result-fn` context boundary (using a nullable/state-controlled implementation), so the tests inject infrastructure state rather than mock global production behavior.
   - Both namespaces now inject deterministic responses through the context callback and rebuild the context's named workflow execution adapter from that callback; no global production Vars are redefined. Focused Scry: 20 tests, 219 assertions passed.
+
+## Test review follow-up
+
+- [ ] Extract the duplicated `with-workflow-prompt-execution-result-fn` / `with-workflow-prompt-execution-result` fixture from `workflow_implementation_routing_test.clj` and `workflow_task_lifecycle_implementation_gate_test.clj` into shared agent-session test support, then use that single context/adapter injection seam in both namespaces. Keep response setup local to each test so the shared helper compresses infrastructure ceremony without hiding test intent.
