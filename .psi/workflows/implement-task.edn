@@ -23,18 +23,17 @@
     "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}}
   {:name "validate-implementation-blocker",
    :type :invoke,
-   :operation "workflow/constant-routing",
-   :args {:route "DONE"},
-   :judge
-   {:type :invoke,
-    :operation "workflow/fresh-final-complete-block-routing",
-    :args {:task-path {:from :workflow-input, :path [:input]},
-           :artifact "implementation.md",
-           :before-content {:from {:step "capture-implementation-before-pass", :output :data}},
-           :start-delimiter "<!-- IMPLEMENTATION_BLOCKER: START -->",
-           :field-prefixes ["- blocker: " "- required-human-action: "],
-           :end-delimiter "<!-- IMPLEMENTATION_BLOCKER: END -->",
-           :valid-route "DONE"}},
+   :operation "workflow/fresh-final-complete-block-routing",
+   :args {:task-path {:from :workflow-input, :path [:input]},
+          :artifact "implementation.md",
+          :before-content {:from {:step "capture-implementation-before-pass", :output :data}},
+          :start-delimiter "<!-- IMPLEMENTATION_BLOCKER: START -->",
+          :field-prefixes ["- blocker: " "- required-human-action: "],
+          :end-delimiter "<!-- IMPLEMENTATION_BLOCKER: END -->",
+          :valid-route "DONE"},
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
    :on {"DONE" {:goto "final-summary-blocked"}}}
   {:name "final-summary-complete",
    :type :session,
@@ -58,8 +57,12 @@
     {:type :source, :from {:step "implement-pass", :yield :text}}
     {:type :template,
      :text
-     "Produce the user-facing blocked handback for the specific Munera task described by {{input}}. Independently inspect `design.md`, `plan.md`, `steps.md`, and `implementation.md`. Implementation stopped blocked; do not describe it as completed.\n\nIn `implementation.md`, locate `<!-- IMPLEMENTATION_BLOCKER: START -->` through `<!-- IMPLEMENTATION_BLOCKER: END -->` blocks. A complete record has exactly these non-empty field lines between its delimiters:\n- blocker: <text>\n- required-human-action: <text>\nUse only the last complete record in file order. Ignore incomplete or malformed blocks. If no complete record exists, fail rather than inventing a blocker. Reproduce that record's `blocker` and `required-human-action` values verbatim.\n\nOutput a compact Markdown summary with headings `## Implementation Blocked`, `## Completed Work and Verification`, and `## Required Human Action`. State the completed work, current checklist state, task artifacts updated, and verification already performed. Explain that a human must take the recorded required action and then freshly re-invoke `implement-task`; do not claim implementation review or knowledge extraction ran. Include machine-friendly handoff fields from actor-step context when available (`pr_number:`, `pr_url:`, `pr_branch:`, `worktree_path:`, `munera_task_path:`, `deviation_summary:`). End with exactly this column-zero line:\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED",
-     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+     "Produce the user-facing blocked handback for the specific Munera task described by {{input}}. Independently inspect `design.md`, `plan.md`, `steps.md`, and `implementation.md` for completed work and verification only. Implementation stopped blocked; do not describe it as completed.\n\nThe deterministic validation step selected this blocker record from one artifact snapshot:\n- blocker: {{blocker}}\n- required-human-action: {{required-human-action}}\nReproduce these validated values verbatim. Do not re-read or select a blocker record from `implementation.md`; a later artifact revision is not authoritative for this handback.\n\nOutput a compact Markdown summary with headings `## Implementation Blocked`, `## Completed Work and Verification`, and `## Required Human Action`. State the completed work, current checklist state, task artifacts updated, and verification already performed. Explain that a human must take the recorded required action and then freshly re-invoke `implement-task`; do not claim implementation review or knowledge extraction ran. Include machine-friendly handoff fields from actor-step context when available (`pr_number:`, `pr_url:`, `pr_branch:`, `worktree_path:`, `munera_task_path:`, `deviation_summary:`). End with exactly these column-zero lines:\nIMPLEMENTATION_BLOCKER: {{blocker}}\nIMPLEMENTATION_REQUIRED_HUMAN_ACTION: {{required-human-action}}\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED",
+     :vars {"input" {:from :workflow-input, :path [:input]}
+            "blocker" {:from {:step "validate-implementation-blocker", :output :result},
+                       :path [:outputs :result :details :record "- blocker: "]}
+            "required-human-action" {:from {:step "validate-implementation-blocker", :output :result},
+                                     :path [:outputs :result :details :record "- required-human-action: "]}}}],
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},

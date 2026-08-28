@@ -45,7 +45,7 @@
     {:type :source, :from {:step "implement-task", :yield :text}}
     {:type :template,
      :text
-     "Produce the terminal blocked handback for `reduce-incidental-complexity` at {{input}}. Read the committed task artifacts, especially `implementation.md`, and the `implement-task` handback. Implementation stopped blocked; do not describe it as completed. Reproduce the final complete `IMPLEMENTATION_BLOCKER` record's `blocker` and `required-human-action`, summarize completed work and verification, and say that a human must resolve the recorded action before freshly re-invoking `reduce-incidental-complexity`. Do not run or claim validation, implementation review, proof synchronization, or final summary ran.",
+     "Produce the terminal blocked handback for `reduce-incidental-complexity` at {{input}}. Read committed task artifacts for completed work and verification only. Implementation stopped blocked; do not describe it as completed. The `implement-task` handback contains exactly one column-zero `IMPLEMENTATION_BLOCKER: <text>` line and one column-zero `IMPLEMENTATION_REQUIRED_HUMAN_ACTION: <text>` line selected from the artifact snapshot that passed deterministic validation. Reproduce both lines and values verbatim; do not re-read or select a blocker record from `implementation.md`. Summarize completed work and verification, and say that a human must resolve the recorded action before freshly re-invoking `reduce-incidental-complexity`. Do not run or claim validation, implementation review, proof synchronization, or final summary ran.",
      :vars {"input" {:from {:step "extract-task-path", :yield :text}}}}]
    :judge {:type :invoke,
            :operation "workflow/constant-routing",

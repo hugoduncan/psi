@@ -986,11 +986,14 @@ to the task's `implementation.md` before returning
 The blocked route captures `implementation.md` before every implementation pass
 and deterministically validates that the current blocked pass appended a complete
 record. Missing, malformed, or stale records from an earlier attempt fail rather
-than producing an invented handback. When several attempts exist, summaries use
-the final complete record in file order. Its standalone blocked handback reports that record, completed work, and
-verification, then directs the human to resolve the action and freshly invoke
-`implement-task`. The normal and blocked terminal summaries export exactly one
-branch-matching `IMPLEMENTATION_STATUS` marker.
+than producing an invented handback. When several attempts exist, validation uses
+the final complete record in file order. The standalone blocked handback consumes
+that record from the same validated artifact snapshot, reports its values as
+`IMPLEMENTATION_BLOCKER` and `IMPLEMENTATION_REQUIRED_HUMAN_ACTION` lines, and
+then directs the human to resolve the action and freshly invoke `implement-task`.
+Caller handbacks propagate those validated lines rather than selecting a blocker
+from a later `implementation.md` revision. The normal and blocked terminal
+summaries export exactly one branch-matching `IMPLEMENTATION_STATUS` marker.
 
 `implement-task-in-worktree` is a loadable multi-step `.edn` wrapper that first
 resolves the handed-off worktree, then delegates implementation. Every workflow

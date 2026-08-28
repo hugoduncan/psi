@@ -195,7 +195,11 @@
               "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}
              (:on implement-pass)))
       (is (= "workflow/fresh-final-complete-block-routing"
-             (get-in blocker-validation [:judge :operation])))
+             (:operation blocker-validation)))
+      (is (= {:type :invoke
+              :operation "workflow/constant-routing"
+              :args {:route "DONE"}}
+             (:judge blocker-validation)))
       (is (= {"DONE" {:goto "final-summary-blocked"}}
              (:on blocker-validation)))
       (is (some? complete-summary))
@@ -204,5 +208,10 @@
                          "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"))
       (is (str/includes? blocked-prompt
                          "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
-      (is (str/includes? blocked-prompt "last complete record in file order"))
-      (is (str/includes? blocked-prompt "fail rather than inventing a blocker")))))
+      (is (str/includes? blocked-prompt
+                         "selected this blocker record from one artifact snapshot"))
+      (is (str/includes? blocked-prompt
+                         "Do not re-read or select a blocker record"))
+      (is (str/includes? blocked-prompt "IMPLEMENTATION_BLOCKER: {{blocker}}"))
+      (is (str/includes? blocked-prompt
+                         "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: {{required-human-action}}")))))

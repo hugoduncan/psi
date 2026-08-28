@@ -167,12 +167,9 @@
    [{:type :source, :from :workflow-original}
     {:type :source, :from {:step "implement-task", :yield :text}}
     {:type :template,
-     :text "Produce the user-facing blocked handback for the Munera task lifecycle described by {{input}}. Independently inspect the specific task artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, and preserve the `implement-task` yielded handback as supporting context. The lifecycle stopped because implementation yielded `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED`; it did not complete implementation.
+     :text "Produce the user-facing blocked handback for the Munera task lifecycle described by {{input}}. Independently inspect the specific task artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, for completed work and verification only. The lifecycle stopped because implementation yielded `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED`; it did not complete implementation.
 
-In `implementation.md`, locate `<!-- IMPLEMENTATION_BLOCKER: START -->` through `<!-- IMPLEMENTATION_BLOCKER: END -->` blocks. A complete record has exactly these non-empty field lines between its delimiters:
-- blocker: <text>
-- required-human-action: <text>
-Use only the last complete record in file order. Ignore incomplete or malformed blocks. If no complete record exists, fail rather than inventing a blocker. Reproduce that record's `blocker` and `required-human-action` values verbatim.
+The `implement-task` yielded handback contains exactly one column-zero `IMPLEMENTATION_BLOCKER: <text>` line and one column-zero `IMPLEMENTATION_REQUIRED_HUMAN_ACTION: <text>` line selected from the artifact snapshot that passed deterministic validation. Reproduce those two values verbatim. Do not re-read or select a blocker record from `implementation.md`; a later artifact revision is not authoritative for this handback.
 
 Output a compact Markdown summary with headings `## Implementation Blocked`, `## Completed Work and Verification`, and `## Required Human Action`. State completed work, current checklist state, task artifacts updated, and verification already performed. Explicitly state that `review-task-implementation` and `extract-task-knowledge` did not run. Tell the human to take the recorded required action and then freshly re-invoke `task-lifecycle`; do not resolve, guess, or bypass the blocker and do not write mementum knowledge here.
 

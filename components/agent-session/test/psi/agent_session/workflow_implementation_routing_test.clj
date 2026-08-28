@@ -164,7 +164,8 @@
     (fn [worktree ctx session-id]
       (let [task-path "munera/open/230-x"
             run-id "checked-in-implement-blocked"
-            replies* (atom 0)]
+            replies* (atom 0)
+            prompts* (atom [])]
         (test-support/write-task-artifact!
          worktree task-path "implementation.md"
          (artifact-content {:blocker "earlier decision"
@@ -174,7 +175,8 @@
                                     (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                     run-id task-path)
         (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                      (fn [_ctx _child-session-id _prompt]
+                      (fn [_ctx _child-session-id prompt]
+                        (swap! prompts* conj prompt)
                         (let [reply-number (swap! replies* inc)]
                           (when (= 1 reply-number)
                             (spit (str worktree "/" task-path "/implementation.md")
@@ -187,7 +189,12 @@
                             :content [{:type :text
                                        :text (case reply-number
                                                1 "PASS_STATUS: IMPLEMENTATION_BLOCKED"
-                                               2 "blocked handback")}]
+                                               2 (do
+                                                   (spit (str worktree "/" task-path "/implementation.md")
+                                                         (artifact-content
+                                                          {:blocker "intervening edit"
+                                                           :required-human-action "ignore validated record"}))
+                                                   "blocked handback"))}]
                             :stop-reason :stop}}))]
           (let [result (workflow-execution/execute-run! ctx session-id run-id)
                 run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
@@ -202,7 +209,12 @@
             (is (= "blocked handback" (terminal-contract/terminal-yielded-text run)))
             (is (= "DONE"
                    (get-in run [:step-runs "validate-implementation-blocker"
-                                :attempts 0 :judge-output :routing-result :data])))))))))
+                                :accepted-result :outputs :data])))
+            (is (some #(.contains % "- blocker: awaiting product decision")
+                      @prompts*))
+            (is (some #(.contains % "- required-human-action: choose the retention policy")
+                      @prompts*))
+            (is (not-any? #(.contains % "intervening edit") @prompts*))))))))
 
 (deftest checked-in-implement-task-blocked-route-rejects-stale-blocker-test
   (test-support/with-temp-worktree-session
@@ -226,7 +238,8 @@
                 run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
             (is (= :failed (:status result)) (pr-str run))
             (is (= :missing-fresh-final-complete-block
-                   (get-in run [:terminal-outcome :reason])) (pr-str run))
+                   (get-in run [:step-runs "validate-implementation-blocker"
+                                :attempts 0 :execution-error :reason])) (pr-str run))
             (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts])))
                 (pr-str run))))))))
 
@@ -254,7 +267,8 @@
                   run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
               (is (= :failed (:status result)) label)
               (is (= :missing-fresh-final-complete-block
-                     (get-in run [:terminal-outcome :reason])) label)
+                     (get-in run [:step-runs "validate-implementation-blocker"
+                                  :attempts 0 :execution-error :reason])) label)
               (is (= 1 (count (get-in run [:step-runs "validate-implementation-blocker" :attempts]))) label)
               (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts]))) label)
               (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))) label))))))))

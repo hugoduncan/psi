@@ -110,6 +110,27 @@
   [worktree]
   (checked-in-workflow-definition worktree "implement-task-in-worktree"))
 
+(defn- checked-in-blocked-caller-definition
+  [worktree workflow-name delegate-step-name blocked-step-name]
+  (let [definition (checked-in-workflow-definition worktree workflow-name)
+        by-name (into {} (map (juxt :name identity)) (:steps definition))
+        gate (-> (get by-name "check-implementation-status")
+                 (assoc-in [:on "IMPLEMENTATION_COMPLETE" :goto] blocked-step-name))
+        blocked (-> (get by-name blocked-step-name)
+                    (assoc :contributions
+                           [{:type :source :from {:step delegate-step-name :yield :text}}
+                            (-> (last (:contributions (get by-name blocked-step-name)))
+                                (assoc :vars {}))]))]
+    {:definition-id (str workflow-name "-blocked-snapshot-proof")
+     :name (str workflow-name "-blocked-snapshot-proof")
+     :steps [{:name delegate-step-name
+              :type :delegate
+              :target "implement-task"
+              :prompt-string "implement"
+              :context []}
+             gate
+             blocked]}))
+
 (defn- checked-in-gh-issue-implement-gate-definition
   [worktree]
   (let [definition (checked-in-workflow-definition worktree "gh-issue-implement")
@@ -446,6 +467,57 @@
                (get-in run [:terminal-outcome :step-id])))
         (is (= 1 (count (get-in run [:step-runs "summary-implementation-blocked" :attempts]))))
         (is (zero? (count (get-in run [:step-runs "summary" :attempts]))))))))
+
+(deftest checked-in-caller-handbacks-propagate-validated-blocker-test
+  ;; Tests every checked-in direct caller handback preserves the delegated
+  ;; validated snapshot after the task artifact changes.
+  (doseq [[workflow-name delegate-step blocked-step]
+          [["task-lifecycle" "implement-task" "final-summary-implementation-blocked"]
+           ["implement-task-in-worktree" "implement" "summary-implementation-blocked"]
+           ["reduce-architectural-complexity" "implement-task" "terminal-stop-implementation-blocked"]
+           ["reduce-incidental-complexity" "implement-task" "terminal-stop-implementation-blocked"]]]
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          source-worktree (System/getProperty "user.dir")
+          definition (checked-in-blocked-caller-definition source-worktree workflow-name
+                                                           delegate-step blocked-step)
+          blocked-yield (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                             "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                             "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+          implementation (child-definition "implement-task" blocked-yield)
+          run-id (str workflow-name "-blocked-snapshot")
+          prompts* (atom [])]
+      (register-routing-ops! ctx)
+      (swap! (:state* ctx)
+             (fn [state]
+               (reduce (fn [next-state child-definition]
+                         (first (workflow-registry/register-definition next-state child-definition)))
+                       state
+                       [implementation definition])))
+      (create-lifecycle-run! ctx definition run-id {:input "munera/open/256-task"})
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx _child-session-id prompt]
+                      (swap! prompts* conj prompt)
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text
+                                   :text (if (= blocked-yield prompt)
+                                           prompt
+                                           "blocked caller handback")}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id run-id)
+              run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
+              prompts @prompts*]
+          (is (= :completed (:status result)) workflow-name)
+          (is (= blocked-step (get-in run [:terminal-outcome :step-id])) workflow-name)
+          (is (some #(.contains % "IMPLEMENTATION_BLOCKER: validated blocker") prompts)
+              workflow-name)
+          (is (some #(.contains % "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action")
+                    prompts)
+              workflow-name)
+          (is (some #(or (.contains % "Do not re-read or select a blocker record")
+                         (.contains % "do not re-read or select a blocker record"))
+                    prompts)
+              workflow-name))))))
 
 (deftest checked-in-gh-issue-implement-blocked-route-test
   ;; Tests the checked-in outer orchestration consumes the wrapper's blocked

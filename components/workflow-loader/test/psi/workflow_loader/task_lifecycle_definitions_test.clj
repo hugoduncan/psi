@@ -130,7 +130,8 @@
          (is (some #(= {:type :source :from {:step "implement-task" :yield :text}} %)
                    (:contributions implementation-blocked-step)))
          (let [text (step-template-text implementation-blocked-step)]
-           (is (.contains text "last complete record in file order"))
+           (is (.contains text "selected from the artifact snapshot that passed deterministic validation"))
+           (is (.contains text "Do not re-read or select a blocker record"))
            (is (.contains text "review-task-implementation` and `extract-task-knowledge` did not run"))
            (is (.contains text "re-invoke `task-lifecycle`")))
          (is (= {"DONE" {:goto :done}} (:on implementation-blocked-step))))
