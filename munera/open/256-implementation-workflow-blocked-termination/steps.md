@@ -296,3 +296,7 @@
   - Empty maps and maps containing only empty route vectors now compose as identity without requiring source text. Focused Scry: 13 tests/313 assertions passed; clj-kondo and `git diff --check` passed.
 - [x] Reject duplicate labels in `:forbidden-field-labels-by-route` during `workflow/exact-marker-routing` argument validation. Required source-derived labels are already required to be distinct, while forbidden labels such as `["FIELD" "FIELD"]` are accepted, leaving two analogous route-field schema vectors with inconsistent enforceable invariants; add focused invalid-argument coverage.
   - Forbidden route-field vectors now reject duplicate labels with their indices as structured invalid arguments. Focused Scry: 13 tests/315 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Code-shaper review follow-up
+
+- [ ] Validate and normalize `task-path` before every `workflow/task-artifact-content-read`, `workflow/final-complete-block-routing`, and `workflow/fresh-final-complete-block-routing` artifact read. Their current argument checks accept any nonblank string, and the injectable `read-task-artifact-content` branch bypasses `normalize-open-task-path`, so malformed, closed-task, or free-text paths cross the I/O boundary and are misreported as missing content; add handler-level regressions proving non-canonical paths return structured invalid-argument results and perform no read.
