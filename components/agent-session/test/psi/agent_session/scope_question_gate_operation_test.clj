@@ -108,7 +108,15 @@
 (deftest final-complete-block-routing-rejects-ambiguous-schema-test
   ;; The operation rejects schemas that cannot produce exact-marker-compatible fields.
   (let [base-args (assoc blocker-routing-args :task-path "munera/open/230-x")
-        invalid-overrides [{:field-prefixes []}
+        invalid-overrides [{:task-path ""}
+                           {:task-path "   "}
+                           {:artifact ""}
+                           {:artifact "   "}
+                           {:start-delimiter ""}
+                           {:start-delimiter "   "}
+                           {:end-delimiter ""}
+                           {:end-delimiter "   "}
+                           {:field-prefixes []}
                            {:field-prefixes ["- blocker: " "- blocker: "]}
                            {:field-prefixes ["" "- required-human-action: "]}
                            {:output-field-labels []}

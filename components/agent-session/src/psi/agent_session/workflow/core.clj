@@ -163,10 +163,14 @@
   (let [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route
                 output-field-labels]} args
         valid-args? (and (string? task-path)
+                         (not (str/blank? task-path))
                          (string? artifact)
+                         (not (str/blank? artifact))
                          (string? start-delimiter)
+                         (not (str/blank? start-delimiter))
                          (routing/valid-field-prefixes? field-prefixes)
                          (string? end-delimiter)
+                         (not (str/blank? end-delimiter))
                          (routing/valid-route-token? valid-route)
                          (or (nil? output-field-labels)
                              (and (vector? output-field-labels)
