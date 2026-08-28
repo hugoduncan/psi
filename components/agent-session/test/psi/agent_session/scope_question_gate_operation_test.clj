@@ -8,7 +8,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-judge :as workflow-judge]
-   [psi.agent-session.workflow.core :as workflow-core]
+   [psi.agent-session.workflow.artifact-routing :as artifact-routing]
    [psi.deterministic-operation-registry.registry :as registry]
    [psi.deterministic-operation-runtime.core :as runtime]))
 
@@ -71,7 +71,7 @@
     (registry/register-operation-in!
      reg {:id gate-operation-id
           :description "scope gate (test registration)"
-          :handler workflow-core/scope-question-gate-routing})
+          :handler artifact-routing/scope-question-gate-routing})
     (registry/invoke-operation-in reg gate-operation-id invocation
                                   runtime/invoke-operation)))
 
@@ -82,7 +82,7 @@
    (:deterministic-operation-registry ctx)
    {:id gate-operation-id
     :description "scope gate (test registration)"
-    :handler workflow-core/scope-question-gate-routing}))
+    :handler artifact-routing/scope-question-gate-routing}))
 
 (defn- direct-invocation
   [ctx session-id task-path]
@@ -97,7 +97,7 @@
       (let [operation-id "workflow/final-complete-block-routing"]
         (registry/register-operation-in!
          (:deterministic-operation-registry ctx)
-         {:id operation-id :handler workflow-core/final-complete-block-routing})
+         {:id operation-id :handler artifact-routing/final-complete-block-routing})
         (write-task-artifact! worktree "munera/open/230-x" "implementation.md"
                               (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
                                    "- blocker: stale\n"
@@ -131,7 +131,7 @@
   ;; The operation rejects schemas that cannot produce exact-marker-compatible fields.
   (let [base-args (assoc blocker-routing-args :task-path "munera/open/230-x")]
     (doseq [override invalid-blocker-routing-overrides]
-      (let [result (#'workflow-core/final-complete-block-routing-result
+      (let [result (#'artifact-routing/final-complete-block-routing-result
                     (merge base-args override) "")]
         (is (= :error (:status result)) (pr-str override result))
         (is (= :invalid-final-complete-block-routing-args (:reason result))
@@ -150,7 +150,7 @@
         (let [args (merge blocker-routing-args
                           {:task-path "munera/open/230-x"}
                           override)
-              result (workflow-core/final-complete-block-routing
+              result (artifact-routing/final-complete-block-routing
                       (assoc invocation :args args))]
           (is (= :invalid-final-complete-block-routing-args (:reason result))
               (pr-str override result))
@@ -161,7 +161,7 @@
                           {:task-path "munera/open/230-x"
                            :before-content "prior implementation notes\n"}
                           override)
-              result (workflow-core/fresh-final-complete-block-routing
+              result (artifact-routing/fresh-final-complete-block-routing
                       (assoc invocation :args args))]
           (is (= :invalid-final-complete-block-routing-args (:reason result))
               (pr-str override result))
@@ -170,7 +170,7 @@
       (let [args (assoc blocker-routing-args
                         :task-path "munera/open/230-x"
                         :before-content nil)
-            result (workflow-core/fresh-final-complete-block-routing
+            result (artifact-routing/fresh-final-complete-block-routing
                     (assoc invocation :args args))]
         (is (= :invalid-fresh-final-complete-block-routing-args (:reason result))
             (pr-str result))
@@ -187,7 +187,7 @@
         args (assoc blocker-routing-args
                     :task-path "munera/open/230-x"
                     :before-content before-content)
-        result (#'workflow-core/fresh-final-complete-block-routing-result
+        result (#'artifact-routing/fresh-final-complete-block-routing-result
                 args current-content)]
     (is (= :ok (:status result)) (pr-str result))
     (is (= "DONE" (:data result)) (pr-str result)))
@@ -200,7 +200,7 @@
           args (assoc blocker-routing-args
                       :task-path "munera/open/230-x"
                       :before-content before-content)
-          result (#'workflow-core/fresh-final-complete-block-routing-result
+          result (#'artifact-routing/fresh-final-complete-block-routing-result
                   args (str before-content block block))]
       (is (= :error (:status result)) (pr-str result))
       (is (= :missing-fresh-final-complete-block (:reason result))
@@ -209,7 +209,7 @@
     (let [args (assoc blocker-routing-args
                       :task-path " "
                       :before-content "prior implementation notes\n")
-          result (#'workflow-core/fresh-final-complete-block-routing-result args "")]
+          result (#'artifact-routing/fresh-final-complete-block-routing-result args "")]
       (is (= :error (:status result)) (pr-str result))
       (is (= :invalid-final-complete-block-routing-args (:reason result))
           (pr-str result))))
@@ -218,7 +218,7 @@
       (let [args (assoc blocker-routing-args
                         :task-path "munera/open/230-x"
                         :before-content before-content)
-            result (#'workflow-core/fresh-final-complete-block-routing-result args "")]
+            result (#'artifact-routing/fresh-final-complete-block-routing-result args "")]
         (is (= :error (:status result)) (pr-str result))
         (is (= :invalid-fresh-final-complete-block-routing-args (:reason result))
             (pr-str result))))))
