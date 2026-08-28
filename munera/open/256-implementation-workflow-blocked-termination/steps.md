@@ -301,3 +301,7 @@
 
 - [x] Validate and normalize `task-path` before every `workflow/task-artifact-content-read`, `workflow/final-complete-block-routing`, and `workflow/fresh-final-complete-block-routing` artifact read. Their current argument checks accept any nonblank string, and the injectable `read-task-artifact-content` branch bypasses `normalize-open-task-path`, so malformed, closed-task, or free-text paths cross the I/O boundary and are misreported as missing content; add handler-level regressions proving non-canonical paths return structured invalid-argument results and perform no read.
   - All three handlers now reject non-canonical open-task paths before I/O and pass normalized bare-task tokens through the injectable read seam. Focused Scry: 12 tests/199 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Code-shaper review follow-up
+
+- [ ] Validate `artifact` as a single safe artifact filename before every `workflow/task-artifact-content-read`, `workflow/final-complete-block-routing`, and `workflow/fresh-final-complete-block-routing` read. The handlers currently accept any nonblank string, so absolute, traversal, or nested paths cross the injectable read boundary even though the production resolver rejects them; use one shared validation rule and add handler-level regressions proving unsafe names return structured invalid-argument results without performing a read.
