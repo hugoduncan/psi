@@ -72,3 +72,4 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 review step: `gh-issue-implement` now validates and exports the blocked terminal status plus snapshot-matching blocker/action fields; checked-in execution proof covers accepted and invalid outputs while downstream PR work remains skipped.
 - added 1 step to be addressed
 - addressed 1 review step: the worktree wrapper now validates its normal terminal export exactly; checked-in execution proof covers accepted, missing, malformed, duplicate, and branch-mismatched handbacks.
+- added 1 step to be addressed

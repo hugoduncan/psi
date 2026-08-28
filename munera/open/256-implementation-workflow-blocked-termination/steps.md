@@ -131,3 +131,7 @@
 
 - [x] Enforce the normal terminal handback contract in `.psi/workflows/implement-task-in-worktree.edn`. Its `summary` step instructs the session to export `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE` but accepts any reply through `workflow/constant-routing`, so a standalone wrapper run can complete with a missing, malformed, duplicate, or branch-mismatched status despite the documented exact terminal-export contract. Use deterministic exact-marker validation and add checked-in execution coverage for accepted and rejected normal handbacks.
   - The wrapper's normal summary now exact-marker-validates only `IMPLEMENTATION_COMPLETE`; checked-in execution proof accepts and projects a valid handback and rejects missing, malformed, duplicate, and branch-mismatched status exports.
+
+## Implementation review follow-up
+
+- [ ] Reject blocked-only `IMPLEMENTATION_BLOCKER` and `IMPLEMENTATION_REQUIRED_HUMAN_ACTION` fields from every `IMPLEMENTATION_COMPLETE` terminal handback. The normal `implement-task` and `implement-task-in-worktree` summary judges currently validate only the completion status, so they accept branch-mismatched blocker/action lines despite `doc/workflows.md` stating that branch-mismatched terminal fields fail. Extend deterministic field validation and checked-in standalone/delegated execution coverage so a clean completion export is accepted while either blocked-only field on a completion branch fails before downstream work.
