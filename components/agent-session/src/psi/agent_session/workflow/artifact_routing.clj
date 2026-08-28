@@ -62,12 +62,21 @@
   (when-let [task-path (routing/normalize-open-task-path (:task-path args))]
     (assoc args :task-path task-path)))
 
+(defn- safe-artifact-filename?
+  [artifact]
+  (and (string? artifact)
+       (not (str/blank? artifact))
+       (not (#{"." ".."} artifact))
+       (not-any? #(or (= \/ %)
+                      (= \\ %)
+                      (Character/isISOControl ^char %))
+                 artifact)))
+
 (defn- valid-final-complete-block-routing-args?
   [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route
            output-field-labels]}]
   (and (some? (routing/normalize-open-task-path task-path))
-       (string? artifact)
-       (not (str/blank? artifact))
+       (safe-artifact-filename? artifact)
        (string? start-delimiter)
        (not (str/blank? start-delimiter))
        (routing/valid-field-prefixes? field-prefixes)
@@ -126,8 +135,7 @@
 (defn- valid-task-artifact-content-read-args?
   [{:keys [task-path artifact]}]
   (and (some? (routing/normalize-open-task-path task-path))
-       (string? artifact)
-       (not (str/blank? artifact))))
+       (safe-artifact-filename? artifact)))
 
 (defn task-artifact-content-read
   "Read a task artifact as an invoke-step value for authored workflow policy."

@@ -31,31 +31,37 @@
    :end-delimiter "<!-- IMPLEMENTATION_BLOCKER: END -->"
    :valid-route "DONE"})
 
+(def ^:private unsafe-artifact-names
+  ["." ".." "/tmp/implementation.md" "../implementation.md"
+   "notes/implementation.md" "notes\\implementation.md" "implementation\n.md"])
+
 (def ^:private invalid-blocker-routing-overrides
-  [{:task-path ""}
-   {:task-path "   "}
-   {:task-path "munera/closed/230-x"}
-   {:task-path "open task 230-x"}
-   {:task-path "/tmp/munera/open/230-x"}
-   {:task-path "munera/open/230-x/implementation.md"}
-   {:artifact ""}
-   {:artifact "   "}
-   {:start-delimiter ""}
-   {:start-delimiter "   "}
-   {:end-delimiter ""}
-   {:end-delimiter "   "}
-   {:field-prefixes []}
-   {:field-prefixes ["- blocker: " "- blocker: "]}
-   {:field-prefixes ["" "- required-human-action: "]}
-   {:field-prefixes [" " "- required-human-action: "]}
-   {:field-prefixes ["\t" "- required-human-action: "]}
-   {:output-field-labels []}
-   {:output-field-labels ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_BLOCKER"]}
-   {:output-field-labels ["" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
-   {:output-field-labels ["implementation_blocker"
-                          "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
-   {:valid-route ""}
-   {:valid-route "IMPLEMENTATION BLOCKED"}])
+  (concat
+   [{:task-path ""}
+    {:task-path "   "}
+    {:task-path "munera/closed/230-x"}
+    {:task-path "open task 230-x"}
+    {:task-path "/tmp/munera/open/230-x"}
+    {:task-path "munera/open/230-x/implementation.md"}
+    {:artifact ""}
+    {:artifact "   "}
+    {:start-delimiter ""}
+    {:start-delimiter "   "}
+    {:end-delimiter ""}
+    {:end-delimiter "   "}
+    {:field-prefixes []}
+    {:field-prefixes ["- blocker: " "- blocker: "]}
+    {:field-prefixes ["" "- required-human-action: "]}
+    {:field-prefixes [" " "- required-human-action: "]}
+    {:field-prefixes ["\t" "- required-human-action: "]}
+    {:output-field-labels []}
+    {:output-field-labels ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_BLOCKER"]}
+    {:output-field-labels ["" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
+    {:output-field-labels ["implementation_blocker"
+                           "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
+    {:valid-route ""}
+    {:valid-route "IMPLEMENTATION BLOCKED"}]
+   (map (fn [artifact] {:artifact artifact}) unsafe-artifact-names)))
 
 (defn- write-task-artifact!
   [worktree task-dir artifact content]
@@ -150,19 +156,23 @@
                "captured content")}
         invocation {:ctx ctx :session-id "session-1"}]
     (testing "malformed identifiers fail without reading"
-      (doseq [args [{:task-path nil :artifact "implementation.md"}
-                    {:task-path 42 :artifact "implementation.md"}
-                    {:task-path "" :artifact "implementation.md"}
-                    {:task-path "   " :artifact "implementation.md"}
-                    {:task-path "munera/closed/230-x" :artifact "implementation.md"}
-                    {:task-path "open task 230-x" :artifact "implementation.md"}
-                    {:task-path "/tmp/munera/open/230-x" :artifact "implementation.md"}
-                    {:task-path "munera/open/230-x/implementation.md"
-                     :artifact "implementation.md"}
-                    {:task-path "munera/open/230-x" :artifact nil}
-                    {:task-path "munera/open/230-x" :artifact 42}
-                    {:task-path "munera/open/230-x" :artifact ""}
-                    {:task-path "munera/open/230-x" :artifact "   "}]]
+      (doseq [args (concat
+                    [{:task-path nil :artifact "implementation.md"}
+                     {:task-path 42 :artifact "implementation.md"}
+                     {:task-path "" :artifact "implementation.md"}
+                     {:task-path "   " :artifact "implementation.md"}
+                     {:task-path "munera/closed/230-x" :artifact "implementation.md"}
+                     {:task-path "open task 230-x" :artifact "implementation.md"}
+                     {:task-path "/tmp/munera/open/230-x" :artifact "implementation.md"}
+                     {:task-path "munera/open/230-x/implementation.md"
+                      :artifact "implementation.md"}
+                     {:task-path "munera/open/230-x" :artifact nil}
+                     {:task-path "munera/open/230-x" :artifact 42}
+                     {:task-path "munera/open/230-x" :artifact ""}
+                     {:task-path "munera/open/230-x" :artifact "   "}]
+                    (map (fn [artifact]
+                           {:task-path "munera/open/230-x" :artifact artifact})
+                         unsafe-artifact-names))]
         (let [result (artifact-routing/task-artifact-content-read
                       (assoc invocation :args args))]
           (is (= :invalid-task-artifact-content-read-args (:reason result))
