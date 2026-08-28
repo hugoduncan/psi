@@ -137,3 +137,4 @@ No implementation has started. The existing implementation loop currently recogn
 - added 1 step to be addressed
 - addressed 1 review step: cancelled terminal outcomes now have focused projection coverage proving retained accepted terminal text is not yielded.
 - no new test-shaper review feedback
+- documentation review added 1 step to be addressed

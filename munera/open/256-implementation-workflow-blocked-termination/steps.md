@@ -277,3 +277,7 @@
 
 - [x] Add a focused `terminal-contract/terminal-yielded-text` test for a cancelled workflow run that retains an accepted terminal-step result, proving cancellation suppresses that text. The production guard and resolution note cover both failed and cancelled outcomes, but the current regression exercises only failed terminal judges.
   - Added a pure terminal-contract regression with retained accepted terminal text and a cancelled outcome. Focused Scry: 1 test/2 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Documentation review follow-up
+
+- [ ] Add an `[Unreleased]` changelog entry for the user-visible workflow terminal-projection fix: failed and cancelled workflow runs no longer expose retained or rejected terminal-step text as their yielded result. Keep the wording consistent with `doc/workflows.md` and the delegate contract that failed attempts produce no accepted result.
