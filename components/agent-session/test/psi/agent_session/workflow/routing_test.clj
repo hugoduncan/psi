@@ -526,6 +526,20 @@
                :indices [0 1]}]
              (get-in result [:details :errors]))
           (pr-str result))))
+  (testing "duplicate forbidden field labels are invalid arguments"
+    (let [result (exact-marker-routing/parse-exact-marker-routing
+                  {:text "QUALITY_GATE: APPROVE"
+                   :marker-label "QUALITY_GATE"
+                   :allowed-routes ["APPROVE"]
+                   :forbidden-field-labels-by-route {"APPROVE" ["FIELD" "FIELD"]}})]
+      (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+      (is (= [{:field :forbidden-field-labels-by-route
+               :reason :duplicate-field-label
+               :route "APPROVE"
+               :value "FIELD"
+               :indices [0 1]}]
+             (get-in result [:details :errors]))
+          (pr-str result))))
   (testing "malformed overlapping field labels remain structured invalid arguments"
     (doseq [label [nil 1]]
       (let [result (exact-marker-routing/parse-exact-marker-routing

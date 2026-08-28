@@ -185,7 +185,19 @@
                         [{:field field
                           :reason :invalid-field-labels
                           :route route
-                          :value labels}]))))
+                          :value labels}])
+                      (when (vector? labels)
+                        (->> labels
+                             (map-indexed vector)
+                             (group-by second)
+                             (keep (fn [[label indexed-labels]]
+                                     (let [indices (mapv first indexed-labels)]
+                                       (when (> (count indices) 1)
+                                         {:field field
+                                          :reason :duplicate-field-label
+                                          :route route
+                                          :value label
+                                          :indices indices})))))))))
            vec))))
 
 (defn- duplicate-required-field-label-errors
