@@ -212,3 +212,7 @@
 
 - [x] Define and enforce unambiguous overlap semantics when `workflow/exact-marker-routing` receives both `:required-fields-by-route` and `:required-field-labels-by-route`. The current `merge` silently lets a source-derived value replace a contradictory direct value for the same route/label, so the parser can accept output that violates the caller's direct requirement. Reject overlapping labels as invalid arguments, or require both sources to agree, and add focused regression coverage for conflicting and matching overlaps.
   - Matching direct and source-derived values compose; contradictory values return structured `:invalid-route-marker-args` before parsing. Focused Scry: 13 tests/276 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Code-shaper review follow-up
+
+- [ ] Treat labels required through `:required-field-labels-by-route` as branch-specific fields when validating every other route in `workflow/exact-marker-routing`. The current foreign-field set is derived only from `:required-fields-by-route`, so a multi-route judge can accept a completion handback containing fields reserved for a source-derived blocked route unless the workflow redundantly declares them under `:forbidden-field-labels-by-route`. Unify direct and source-derived route-label handling and add focused regression coverage proving the owning route accepts its exact source-derived fields while another route rejects either field.
