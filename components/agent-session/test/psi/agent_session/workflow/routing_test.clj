@@ -549,6 +549,30 @@
                  :label "FIELD"}]
                (get-in result [:details :errors]))
             (pr-str result)))))
+  (testing "the marker label cannot also be a route field label"
+    (doseq [[field optional-args]
+            [[:required-fields-by-route
+              {:required-fields-by-route
+               {"APPROVE" {"QUALITY_GATE" "APPROVE"}}}]
+             [:required-field-labels-by-route
+              {:required-fields-source-text "QUALITY_GATE: APPROVE"
+               :required-field-labels-by-route
+               {"APPROVE" ["QUALITY_GATE"]}}]
+             [:forbidden-field-labels-by-route
+              {:forbidden-field-labels-by-route
+               {"APPROVE" ["QUALITY_GATE"]}}]]]
+      (let [result (routing/parse-exact-marker-routing
+                    (merge {:text "QUALITY_GATE: APPROVE"
+                            :marker-label "QUALITY_GATE"
+                            :allowed-routes ["APPROVE"]}
+                           optional-args))]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (= [{:field field
+                 :reason :marker-label-route-field
+                 :route "APPROVE"
+                 :label "QUALITY_GATE"}]
+               (get-in result [:details :errors]))
+            (pr-str result)))))
   (testing "required invalid arg cases"
     (doseq [[args expected-errors]
             [[{} [{:field :text :reason :missing-text}

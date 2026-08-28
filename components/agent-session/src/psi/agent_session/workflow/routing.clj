@@ -636,6 +636,35 @@
          vec)
     []))
 
+(defn- marker-and-route-fields-errors
+  [{:keys [marker-label required-fields-by-route required-field-labels-by-route
+           forbidden-field-labels-by-route]}]
+  (let [direct-overlaps (when (map? required-fields-by-route)
+                          (for [[route fields] required-fields-by-route
+                                :when (and (map? fields)
+                                           (contains? fields marker-label))]
+                            {:field :required-fields-by-route
+                             :reason :marker-label-route-field
+                             :route route
+                             :label marker-label}))
+        source-overlaps (when (map? required-field-labels-by-route)
+                          (for [[route labels] required-field-labels-by-route
+                                :when (and (vector? labels)
+                                           (some #{marker-label} labels))]
+                            {:field :required-field-labels-by-route
+                             :reason :marker-label-route-field
+                             :route route
+                             :label marker-label}))
+        forbidden-overlaps (when (map? forbidden-field-labels-by-route)
+                             (for [[route labels] forbidden-field-labels-by-route
+                                   :when (and (vector? labels)
+                                              (some #{marker-label} labels))]
+                               {:field :forbidden-field-labels-by-route
+                                :reason :marker-label-route-field
+                                :route route
+                                :label marker-label}))]
+    (vec (concat direct-overlaps source-overlaps forbidden-overlaps))))
+
 (defn- validate-required-route-fields
   [text required-fields forbidden-labels]
   (if-let [unexpected-label (some (fn [label]
@@ -695,7 +724,8 @@
                               (:allowed-routes args)
                               :forbidden-field-labels-by-route
                               (:forbidden-field-labels-by-route args))
-                             (required-and-forbidden-route-fields-errors args)))]
+                             (required-and-forbidden-route-fields-errors args)
+                             (marker-and-route-fields-errors args)))]
     (if (seq errors)
       (invalid-exact-marker-routing-args-result errors)
       (let [{:keys [text marker-label allowed-routes required-fields-by-route

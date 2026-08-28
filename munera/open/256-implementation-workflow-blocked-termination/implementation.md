@@ -118,3 +118,4 @@ No implementation has started. The existing implementation loop currently recogn
 
 - addressed 3 review steps
 - code-shaper review added 3 steps to be addressed
+- addressed 1 review step: exact-marker schemas now reject marker-label reuse by direct required, source-derived required, or forbidden route fields.
