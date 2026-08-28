@@ -19,6 +19,7 @@
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
+   [psi.agent-session.workflow.exact-marker-routing :as exact-marker-routing]
    [psi.agent-session.workflow.routing :as routing]
    [psi.agent-session.workflow.runtime-state :as runtime-state]
    [psi.agent-session.workflow.text :as text]
@@ -285,7 +286,7 @@
     (register-operation
      {:id "workflow/exact-marker-routing"
       :handler (fn [{:keys [args]}]
-                 (routing/parse-exact-marker-routing args))})
+                 (exact-marker-routing/parse-exact-marker-routing args))})
     (register-operation
      {:id "workflow/scope-question-gate-routing"
       :description (str "Deterministically gate the task lifecycle on unchecked "
