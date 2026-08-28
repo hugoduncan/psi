@@ -134,7 +134,8 @@
            (is (.contains text "Do not re-read or select a blocker record"))
            (is (.contains text "review-task-implementation` and `extract-task-knowledge` did not run"))
            (is (.contains text "re-invoke `task-lifecycle`")))
-         (is (= {"DONE" {:goto :done}} (:on implementation-blocked-step))))
+         (is (= {"IMPLEMENTATION_BLOCKED" {:goto :done}}
+                (:on implementation-blocked-step))))
        (testing "the status step owns the extraction gate"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"

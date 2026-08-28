@@ -204,6 +204,15 @@
              (:on blocker-validation)))
       (is (some? complete-summary))
       (is (some? blocked-summary))
+      (is (= "workflow/exact-marker-routing"
+             (get-in complete-summary [:judge :operation])))
+      (is (= "workflow/exact-marker-routing"
+             (get-in blocked-summary [:judge :operation])))
+      (is (= ["IMPLEMENTATION_BLOCKED"]
+             (get-in blocked-summary [:judge :args :allowed-routes])))
+      (is (= ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]
+             (get-in blocked-summary [:judge :args :required-field-labels-by-route
+                                      "IMPLEMENTATION_BLOCKED"])))
       (is (str/includes? (get-in complete-summary [:contributions 2 :text])
                          "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"))
       (is (str/includes? blocked-prompt

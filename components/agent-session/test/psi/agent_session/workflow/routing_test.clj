@@ -343,6 +343,59 @@
                (get-in result [:details :route-marker-candidates]))
             (pr-str result))))))
 
+(deftest exact-marker-routing-required-fields-test
+  ;; Tests terminal handback fields are exact, unique, branch-specific, and may
+  ;; be derived from a previously validated source handback.
+  (let [base {:marker-label "IMPLEMENTATION_STATUS"
+              :allowed-routes ["IMPLEMENTATION_COMPLETE" "IMPLEMENTATION_BLOCKED"]
+              :required-fields-by-route
+              {"IMPLEMENTATION_BLOCKED"
+               {"IMPLEMENTATION_BLOCKER" "validated blocker"
+                "IMPLEMENTATION_REQUIRED_HUMAN_ACTION" "validated action"}}}
+        valid (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")]
+    (is (= "IMPLEMENTATION_BLOCKED"
+           (:data (routing/parse-exact-marker-routing (assoc base :text valid)))))
+    (doseq [[label text reason]
+            [["missing"
+              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+              :missing-route-field]
+             ["malformed"
+              "IMPLEMENTATION_BLOCKER:validated blocker\nIMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+              :mismatched-route-field]
+             ["duplicate"
+              (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+              :ambiguous-route-field]
+             ["branch mismatch"
+              (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+              :unexpected-route-field]
+             ["snapshot mismatch"
+              (str "IMPLEMENTATION_BLOCKER: changed blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+              :mismatched-route-field]]]
+      (is (= reason
+             (:reason (routing/parse-exact-marker-routing (assoc base :text text))))
+          label))
+    (let [source (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                      "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+          args {:text valid
+                :marker-label "IMPLEMENTATION_STATUS"
+                :allowed-routes ["IMPLEMENTATION_BLOCKED"]
+                :required-fields-source-text source
+                :required-field-labels-by-route
+                {"IMPLEMENTATION_BLOCKED"
+                 ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}]
+      (is (= "IMPLEMENTATION_BLOCKED"
+             (:data (routing/parse-exact-marker-routing args)))))))
+
 (deftest exact-marker-routing-invalid-args-test
   ;; Tests exact-marker operation arguments are validated before marker parsing
   ;; and return accumulated diagnostics without throwing.

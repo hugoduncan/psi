@@ -194,7 +194,10 @@
                                                          (artifact-content
                                                           {:blocker "intervening edit"
                                                            :required-human-action "ignore validated record"}))
-                                                   "blocked handback"))}]
+                                                   (str "blocked handback\n"
+                                                        "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
+                                                        "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
+                                                        "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")))}]
                             :stop-reason :stop}}))]
           (let [result (workflow-execution/execute-run! ctx session-id run-id)
                 run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
@@ -206,7 +209,11 @@
             (is (= 1 (count (get-in run [:step-runs "final-summary-blocked" :attempts]))))
             (is (zero? (count (get-in run [:step-runs "final-summary-complete" :attempts]))))
             (is (= "final-summary-blocked" (get-in run [:terminal-outcome :step-id])))
-            (is (= "blocked handback" (terminal-contract/terminal-yielded-text run)))
+            (is (= (str "blocked handback\n"
+                        "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
+                        "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
+                        "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                   (terminal-contract/terminal-yielded-text run)))
             (is (= "DONE"
                    (get-in run [:step-runs "validate-implementation-blocker"
                                 :accepted-result :outputs :data])))
@@ -336,7 +343,7 @@
                                      :text (case (swap! replies* inc)
                                              1 "PASS_STATUS: MORE_WORK_REMAINS"
                                              2 "PASS_STATUS: IMPLEMENTATION_COMPLETE"
-                                             3 "complete handback")}]
+                                             3 "complete handback\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")}]
                           :stop-reason :stop}})]
           (let [result (workflow-execution/execute-run! ctx session-id run-id)
                 run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
@@ -352,4 +359,43 @@
             (is (zero? (count (get-in run [:step-runs "validate-implementation-blocker" :attempts]))))
             (is (zero? (count (get-in run [:step-runs "final-summary-blocked" :attempts]))))
             (is (= "final-summary-complete" (get-in run [:terminal-outcome :step-id])))
-            (is (= "complete handback" (terminal-contract/terminal-yielded-text run)))))))))
+            (is (= "complete handback\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
+                   (terminal-contract/terminal-yielded-text run)))))))))
+
+(deftest checked-in-implement-task-rejects-invalid-terminal-handbacks-test
+  ;; Tests checked-in terminal judges reject prompt-noncompliant yielded text.
+  (doseq [[label pass-reply summary-reply expected-reason]
+          [["complete missing" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+            "complete handback" :missing-route-marker]
+           ["complete malformed" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+            "IMPLEMENTATION_STATUS:IMPLEMENTATION_COMPLETE" :malformed-route-marker]
+           ["complete duplicate" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+            (str "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+            :ambiguous-route-marker]
+           ["complete branch mismatch" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+            "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED" :unsupported-route-marker]]]
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx session-id]
+        (let [task-path "munera/open/230-x"
+              run-id (str "checked-in-terminal-" label)
+              reply-number* (atom 0)]
+          (test-support/write-task-artifact! worktree task-path "implementation.md" "notes\n")
+          (register-review-routing-ops! ctx)
+          (create-implement-task-run! ctx
+                                      (checked-in-implement-task-definition
+                                       (System/getProperty "user.dir"))
+                                      run-id task-path)
+          (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                        (fn [_ctx _child-session-id _prompt]
+                          {:execution-result/assistant-message
+                           {:role "assistant"
+                            :content [{:type :text
+                                       :text (if (= 1 (swap! reply-number* inc))
+                                               pass-reply
+                                               summary-reply)}]
+                            :stop-reason :stop}})]
+            (let [result (workflow-execution/execute-run! ctx session-id run-id)
+                  run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+              (is (= :failed (:status result)) label)
+              (is (= expected-reason (get-in run [:terminal-outcome :reason])) label))))))))

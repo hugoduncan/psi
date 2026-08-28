@@ -993,7 +993,7 @@ that record from the same validated artifact snapshot, reports its values as
 then directs the human to resolve the action and freshly invoke `implement-task`.
 Caller handbacks propagate those validated lines rather than selecting a blocker
 from a later `implementation.md` revision. The normal and blocked terminal
-summaries export exactly one branch-matching `IMPLEMENTATION_STATUS` marker.
+summaries export exactly one branch-matching `IMPLEMENTATION_STATUS` marker. Terminal handbacks are accepted only when this marker is exact and unique; blocked handbacks must also contain exactly one `IMPLEMENTATION_BLOCKER` and `IMPLEMENTATION_REQUIRED_HUMAN_ACTION` line whose values match the deterministically validated blocker snapshot. Missing, malformed, duplicate, branch-mismatched, or snapshot-mismatched terminal fields fail the workflow instead of yielding a handback.
 
 `implement-task-in-worktree` is a loadable multi-step `.edn` wrapper that first
 resolves the handed-off worktree, then delegates implementation. Every workflow

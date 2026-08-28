@@ -66,3 +66,4 @@ No implementation has started. The existing implementation loop currently recogn
 - added 1 step to be addressed
 - addressed 1 review step: blocked handbacks now propagate the blocker/action from the validated artifact snapshot; checked-in execution proof covers an intervening edit and every direct caller.
 - added 1 step to be addressed
+- addressed 1 review step: terminal handback judges now enforce exact branch status and validated blocker/action exports; checked-in standalone and delegated execution proofs assert actual yielded text and reject invalid contracts.

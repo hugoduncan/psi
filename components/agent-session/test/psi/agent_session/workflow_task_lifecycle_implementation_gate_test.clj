@@ -186,7 +186,9 @@
         definitions [(child-definition "review-task-design-core" "PASS_STATUS: REVIEW_COMPLETE")
                      (child-definition "create-task-plan" "plan created")
                      (child-definition "review-task-plan-core" "PASS_STATUS: REVIEW_COMPLETE")
-                     (child-definition "implement-task" "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                     (child-definition "implement-task" (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                                             "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                                             "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
                      (child-definition "review-task-implementation-core" "implementation reviewed")
                      (child-definition "extract-task-knowledge" "knowledge extracted")
                      definition]]
@@ -204,7 +206,10 @@
                      {:role "assistant"
                       :content [{:type :text
                                  :text (if (.contains prompt "Produce the user-facing blocked handback")
-                                         "lifecycle blocked handback"
+                                         (str "lifecycle blocked handback\n"
+                                              "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
                                          prompt)}]
                       :stop-reason :stop}})]
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
@@ -273,13 +278,19 @@
                                                             "IMPLEMENTATION_COMPLETE")))
 
                                  (.contains prompt "Produce the user-facing blocked handback for the specific Munera task")
-                                 "implement blocked terminal\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+                                 (str "implement blocked terminal\n"
+                                      "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
+                                      "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
+                                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
 
                                  (.contains prompt "Produce the user-facing final result for the specific Munera task")
                                  "implement complete terminal\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
 
                                  (.contains prompt "Produce the user-facing blocked handback for the Munera task lifecycle")
-                                 "lifecycle blocked handback"
+                                 (str "lifecycle blocked handback\n"
+                                      "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
+                                      "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
+                                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
 
                                  :else prompt)]
                       {:execution-result/assistant-message
@@ -436,7 +447,9 @@
         source-worktree (System/getProperty "user.dir")
         wrapper (checked-in-implement-task-in-worktree-definition source-worktree)
         implement-task (child-definition "implement-task"
-                                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                                         (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
         run-id "checked-in-implement-task-in-worktree-blocked"]
     (register-routing-ops! ctx)
     (swap! (:state* ctx)
@@ -456,7 +469,10 @@
                                          "munera/open/256-task"
 
                                          (.contains prompt "Produce the user-facing blocked handback")
-                                         "wrapper blocked handback"
+                                         (str "wrapper blocked handback\n"
+                                              "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
 
                                          :else prompt)}]
                       :stop-reason :stop}})]
@@ -502,13 +518,22 @@
                         :content [{:type :text
                                    :text (if (= blocked-yield prompt)
                                            prompt
-                                           "blocked caller handback")}]
+                                           (str "blocked caller handback\n"
+                                                "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                                "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                                "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))}]
                         :stop-reason :stop}})]
         (let [result (workflow-execution/execute-run! ctx session-id run-id)
               run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
               prompts @prompts*]
           (is (= :completed (:status result)) workflow-name)
           (is (= blocked-step (get-in run [:terminal-outcome :step-id])) workflow-name)
+          (is (= (str "blocked caller handback\n"
+                      "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                      "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                 (get-in run [:step-runs blocked-step :accepted-result :outputs :final-llm-reply]))
+              workflow-name)
           (is (some #(.contains % "IMPLEMENTATION_BLOCKER: validated blocker") prompts)
               workflow-name)
           (is (some #(.contains % "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action")

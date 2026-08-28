@@ -160,14 +160,19 @@
 
 (defn- final-complete-block-routing-result
   [args content]
-  (let [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route]} args
+  (let [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route
+                output-field-labels]} args
         valid-args? (and (string? task-path)
                          (string? artifact)
                          (string? start-delimiter)
                          (vector? field-prefixes)
                          (every? string? field-prefixes)
                          (string? end-delimiter)
-                         (string? valid-route))]
+                         (string? valid-route)
+                         (or (nil? output-field-labels)
+                             (and (vector? output-field-labels)
+                                  (= (count field-prefixes) (count output-field-labels))
+                                  (every? string? output-field-labels))))]
     (if-not valid-args?
       {:status :error
        :reason :invalid-final-complete-block-routing-args
@@ -175,7 +180,15 @@
        :details {:args args}}
       (if-let [record (routing/parse-final-complete-block
                        content start-delimiter field-prefixes end-delimiter)]
-        {:status :ok :data valid-route :summary valid-route :details {:record record}}
+        {:status :ok
+         :data valid-route
+         :summary valid-route
+         :details (cond-> {:record record}
+                    output-field-labels
+                    (assoc :required-fields-text
+                           (str/join "\n" (map (fn [label prefix]
+                                                 (str label ": " (record prefix)))
+                                               output-field-labels field-prefixes))))}
         {:status :error
          :reason :missing-final-complete-block
          :message "Required complete artifact block is missing"

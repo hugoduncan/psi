@@ -409,6 +409,150 @@
          (remove #(= :ordinary (:kind %)))
          vec)))
 
+(defn- required-route-fields-errors
+  [{:keys [allowed-routes required-fields-by-route
+           required-field-labels-by-route required-fields-source-text]}]
+  (cond
+    (and required-field-labels-by-route
+         (not (string? required-fields-source-text)))
+    [{:field :required-fields-source-text
+      :reason :non-string-required-fields-source-text
+      :value required-fields-source-text}]
+
+    (and required-field-labels-by-route
+         (not (map? required-field-labels-by-route)))
+    [{:field :required-field-labels-by-route
+      :reason :non-map-required-field-labels-by-route
+      :value required-field-labels-by-route}]
+
+    required-field-labels-by-route
+    (->> required-field-labels-by-route
+         (mapcat (fn [[route labels]]
+                   (concat
+                    (when-not (contains? (set allowed-routes) route)
+                      [{:field :required-field-labels-by-route
+                        :reason :unsupported-required-field-labels-route
+                        :value route}])
+                    (when-not (and (vector? labels) (every? route-token? labels))
+                      [{:field :required-field-labels-by-route
+                        :reason :invalid-required-field-labels
+                        :route route
+                        :value labels}]))))
+         vec)
+
+    (nil? required-fields-by-route)
+    []
+
+    (not (map? required-fields-by-route))
+    [{:field :required-fields-by-route
+      :reason :non-map-required-fields-by-route
+      :value required-fields-by-route}]
+
+    :else
+    (->> required-fields-by-route
+         (mapcat (fn [[route fields]]
+                   (concat
+                    (when-not (contains? (set allowed-routes) route)
+                      [{:field :required-fields-by-route
+                        :reason :unsupported-required-fields-route
+                        :value route}])
+                    (when-not (map? fields)
+                      [{:field :required-fields-by-route
+                        :reason :non-map-required-fields
+                        :route route
+                        :value fields}])
+                    (when (map? fields)
+                      (mapcat (fn [[label expected-value]]
+                                (cond-> []
+                                  (not (route-token? label))
+                                  (conj {:field :required-fields-by-route
+                                         :reason :invalid-required-field-label
+                                         :route route
+                                         :value label})
+
+                                  (or (not (string? expected-value))
+                                      (str/blank? expected-value))
+                                  (conj {:field :required-fields-by-route
+                                         :reason :invalid-required-field-value
+                                         :route route
+                                         :label label
+                                         :value expected-value})))
+                              fields)))))
+         vec)))
+
+(defn- required-field-candidates
+  [text label]
+  (let [prefix (str label ":")]
+    (->> (str/split-lines text)
+         (filter (fn [line]
+                   (let [trimmed-left (str/triml line)]
+                     (or (str/starts-with? trimmed-left prefix)
+                         (boolean (re-find (re-pattern
+                                            (str "^" (java.util.regex.Pattern/quote label)
+                                                 "\\s+:"))
+                                           trimmed-left))))))
+         vec)))
+
+(defn- exact-field-value
+  [text label]
+  (let [candidates (required-field-candidates text label)
+        prefix (str label ": ")]
+    (when (and (= 1 (count candidates))
+               (str/starts-with? (first candidates) prefix))
+      (subs (first candidates) (count prefix)))))
+
+(defn- source-required-fields
+  [text labels]
+  (into {} (keep (fn [label]
+                   (when-let [value (exact-field-value text label)]
+                     [label value])))
+        labels))
+
+(defn- validate-required-route-fields
+  [text required-fields forbidden-labels]
+  (if-let [unexpected-label (some (fn [label]
+                                    (when (seq (required-field-candidates text label))
+                                      label))
+                                  forbidden-labels)]
+    {:status :error
+     :reason :unexpected-route-field
+     :message (str unexpected-label " field is not valid for this route")
+     :details {:text text :field-label unexpected-label}}
+    (reduce-kv
+     (fn [result label expected-value]
+       (if (= :error (:status result))
+         (reduced result)
+         (let [candidates (required-field-candidates text label)
+               expected-line (str label ": " expected-value)]
+           (cond
+             (empty? candidates)
+             (reduced {:status :error
+                       :reason :missing-route-field
+                       :message (str label " field missing")
+                       :details {:text text :field-label label}})
+
+             (> (count candidates) 1)
+             (reduced {:status :error
+                       :reason :ambiguous-route-field
+                       :message (str "Multiple " label " field lines found")
+                       :details {:text text
+                                 :field-label label
+                                 :field-lines candidates}})
+
+             (not= expected-line (first candidates))
+             (reduced {:status :error
+                       :reason :mismatched-route-field
+                       :message (str label " field does not match the required value")
+                       :details {:text text
+                                 :field-label label
+                                 :line (first candidates)
+                                 :expected-line expected-line}})
+
+             :else
+             (assoc-in result [:details :fields label] expected-value)))))
+     {:status :ok}
+     required-fields)))
+
 (defn parse-exact-marker-routing
   "Parse one exact workflow-owned route marker from text.
 
@@ -416,10 +560,12 @@
    non-empty vector of distinct all-caps/underscore :allowed-routes. Invalid
    args return :invalid-route-marker-args before marker parsing."
   [args]
-  (let [errors (exact-marker-routing-arg-errors args)]
+  (let [errors (into (exact-marker-routing-arg-errors args)
+                     (required-route-fields-errors args))]
     (if (seq errors)
       (invalid-exact-marker-routing-args-result errors)
-      (let [{:keys [text marker-label allowed-routes]} args
+      (let [{:keys [text marker-label allowed-routes required-fields-by-route
+                    required-field-labels-by-route required-fields-source-text]} args
             candidates (route-marker-candidates args)]
         (cond
           (empty? candidates)
@@ -442,9 +588,26 @@
           (let [{:keys [kind line route value reason]} (first candidates)]
             (case kind
               :exact
-              {:status :ok
-               :data route
-               :summary route}
+              (let [source-labels (get required-field-labels-by-route route [])
+                    source-fields (source-required-fields required-fields-source-text source-labels)
+                    required-fields (merge (get required-fields-by-route route {}) source-fields)
+                    other-route-labels (->> (vals (or required-fields-by-route {}))
+                                            (mapcat keys)
+                                            (remove #(contains? required-fields %))
+                                            set)
+                    field-result (if (= (count source-labels) (count source-fields))
+                                   (validate-required-route-fields text required-fields
+                                                                   other-route-labels)
+                                   {:status :error
+                                    :reason :invalid-required-fields-source
+                                    :message "Required route fields source is missing exact fields"
+                                    :details {:field-labels source-labels}})]
+                (if (= :error (:status field-result))
+                  field-result
+                  (cond-> {:status :ok
+                           :data route
+                           :summary route}
+                    (:details field-result) (assoc :details (:details field-result)))))
 
               :unsupported
               {:status :error
