@@ -166,3 +166,7 @@
 
 - [x] Make the checked-in `implement-task` prompt-response dispatchers fail immediately with the unexpected prompt in the error data when no known pass or branch-summary predicate matches. Their current `cond` expressions return `nil`, turning authored-topology drift into an indirect execution failure with poor diagnostic signal; add a focused regression assertion for the fail-fast response boundary.
   - Added a shared local prompt classifier that throws with `:unexpected-prompt`; all checked-in response dispatchers use it, and focused boundary proof covers the diagnostic data. Focused Scry: 9 tests, 80 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Test review follow-up
+
+- [ ] Make the checked-in lifecycle prompt-response dispatchers fail immediately on unknown prompts instead of returning `prompt` from their fallback branches. In particular, cover `execute-checked-in-blocked-lifecycle!` and `execute-checked-in-lifecycle-with-implement-task!` with explicit expected stage/prompt classification and a focused diagnostic-boundary assertion, so an inserted or renamed authored session step cannot receive its own prompt as a plausible reply and let topology drift pass indirectly.
