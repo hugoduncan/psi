@@ -252,3 +252,7 @@
 
 - [x] Validate the complete argument schema in the public `workflow/final-complete-block-routing` and `workflow/fresh-final-complete-block-routing` handlers before calling `read-task-artifact-content`. Both handlers currently resolve the artifact first and validate only in their result helpers, so malformed identifiers can cross the resolver boundary or throw instead of deterministically returning the documented structured invalid-argument result; add handler-level regressions proving malformed schemas perform no resolver read.
   - Both public handlers now validate the complete base schema before artifact resolution, and the fresh handler also validates `before-content` first. Handler-level tests inject a nullable artifact-read boundary and prove every malformed schema performs zero reads. Focused Scry: 11 tests/146 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Code-shaper review follow-up
+
+- [ ] Remove the stale `psi.agent-session.workflow.core` require from `scope_question_gate_operation_test.clj` after the artifact-routing extraction; `clj-kondo` currently reports it as unused. Re-run the focused operation test and lint the namespace.
