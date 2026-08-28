@@ -483,6 +483,38 @@
                :value []}]
              (get-in result [:details :errors]))
           (pr-str result))))
+  (testing "invalid allowed-routes remains structured with optional route fields"
+    (doseq [optional-args
+            [{:required-fields-by-route {"APPROVE" {"FIELD" "value"}}}
+             {:required-fields-source-text "FIELD: value"
+              :required-field-labels-by-route {"APPROVE" ["FIELD"]}}
+             {:forbidden-field-labels-by-route {"APPROVE" ["FIELD"]}}]]
+      (let [result (routing/parse-exact-marker-routing
+                    (merge {:text "QUALITY_GATE: APPROVE"
+                            :marker-label "QUALITY_GATE"
+                            :allowed-routes 1}
+                           optional-args))]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (= [{:field :allowed-routes
+                 :reason :non-vector-allowed-routes
+                 :value 1}]
+               (get-in result [:details :errors]))
+            (pr-str result)))))
+  (testing "duplicate source-derived required labels are invalid arguments"
+    (let [result (routing/parse-exact-marker-routing
+                  {:text "QUALITY_GATE: APPROVE"
+                   :marker-label "QUALITY_GATE"
+                   :allowed-routes ["APPROVE"]
+                   :required-fields-source-text "FIELD: value"
+                   :required-field-labels-by-route {"APPROVE" ["FIELD" "FIELD"]}})]
+      (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+      (is (= [{:field :required-field-labels-by-route
+               :reason :duplicate-required-field-label
+               :route "APPROVE"
+               :value "FIELD"
+               :indices [0 1]}]
+             (get-in result [:details :errors]))
+          (pr-str result))))
   (testing "required invalid arg cases"
     (doseq [[args expected-errors]
             [[{} [{:field :text :reason :missing-text}

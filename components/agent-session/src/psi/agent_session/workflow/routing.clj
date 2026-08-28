@@ -436,93 +436,117 @@
       :value labels-by-route}]
 
     :else
-    (->> labels-by-route
-         (mapcat (fn [[route labels]]
-                   (concat
-                    (when-not (contains? (set allowed-routes) route)
-                      [{:field field
-                        :reason :unsupported-field-labels-route
-                        :value route}])
-                    (when-not (and (vector? labels) (every? route-token? labels))
-                      [{:field field
-                        :reason :invalid-field-labels
-                        :route route
-                        :value labels}]))))
-         vec)))
+    (let [allowed-routes-set (when (vector? allowed-routes)
+                               (set allowed-routes))]
+      (->> labels-by-route
+           (mapcat (fn [[route labels]]
+                     (concat
+                      (when (and allowed-routes-set
+                                 (not (contains? allowed-routes-set route)))
+                        [{:field field
+                          :reason :unsupported-field-labels-route
+                          :value route}])
+                      (when-not (and (vector? labels) (every? route-token? labels))
+                        [{:field field
+                          :reason :invalid-field-labels
+                          :route route
+                          :value labels}]))))
+           vec))))
+
+(defn- duplicate-required-field-label-errors
+  [route labels]
+  (when (vector? labels)
+    (->> labels
+         (map-indexed vector)
+         (group-by second)
+         (keep (fn [[label indexed-labels]]
+                 (let [indices (mapv first indexed-labels)]
+                   (when (> (count indices) 1)
+                     {:field :required-field-labels-by-route
+                      :reason :duplicate-required-field-label
+                      :route route
+                      :value label
+                      :indices indices})))))))
 
 (defn- required-route-fields-errors
   [{:keys [allowed-routes required-fields-by-route
            required-field-labels-by-route required-fields-source-text]}]
-  (vec
-   (concat
-    (cond
-      (and required-field-labels-by-route
-           (not (string? required-fields-source-text)))
-      [{:field :required-fields-source-text
-        :reason :non-string-required-fields-source-text
-        :value required-fields-source-text}]
+  (let [allowed-routes-set (when (vector? allowed-routes)
+                             (set allowed-routes))
+        source-errors
+        (cond
+          (and required-field-labels-by-route
+               (not (string? required-fields-source-text)))
+          [{:field :required-fields-source-text
+            :reason :non-string-required-fields-source-text
+            :value required-fields-source-text}]
 
-      (and required-field-labels-by-route
-           (not (map? required-field-labels-by-route)))
-      [{:field :required-field-labels-by-route
-        :reason :non-map-required-field-labels-by-route
-        :value required-field-labels-by-route}]
+          (and required-field-labels-by-route
+               (not (map? required-field-labels-by-route)))
+          [{:field :required-field-labels-by-route
+            :reason :non-map-required-field-labels-by-route
+            :value required-field-labels-by-route}]
 
-      required-field-labels-by-route
-      (mapcat (fn [[route labels]]
-                (concat
-                 (when-not (contains? (set allowed-routes) route)
-                   [{:field :required-field-labels-by-route
-                     :reason :unsupported-required-field-labels-route
-                     :value route}])
-                 (when-not (and (vector? labels) (every? route-token? labels))
-                   [{:field :required-field-labels-by-route
-                     :reason :invalid-required-field-labels
-                     :route route
-                     :value labels}])))
-              required-field-labels-by-route)
+          required-field-labels-by-route
+          (mapcat (fn [[route labels]]
+                    (concat
+                     (when (and allowed-routes-set
+                                (not (contains? allowed-routes-set route)))
+                       [{:field :required-field-labels-by-route
+                         :reason :unsupported-required-field-labels-route
+                         :value route}])
+                     (when-not (and (vector? labels) (every? route-token? labels))
+                       [{:field :required-field-labels-by-route
+                         :reason :invalid-required-field-labels
+                         :route route
+                         :value labels}])
+                     (duplicate-required-field-label-errors route labels)))
+                  required-field-labels-by-route)
 
-      :else
-      [])
-    (cond
-      (nil? required-fields-by-route)
-      []
+          :else
+          [])
+        direct-errors
+        (cond
+          (nil? required-fields-by-route)
+          []
 
-      (not (map? required-fields-by-route))
-      [{:field :required-fields-by-route
-        :reason :non-map-required-fields-by-route
-        :value required-fields-by-route}]
+          (not (map? required-fields-by-route))
+          [{:field :required-fields-by-route
+            :reason :non-map-required-fields-by-route
+            :value required-fields-by-route}]
 
-      :else
-      (mapcat (fn [[route fields]]
-                (concat
-                 (when-not (contains? (set allowed-routes) route)
-                   [{:field :required-fields-by-route
-                     :reason :unsupported-required-fields-route
-                     :value route}])
-                 (when-not (map? fields)
-                   [{:field :required-fields-by-route
-                     :reason :non-map-required-fields
-                     :route route
-                     :value fields}])
-                 (when (map? fields)
-                   (mapcat (fn [[label expected-value]]
-                             (cond-> []
-                               (not (route-token? label))
-                               (conj {:field :required-fields-by-route
-                                      :reason :invalid-required-field-label
-                                      :route route
-                                      :value label})
+          :else
+          (mapcat (fn [[route fields]]
+                    (concat
+                     (when (and allowed-routes-set
+                                (not (contains? allowed-routes-set route)))
+                       [{:field :required-fields-by-route
+                         :reason :unsupported-required-fields-route
+                         :value route}])
+                     (when-not (map? fields)
+                       [{:field :required-fields-by-route
+                         :reason :non-map-required-fields
+                         :route route
+                         :value fields}])
+                     (when (map? fields)
+                       (mapcat (fn [[label expected-value]]
+                                 (cond-> []
+                                   (not (route-token? label))
+                                   (conj {:field :required-fields-by-route
+                                          :reason :invalid-required-field-label
+                                          :route route
+                                          :value label})
 
-                               (or (not (string? expected-value))
-                                   (str/blank? expected-value))
-                               (conj {:field :required-fields-by-route
-                                      :reason :invalid-required-field-value
-                                      :route route
-                                      :label label
-                                      :value expected-value})))
-                           fields))))
-              required-fields-by-route)))))
+                                   (or (not (string? expected-value))
+                                       (str/blank? expected-value))
+                                   (conj {:field :required-fields-by-route
+                                          :reason :invalid-required-field-value
+                                          :route route
+                                          :label label
+                                          :value expected-value})))
+                               fields))))
+                  required-fields-by-route))]
+    (vec (concat source-errors direct-errors))))
 
 (defn- required-field-candidates
   [text label]
