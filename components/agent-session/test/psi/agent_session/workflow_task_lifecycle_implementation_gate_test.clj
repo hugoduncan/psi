@@ -484,6 +484,75 @@
         (is (= 1 (count (get-in run [:step-runs "summary-implementation-blocked" :attempts]))))
         (is (zero? (count (get-in run [:step-runs "summary" :attempts]))))))))
 
+(defn- execute-checked-in-worktree-wrapper-complete!
+  [summary-reply run-suffix]
+  (let [[ctx session-id] (support/create-session-context {:persist? false})
+        source-worktree (System/getProperty "user.dir")
+        wrapper (checked-in-implement-task-in-worktree-definition source-worktree)
+        implement-task (child-definition "implement-task"
+                                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+        run-id (str "checked-in-implement-task-in-worktree-complete-" run-suffix)]
+    (register-routing-ops! ctx)
+    (swap! (:state* ctx)
+           (fn [state]
+             (reduce (fn [next-state definition]
+                       (first (workflow-registry/register-definition next-state definition)))
+                     state
+                     [implement-task wrapper])))
+    (create-lifecycle-run! ctx wrapper run-id
+                           {:input (str "worktree_path: /tmp/worktree\n"
+                                        "munera_task_path: munera/open/256-task")})
+    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                  (fn [_ctx _child-session-id prompt]
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :text
+                                 :text (cond
+                                         (.contains prompt "Extract the worktree path")
+                                         "munera/open/256-task"
+
+                                         (= "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE" prompt)
+                                         prompt
+
+                                         :else summary-reply)}]
+                      :stop-reason :stop}})]
+      (let [result (workflow-execution/execute-run! ctx session-id run-id)]
+        [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
+
+(deftest checked-in-implement-task-in-worktree-complete-handback-test
+  ;; Tests the checked-in wrapper accepts and projects exactly one normal
+  ;; terminal status after delegated implementation completes.
+  (let [handback (str "wrapper complete handback\n"
+                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+        [result run] (execute-checked-in-worktree-wrapper-complete! handback "accepted")]
+    (is (= :completed (:status result)) (pr-str run))
+    (is (= "summary" (get-in run [:terminal-outcome :step-id])))
+    (is (= handback
+           (get-in run [:step-runs "summary" :accepted-result :outputs :final-llm-reply])))
+    (is (zero? (count (get-in run [:step-runs "summary-implementation-blocked" :attempts]))))))
+
+(deftest checked-in-implement-task-in-worktree-invalid-complete-handbacks-fail-test
+  ;; Tests missing, malformed, duplicate, and branch-mismatched normal exports
+  ;; fail at the checked-in wrapper summary judge.
+  (doseq [[label handback reason]
+          [["missing status" "wrapper complete handback" :missing-route-marker]
+           ["malformed status"
+            "IMPLEMENTATION_STATUS:IMPLEMENTATION_COMPLETE"
+            :malformed-route-marker]
+           ["duplicate status"
+            (str "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+            :ambiguous-route-marker]
+           ["branch mismatch"
+            "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+            :unsupported-route-marker]]]
+    (let [[result run] (execute-checked-in-worktree-wrapper-complete! handback label)]
+      (is (= :failed (:status result)) label)
+      (is (= reason (get-in run [:terminal-outcome :reason])) label)
+      (is (= 1 (count (get-in run [:step-runs "summary" :attempts]))) label)
+      (is (zero? (count (get-in run [:step-runs "summary-implementation-blocked" :attempts])))
+          label))))
+
 (deftest checked-in-caller-handbacks-propagate-validated-blocker-test
   ;; Tests every checked-in direct caller handback preserves the delegated
   ;; validated snapshot after the task artifact changes.

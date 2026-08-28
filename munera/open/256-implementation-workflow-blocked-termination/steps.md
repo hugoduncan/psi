@@ -129,4 +129,5 @@
 
 ## Implementation review follow-up
 
-- [ ] Enforce the normal terminal handback contract in `.psi/workflows/implement-task-in-worktree.edn`. Its `summary` step instructs the session to export `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE` but accepts any reply through `workflow/constant-routing`, so a standalone wrapper run can complete with a missing, malformed, duplicate, or branch-mismatched status despite the documented exact terminal-export contract. Use deterministic exact-marker validation and add checked-in execution coverage for accepted and rejected normal handbacks.
+- [x] Enforce the normal terminal handback contract in `.psi/workflows/implement-task-in-worktree.edn`. Its `summary` step instructs the session to export `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE` but accepts any reply through `workflow/constant-routing`, so a standalone wrapper run can complete with a missing, malformed, duplicate, or branch-mismatched status despite the documented exact terminal-export contract. Use deterministic exact-marker validation and add checked-in execution coverage for accepted and rejected normal handbacks.
+  - The wrapper's normal summary now exact-marker-validates only `IMPLEMENTATION_COMPLETE`; checked-in execution proof accepts and projects a valid handback and rejects missing, malformed, duplicate, and branch-mismatched status exports.
