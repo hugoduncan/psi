@@ -207,3 +207,7 @@
 - [x] Remove the extra trailing blank line from `components/agent-session/test/psi/agent_session/workflow_implementation_callers_test.clj`; the full task range currently fails `git diff --check` at line 424.
 - [x] Reject blank or whitespace-only values in source-derived required fields for `workflow/exact-marker-routing`. Direct `:required-fields-by-route` values reject blanks during argument validation, but `source-required-fields` currently accepts `FIELD: ` and `FIELD:   ` as exact values, allowing an empty validated handback contract through the source-derived path; add focused regression coverage proving both forms fail while non-blank snapshot values still pass.
   - Source-derived exact values now require non-blank content; focused coverage rejects empty and whitespace-only values while preserving the accepted non-blank snapshot. Focused Scry: 13 tests/273 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Code-shaper review follow-up
+
+- [ ] Define and enforce unambiguous overlap semantics when `workflow/exact-marker-routing` receives both `:required-fields-by-route` and `:required-field-labels-by-route`. The current `merge` silently lets a source-derived value replace a contradictory direct value for the same route/label, so the parser can accept output that violates the caller's direct requirement. Reject overlapping labels as invalid arguments, or require both sources to agree, and add focused regression coverage for conflicting and matching overlaps.
