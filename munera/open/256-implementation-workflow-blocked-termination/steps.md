@@ -171,3 +171,7 @@
 
 - [x] Make the checked-in lifecycle prompt-response dispatchers fail immediately on unknown prompts instead of returning `prompt` from their fallback branches. In particular, cover `execute-checked-in-blocked-lifecycle!` and `execute-checked-in-lifecycle-with-implement-task!` with explicit expected stage/prompt classification and a focused diagnostic-boundary assertion, so an inserted or renamed authored session step cannot receive its own prompt as a plausible reply and let topology drift pass indirectly.
   - Both checked-in lifecycle helpers now classify every expected stage prompt and throw with `:unexpected-prompt` on topology drift. Focused Scry: 13 tests, 143 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Test review follow-up
+
+- [ ] Make the remaining checked-in wrapper and outer-orchestration prompt-response dispatchers fail immediately on unknown prompts instead of returning `prompt`, `summary-reply`, or a branch handback from catch-all fallbacks. Cover the `implement-task-in-worktree`, direct-caller snapshot, and `gh-issue-implement` helpers with explicit expected prompt classification and one focused diagnostic-boundary assertion, so an inserted or renamed session step cannot receive a plausible terminal reply and let authored-topology drift pass indirectly.
