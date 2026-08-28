@@ -70,3 +70,4 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 review step: terminal handback judges now enforce exact branch status and validated blocker/action exports; checked-in standalone and delegated execution proofs assert actual yielded text and reject invalid contracts.
 - added 1 step to be addressed
 - addressed 1 review step: `gh-issue-implement` now validates and exports the blocked terminal status plus snapshot-matching blocker/action fields; checked-in execution proof covers accepted and invalid outputs while downstream PR work remains skipped.
+- added 1 step to be addressed

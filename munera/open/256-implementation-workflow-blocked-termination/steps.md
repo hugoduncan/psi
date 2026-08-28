@@ -126,3 +126,7 @@
 
 - [x] Enforce the blocked terminal handback contract in `.psi/workflows/gh-issue-implement.edn`. Its `implementation-blocked` step still uses `workflow/constant-routing` and does not require or export `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED`, so it can accept a handback that omits or changes the validated blocker/action values even though its delegated wrapper output supplied them. Use deterministic exact-marker/required-field validation against the `implement` yield, export the blocked status, and add checked-in execution coverage proving invalid outer handbacks fail while accepted output preserves the validated fields and never reaches review, push, or label editing.
   - The outer blocked step now validates its exact status and snapshot-matching blocker/action fields against the wrapper yield; checked-in execution proof accepts the preserved export, rejects invalid handbacks, and confirms review, push, and label editing remain unreachable.
+
+## Implementation review follow-up
+
+- [ ] Enforce the normal terminal handback contract in `.psi/workflows/implement-task-in-worktree.edn`. Its `summary` step instructs the session to export `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE` but accepts any reply through `workflow/constant-routing`, so a standalone wrapper run can complete with a missing, malformed, duplicate, or branch-mismatched status despite the documented exact terminal-export contract. Use deterministic exact-marker validation and add checked-in execution coverage for accepted and rejected normal handbacks.
