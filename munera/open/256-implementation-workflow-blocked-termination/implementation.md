@@ -117,3 +117,4 @@ No implementation has started. The existing implementation loop currently recogn
 - added 3 steps to be addressed
 
 - addressed 3 review steps
+- code-shaper review added 3 steps to be addressed
