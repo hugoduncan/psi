@@ -1,8 +1,8 @@
 (ns psi.agent-session.workflow-task-lifecycle-implementation-gate-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.context :as session-context]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.turn]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
    [psi.agent-session.workflow.core :as workflow-core]
@@ -10,7 +10,8 @@
    [psi.workflow-loader.compiler :as workflow-compiler]
    [psi.workflow-loader.parser :as workflow-parser]
    [psi.workflow-registry.registry :as workflow-registry]
-   [psi.workflow-runtime.core :as workflow-runtime]))
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]))
 
 (defn- register-routing-ops!
   [ctx]
@@ -25,6 +26,25 @@
                        :query-session (fn [& _] nil)
                        :mutate (fn [& _] nil)
                        :mutate-session (fn [& _] nil)}))
+
+(defn- with-workflow-prompt-execution-result-fn
+  [ctx prompt-execution-result-fn]
+  (let [ctx (assoc ctx :workflow-prompt-execution-result-fn
+                   (fn
+                     ([workflow-ctx child-session-id prompt]
+                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
+                     ([workflow-ctx child-session-id prompt _images]
+                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
+                     ([workflow-ctx child-session-id prompt _images _opts]
+                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))))]
+    (assoc ctx workflow-execution-adapter/adapter-key
+           (session-context/workflow-execution-adapter ctx))))
+
+(defmacro with-workflow-prompt-execution-result
+  [[ctx] prompt-execution-result-fn & body]
+  `(let [~ctx (with-workflow-prompt-execution-result-fn
+                ~ctx ~prompt-execution-result-fn)]
+     ~@body))
 
 (defn- session-step
   [name prompt]
@@ -200,18 +220,18 @@
                      state
                      definitions)))
     (create-lifecycle-run! ctx definition run-id {:input task-path})
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx _child-session-id prompt]
-                    {:execution-result/assistant-message
-                     {:role "assistant"
-                      :content [{:type :text
-                                 :text (if (.contains prompt "Produce the user-facing blocked handback")
-                                         (str "lifecycle blocked handback\n"
-                                              "IMPLEMENTATION_BLOCKER: validated blocker\n"
-                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-                                         prompt)}]
-                      :stop-reason :stop}})]
+    (with-workflow-prompt-execution-result [ctx]
+      (fn [_ctx _child-session-id prompt]
+        {:execution-result/assistant-message
+         {:role "assistant"
+          :content [{:type :text
+                     :text (if (.contains prompt "Produce the user-facing blocked handback")
+                             (str "lifecycle blocked handback\n"
+                                  "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                  "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                             prompt)}]
+          :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
 
@@ -222,16 +242,16 @@
     (register-routing-ops! ctx)
     (register-definitions! ctx implementation-status)
     (create-lifecycle-run! ctx lifecycle-definition run-id {})
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx _child-session-id prompt]
-                    {:execution-result/assistant-message
-                     {:role "assistant"
-                      :content [{:type :text
-                                 :text (case prompt
-                                         "complete lifecycle summary" "lifecycle completed"
-                                         "blocked lifecycle handback" "lifecycle blocked"
-                                         prompt)}]
-                      :stop-reason :stop}})]
+    (with-workflow-prompt-execution-result [ctx]
+      (fn [_ctx _child-session-id prompt]
+        {:execution-result/assistant-message
+         {:role "assistant"
+          :content [{:type :text
+                     :text (case prompt
+                             "complete lifecycle summary" "lifecycle completed"
+                             "blocked lifecycle handback" "lifecycle blocked"
+                             prompt)}]
+          :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
 
@@ -265,38 +285,38 @@
                      state
                      definitions)))
     (create-lifecycle-run! ctx lifecycle run-id {:input task-path})
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx _child-session-id prompt]
-                    (let [reply-number (swap! reply-number* inc)
-                          text (cond
-                                 (= 4 reply-number)
-                                 (do (when (= :blocked outcome)
-                                       (spit (str worktree "/" task-path "/implementation.md")
-                                             (str "initial notes\n" (implementation-blocker-record))))
-                                     (str "PASS_STATUS: " (if (= :blocked outcome)
-                                                            "IMPLEMENTATION_BLOCKED"
-                                                            "IMPLEMENTATION_COMPLETE")))
+    (with-workflow-prompt-execution-result [ctx]
+      (fn [_ctx _child-session-id prompt]
+        (let [reply-number (swap! reply-number* inc)
+              text (cond
+                     (= 4 reply-number)
+                     (do (when (= :blocked outcome)
+                           (spit (str worktree "/" task-path "/implementation.md")
+                                 (str "initial notes\n" (implementation-blocker-record))))
+                         (str "PASS_STATUS: " (if (= :blocked outcome)
+                                                "IMPLEMENTATION_BLOCKED"
+                                                "IMPLEMENTATION_COMPLETE")))
 
-                                 (.contains prompt "Produce the user-facing blocked handback for the specific Munera task")
-                                 (str "implement blocked terminal\n"
-                                      "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
-                                      "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
-                                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                     (.contains prompt "Produce the user-facing blocked handback for the specific Munera task")
+                     (str "implement blocked terminal\n"
+                          "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
+                          "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
+                          "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
 
-                                 (.contains prompt "Produce the user-facing final result for the specific Munera task")
-                                 "implement complete terminal\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
+                     (.contains prompt "Produce the user-facing final result for the specific Munera task")
+                     "implement complete terminal\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
 
-                                 (.contains prompt "Produce the user-facing blocked handback for the Munera task lifecycle")
-                                 (str "lifecycle blocked handback\n"
-                                      "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
-                                      "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
-                                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                     (.contains prompt "Produce the user-facing blocked handback for the Munera task lifecycle")
+                     (str "lifecycle blocked handback\n"
+                          "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
+                          "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
+                          "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
 
-                                 :else prompt)]
-                      {:execution-result/assistant-message
-                       {:role "assistant"
-                        :content [{:type :text :text text}]
-                        :stop-reason :stop}}))]
+                     :else prompt)]
+          {:execution-result/assistant-message
+           {:role "assistant"
+            :content [{:type :text :text text}]
+            :stop-reason :stop}}))
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
 
@@ -419,12 +439,12 @@
                      state
                      definitions)))
     (create-lifecycle-run! ctx definition (str caller-name "-blocked") {})
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx _child-session-id prompt]
-                    {:execution-result/assistant-message
-                     {:role "assistant"
-                      :content [{:type :text :text prompt}]
-                      :stop-reason :stop}})]
+    (with-workflow-prompt-execution-result [ctx]
+      (fn [_ctx _child-session-id prompt]
+        {:execution-result/assistant-message
+         {:role "assistant"
+          :content [{:type :text :text prompt}]
+          :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id (str caller-name "-blocked"))]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) (str caller-name "-blocked"))]))))
 
@@ -459,23 +479,23 @@
                      state
                      [implement-task wrapper])))
     (create-lifecycle-run! ctx wrapper run-id {:input "worktree_path: /tmp/worktree\nmunera_task_path: munera/open/256-task"})
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx _child-session-id prompt]
-                    {:execution-result/assistant-message
-                     {:role "assistant"
-                      :content [{:type :text
-                                 :text (cond
-                                         (.contains prompt "Extract the worktree path")
-                                         "munera/open/256-task"
+    (with-workflow-prompt-execution-result [ctx]
+      (fn [_ctx _child-session-id prompt]
+        {:execution-result/assistant-message
+         {:role "assistant"
+          :content [{:type :text
+                     :text (cond
+                             (.contains prompt "Extract the worktree path")
+                             "munera/open/256-task"
 
-                                         (.contains prompt "Produce the user-facing blocked handback")
-                                         (str "wrapper blocked handback\n"
-                                              "IMPLEMENTATION_BLOCKER: validated blocker\n"
-                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+                             (.contains prompt "Produce the user-facing blocked handback")
+                             (str "wrapper blocked handback\n"
+                                  "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                  "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
 
-                                         :else prompt)}]
-                      :stop-reason :stop}})]
+                             :else prompt)}]
+          :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id run-id)
             run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
         (is (= :completed (:status result)) (pr-str run))
@@ -502,20 +522,20 @@
     (create-lifecycle-run! ctx wrapper run-id
                            {:input (str "worktree_path: /tmp/worktree\n"
                                         "munera_task_path: munera/open/256-task")})
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx _child-session-id prompt]
-                    {:execution-result/assistant-message
-                     {:role "assistant"
-                      :content [{:type :text
-                                 :text (cond
-                                         (.contains prompt "Extract the worktree path")
-                                         "munera/open/256-task"
+    (with-workflow-prompt-execution-result [ctx]
+      (fn [_ctx _child-session-id prompt]
+        {:execution-result/assistant-message
+         {:role "assistant"
+          :content [{:type :text
+                     :text (cond
+                             (.contains prompt "Extract the worktree path")
+                             "munera/open/256-task"
 
-                                         (= "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE" prompt)
-                                         prompt
+                             (= "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE" prompt)
+                             prompt
 
-                                         :else summary-reply)}]
-                      :stop-reason :stop}})]
+                             :else summary-reply)}]
+          :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
 
@@ -587,19 +607,19 @@
                        state
                        [implementation definition])))
       (create-lifecycle-run! ctx definition run-id {:input "munera/open/256-task"})
-      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                    (fn [_ctx _child-session-id prompt]
-                      (swap! prompts* conj prompt)
-                      {:execution-result/assistant-message
-                       {:role "assistant"
-                        :content [{:type :text
-                                   :text (if (= blocked-yield prompt)
-                                           prompt
-                                           (str "blocked caller handback\n"
-                                                "IMPLEMENTATION_BLOCKER: validated blocker\n"
-                                                "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                                "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))}]
-                        :stop-reason :stop}})]
+      (with-workflow-prompt-execution-result [ctx]
+        (fn [_ctx _child-session-id prompt]
+          (swap! prompts* conj prompt)
+          {:execution-result/assistant-message
+           {:role "assistant"
+            :content [{:type :text
+                       :text (if (= blocked-yield prompt)
+                               prompt
+                               (str "blocked caller handback\n"
+                                    "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                    "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                    "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))}]
+            :stop-reason :stop}})
         (let [result (workflow-execution/execute-run! ctx session-id run-id)
               run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
               prompts @prompts*]
@@ -642,18 +662,18 @@
                      state
                      [wrapper review builder definition])))
     (create-lifecycle-run! ctx definition run-id {})
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx _child-session-id prompt]
-                    {:execution-result/assistant-message
-                     {:role "assistant"
-                      :content [{:type :text
-                                 :text (if (= blocked-yield prompt)
-                                         prompt
-                                         (str "outer blocked handback\n"
-                                              "IMPLEMENTATION_BLOCKER: validated blocker\n"
-                                              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                              "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))}]
-                      :stop-reason :stop}})]
+    (with-workflow-prompt-execution-result [ctx]
+      (fn [_ctx _child-session-id prompt]
+        {:execution-result/assistant-message
+         {:role "assistant"
+          :content [{:type :text
+                     :text (if (= blocked-yield prompt)
+                             prompt
+                             (str "outer blocked handback\n"
+                                  "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                                  "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))}]
+          :stop-reason :stop}})
       (let [result (workflow-execution/execute-run! ctx session-id run-id)
             run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
         (is (= :completed (:status result)) (pr-str run))
@@ -711,15 +731,15 @@
                        state
                        [wrapper review builder definition])))
       (create-lifecycle-run! ctx definition run-id {})
-      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                    (fn [_ctx _child-session-id prompt]
-                      {:execution-result/assistant-message
-                       {:role "assistant"
-                        :content [{:type :text
-                                   :text (if (= blocked-yield prompt)
-                                           prompt
-                                           handback)}]
-                        :stop-reason :stop}})]
+      (with-workflow-prompt-execution-result [ctx]
+        (fn [_ctx _child-session-id prompt]
+          {:execution-result/assistant-message
+           {:role "assistant"
+            :content [{:type :text
+                       :text (if (= blocked-yield prompt)
+                               prompt
+                               handback)}]
+            :stop-reason :stop}})
         (let [result (workflow-execution/execute-run! ctx session-id run-id)
               run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
           (is (= :failed (:status result)) label)
