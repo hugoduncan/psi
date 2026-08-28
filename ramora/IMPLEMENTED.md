@@ -29,7 +29,14 @@
   pre-plan `check-scope-question-status` gate (`workflow/scope-question-gate-routing`)
   halts the lifecycle when `design-steps.md` has unchecked `SCOPE_QUESTION:` items
   (content scan, independent of convergence; scope handback wins over the
-  non-converged handback).
+  non-converged handback). `implement-task` has three authored pass outcomes:
+  bounded `MORE_WORK_REMAINS`, `IMPLEMENTATION_COMPLETE`, and
+  `IMPLEMENTATION_BLOCKED`. Blocked routing deterministically validates exactly
+  one fresh complete blocker record from one artifact snapshot and exports a
+  branch-specific terminal status plus the validated blocker/action. Gates in
+  task lifecycle, worktree/GitHub wrappers, and complexity workflows prevent a
+  blocked implementation from reaching downstream review, validation,
+  extraction, or publication work.
 - Workflow cancellation/removal stop signals and ordinary-work entry locks are
   shared in `components/workflow-coordination`; workflow-runtime,
   agent-session, and deterministic-operation-runtime reuse those primitives.
