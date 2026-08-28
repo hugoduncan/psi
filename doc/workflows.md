@@ -829,17 +829,14 @@ non-converging review to a clean `final-summary-not-converged` summary, which
 `task-lifecycle` consumes as a design/plan-stage handback (below).
 
 **Standalone non-converging output.** The `final-summary-not-converged` summary
-is ordered *before* the converged `final-summary` (so the converged summary stays
-the last step and remains the standalone `/delegate` result). Its
-`PASS_STATUS: ACTIONABLE_FEEDBACK` line is consumed only by the order-independent
-`task-lifecycle` gate, which scans for it regardless of step order. As a result a
-**standalone** non-converging `/delegate review-task-design`/`-plan` run currently
-surfaces **empty** result text: the standalone result-text path reads the last
-step (`(last :step-order)`), which is the never-run converged `final-summary`.
-This replaces the previous standalone hard failure (`:reason
-:iteration-exhausted`) — a non-converging standalone review now stops cleanly but
-emits no summary. The handback summary is observable when the same review runs
-under `task-lifecycle`.
+is declared before the converged `final-summary`, but declaration order does not
+select the result. A completed workflow projects yielded text from the executed
+step recorded in `:terminal-outcome :step-id`. Therefore a standalone
+non-converging `/delegate review-task-design` or `/delegate review-task-plan` run
+stops cleanly and surfaces the executed `final-summary-not-converged` handback,
+including `PASS_STATUS: ACTIONABLE_FEEDBACK`. When either review runs under
+`task-lifecycle`, the same yielded status routes the lifecycle to its matching
+non-convergence handback.
 
 ## Shared review follow-up steps
 

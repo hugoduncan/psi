@@ -285,4 +285,5 @@
 
 ## Documentation review follow-up
 
-- [ ] Correct the stale standalone non-converging review description in `doc/workflows.md`: completed workflows now project yielded text from `:terminal-outcome :step-id`, so `review-task-design` and `review-task-plan` surface the executed `final-summary-not-converged` handback rather than empty text selected from the last declared step.
+- [x] Correct the stale standalone non-converging review description in `doc/workflows.md`: completed workflows now project yielded text from `:terminal-outcome :step-id`, so `review-task-design` and `review-task-plan` surface the executed `final-summary-not-converged` handback rather than empty text selected from the last declared step.
+  - Documented terminal-outcome projection and the standalone/lifecycle visibility of the executed non-convergence handback.
