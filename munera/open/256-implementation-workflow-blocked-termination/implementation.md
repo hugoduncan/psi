@@ -102,3 +102,4 @@ No implementation has started. The existing implementation loop currently recogn
 - documentation review added 3 steps to be addressed
 - addressed 3 documentation review steps
 - no new documentation review feedback
+- code-shaper review added 2 steps to be addressed

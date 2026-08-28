@@ -199,3 +199,8 @@
 - [x] Update the `README.md` workflow overview to state that a blocked implementation is a clean human handback, that `task-lifecycle` stops before implementation review and knowledge extraction, and that the human must resolve the recorded action and freshly re-invoke the workflow.
 - [x] Update `ramora/IMPLEMENTED.md` to record the implemented three-outcome `implement-task` contract, deterministic fresh blocker-record validation, branch-specific terminal exports, and caller gates that prevent blocked implementations from reaching downstream review, validation, extraction, or publication work.
 - [x] Add an `[Unreleased]` changelog entry for the user-visible `IMPLEMENTATION_BLOCKED` outcome and lifecycle/caller stop behavior. The existing entry covers only the later validated-snapshot preservation fix and does not announce the new blocked termination behavior itself.
+
+## Code-shaper review follow-up
+
+- [ ] Validate `:required-fields-by-route` even when `:required-field-labels-by-route` is also present in `workflow/exact-marker-routing` arguments (or reject the combination explicitly). The current `cond` in `required-route-fields-errors` stops after validating source-derived labels, so malformed direct-field data can reach the parser and violate its structured invalid-argument contract; add combined-shape regression coverage proving malformed arguments return `:invalid-route-marker-args` without throwing.
+- [ ] Remove the extra trailing blank line from `components/agent-session/test/psi/agent_session/workflow_implementation_callers_test.clj`; the full task range currently fails `git diff --check` at line 424.
