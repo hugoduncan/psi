@@ -144,3 +144,4 @@ No implementation has started. The existing implementation loop currently recogn
 - code-shaper review added 3 new follow-ups
 - addressed 3 review steps
 - added 1 step to be addressed
+- addressed 1 review step: all artifact-read operations now validate and normalize canonical open-task paths before I/O; handler regressions prove malformed, closed, and free-text paths perform no read.

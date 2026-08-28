@@ -34,6 +34,10 @@
 (def ^:private invalid-blocker-routing-overrides
   [{:task-path ""}
    {:task-path "   "}
+   {:task-path "munera/closed/230-x"}
+   {:task-path "open task 230-x"}
+   {:task-path "/tmp/munera/open/230-x"}
+   {:task-path "munera/open/230-x/implementation.md"}
    {:artifact ""}
    {:artifact "   "}
    {:start-delimiter ""}
@@ -150,6 +154,11 @@
                     {:task-path 42 :artifact "implementation.md"}
                     {:task-path "" :artifact "implementation.md"}
                     {:task-path "   " :artifact "implementation.md"}
+                    {:task-path "munera/closed/230-x" :artifact "implementation.md"}
+                    {:task-path "open task 230-x" :artifact "implementation.md"}
+                    {:task-path "/tmp/munera/open/230-x" :artifact "implementation.md"}
+                    {:task-path "munera/open/230-x/implementation.md"
+                     :artifact "implementation.md"}
                     {:task-path "munera/open/230-x" :artifact nil}
                     {:task-path "munera/open/230-x" :artifact 42}
                     {:task-path "munera/open/230-x" :artifact ""}
@@ -159,8 +168,8 @@
           (is (= :invalid-task-artifact-content-read-args (:reason result))
               (pr-str args result))
           (is (empty? @reads) (pr-str args @reads)))))
-    (testing "valid identifiers use the injectable read boundary"
-      (let [args {:task-path "munera/open/230-x" :artifact "implementation.md"}
+    (testing "valid identifiers are normalized before the injectable read boundary"
+      (let [args {:task-path " 230-x " :artifact "implementation.md"}
             result (artifact-routing/task-artifact-content-read
                     (assoc invocation :args args))]
         (is (= {:status :ok :data "captured content" :summary "DONE"} result))
@@ -170,10 +179,16 @@
 (deftest complete-block-routing-handlers-validate-before-artifact-read-test
   ;; Public handlers reject malformed schemas before crossing the resolver boundary.
   (let [reads (atom [])
+        before-content "prior implementation notes\n"
+        current-content (str before-content
+                             "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                             "- blocker: current decision\n"
+                             "- required-human-action: choose an API\n"
+                             "<!-- IMPLEMENTATION_BLOCKER: END -->\n")
         ctx {:workflow-task-artifact-content-read-fn
              (fn [& read-args]
                (swap! reads conj read-args)
-               nil)}
+               current-content)}
         invocation {:ctx ctx :session-id "session-1"}]
     (testing "final block handler rejects every malformed base schema without reading"
       (doseq [override invalid-blocker-routing-overrides]
@@ -204,7 +219,21 @@
                     (assoc invocation :args args))]
         (is (= :invalid-fresh-final-complete-block-routing-args (:reason result))
             (pr-str result))
-        (is (empty? @reads) (pr-str @reads))))))
+        (is (empty? @reads) (pr-str @reads))))
+    (testing "valid paths are normalized before both complete-block reads"
+      (let [final-result (artifact-routing/final-complete-block-routing
+                          (assoc invocation :args
+                                 (assoc blocker-routing-args :task-path " 230-x ")))
+            fresh-result (artifact-routing/fresh-final-complete-block-routing
+                          (assoc invocation :args
+                                 (assoc blocker-routing-args
+                                        :task-path " 230-x "
+                                        :before-content before-content)))]
+        (is (= :ok (:status final-result)) (pr-str final-result))
+        (is (= :ok (:status fresh-result)) (pr-str fresh-result))
+        (is (= [["session-1" "munera/open/230-x" "implementation.md"]
+                ["session-1" "munera/open/230-x" "implementation.md"]]
+               @reads))))))
 
 (deftest fresh-final-complete-block-routing-uses-one-artifact-revision-test
   ;; The fresh gate must derive validity and freshness from one resolved content.

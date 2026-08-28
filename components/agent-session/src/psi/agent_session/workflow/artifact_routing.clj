@@ -57,11 +57,15 @@
          :psi.munera/task-path task-dir
          :psi.munera/artifact-name artifact})))))
 
+(defn- normalize-task-path-arg
+  [args]
+  (when-let [task-path (routing/normalize-open-task-path (:task-path args))]
+    (assoc args :task-path task-path)))
+
 (defn- valid-final-complete-block-routing-args?
   [{:keys [task-path artifact start-delimiter field-prefixes end-delimiter valid-route
            output-field-labels]}]
-  (and (string? task-path)
-       (not (str/blank? task-path))
+  (and (some? (routing/normalize-open-task-path task-path))
        (string? artifact)
        (not (str/blank? artifact))
        (string? start-delimiter)
@@ -110,31 +114,34 @@
   "Read one task artifact and route only when it contains a complete authored
    block. The caller supplies all syntax and route policy."
   [{:keys [args ctx parent-session-id session-id]}]
-  (if-not (valid-final-complete-block-routing-args? args)
-    (invalid-final-complete-block-routing-args-result args)
+  (if-let [normalized-args (and (valid-final-complete-block-routing-args? args)
+                                (normalize-task-path-arg args))]
     (let [owning-session-id (or parent-session-id session-id)
           content (read-task-artifact-content ctx owning-session-id
-                                              (:task-path args) (:artifact args))]
-      (final-complete-block-routing-result args content))))
+                                              (:task-path normalized-args)
+                                              (:artifact normalized-args))]
+      (final-complete-block-routing-result normalized-args content))
+    (invalid-final-complete-block-routing-args-result args)))
 
 (defn- valid-task-artifact-content-read-args?
   [{:keys [task-path artifact]}]
-  (and (string? task-path)
-       (not (str/blank? task-path))
+  (and (some? (routing/normalize-open-task-path task-path))
        (string? artifact)
        (not (str/blank? artifact))))
 
 (defn task-artifact-content-read
   "Read a task artifact as an invoke-step value for authored workflow policy."
   [{:keys [args ctx parent-session-id session-id]}]
-  (if-not (valid-task-artifact-content-read-args? args)
+  (if-let [normalized-args (and (valid-task-artifact-content-read-args? args)
+                                (normalize-task-path-arg args))]
+    (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
+                                              (:task-path normalized-args)
+                                              (:artifact normalized-args))]
+      {:status :ok :data content :summary "DONE"})
     {:status :error
      :reason :invalid-task-artifact-content-read-args
      :message "workflow/task-artifact-content-read args are invalid"
-     :details {:args args}}
-    (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
-                                              (:task-path args) (:artifact args))]
-      {:status :ok :data content :summary "DONE"})))
+     :details {:args args}}))
 
 (defn- fresh-final-complete-block-routing-result
   [args content]
@@ -165,17 +172,20 @@
 (defn fresh-final-complete-block-routing
   "Require a complete authored block newly appended since the captured artifact."
   [{:keys [args ctx parent-session-id session-id]}]
-  (cond
-    (not (valid-final-complete-block-routing-args? (dissoc args :before-content)))
-    (invalid-final-complete-block-routing-args-result (dissoc args :before-content))
+  (let [base-args (dissoc args :before-content)]
+    (cond
+      (not (valid-final-complete-block-routing-args? base-args))
+      (invalid-final-complete-block-routing-args-result base-args)
 
-    (not (string? (:before-content args)))
-    {:status :error
-     :reason :invalid-fresh-final-complete-block-routing-args
-     :message "workflow/fresh-final-complete-block-routing args are invalid"
-     :details {:args args}}
+      (not (string? (:before-content args)))
+      {:status :error
+       :reason :invalid-fresh-final-complete-block-routing-args
+       :message "workflow/fresh-final-complete-block-routing args are invalid"
+       :details {:args args}}
 
-    :else
-    (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
-                                              (:task-path args) (:artifact args))]
-      (fresh-final-complete-block-routing-result args content))))
+      :else
+      (let [normalized-args (normalize-task-path-arg args)
+            content (read-task-artifact-content ctx (or parent-session-id session-id)
+                                                (:task-path normalized-args)
+                                                (:artifact normalized-args))]
+        (fresh-final-complete-block-routing-result normalized-args content)))))
