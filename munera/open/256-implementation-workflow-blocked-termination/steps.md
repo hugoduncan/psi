@@ -151,3 +151,7 @@
 
 - [x] Extract the duplicated `with-workflow-prompt-execution-result-fn` / `with-workflow-prompt-execution-result` fixture from `workflow_implementation_routing_test.clj` and `workflow_task_lifecycle_implementation_gate_test.clj` into shared agent-session test support, then use that single context/adapter injection seam in both namespaces. Keep response setup local to each test so the shared helper compresses infrastructure ceremony without hiding test intent.
   - Moved the context/adapter injection seam to `psi.agent-session.test-support`; both namespaces retain local response functions. Focused Scry: 20 tests, 219 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Test review follow-up
+
+- [ ] Replace the `reply-number = 4` response dispatch in `execute-checked-in-lifecycle-with-implement-task!` with a locally comprehensible prompt or step-identity match. The integration test currently assumes exactly three upstream prompt executions precede `implement-pass`, so an unrelated lifecycle-stage insertion or retry can feed an implementation status to the wrong session and fail for incidental call order rather than the blocked/completed delegation contract.
