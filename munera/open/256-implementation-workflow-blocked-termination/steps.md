@@ -141,3 +141,7 @@
 
 - [x] Reconcile `munera/plan.md` with the implemented task state. Task 256 is still listed under `Not yet started` and described as `Design-only`, even though all implementation slices and review follow-ups are complete; update the orchestration entry so future agents are not directed by stale status.
   - Moved task 256 to an implemented-awaiting-closure section and removed the stale design-only description.
+
+## Test review follow-up
+
+- [ ] Replace task-added `with-redefs` of `psi.agent-session.turn/prompt-execution-result-in!` in the implementation-routing and lifecycle execution tests with the existing injectable `:workflow-prompt-execution-result-fn` context boundary (using a nullable/state-controlled implementation), so the tests inject infrastructure state rather than mock global production behavior.
