@@ -217,11 +217,11 @@
        (boolean (re-matches route-token-pattern value))))
 
 (defn valid-field-prefixes?
-  "True when `field-prefixes` is a non-empty vector of distinct, non-empty strings."
+  "True when `field-prefixes` is a non-empty vector of distinct, non-blank strings."
   [field-prefixes]
   (and (vector? field-prefixes)
        (seq field-prefixes)
-       (every? #(and (string? %) (seq %)) field-prefixes)
+       (every? #(and (string? %) (not (str/blank? %))) field-prefixes)
        (apply distinct? field-prefixes)))
 
 (defn- complete-authored-blocks

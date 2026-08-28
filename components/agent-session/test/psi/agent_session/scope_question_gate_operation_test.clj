@@ -119,6 +119,8 @@
                            {:field-prefixes []}
                            {:field-prefixes ["- blocker: " "- blocker: "]}
                            {:field-prefixes ["" "- required-human-action: "]}
+                           {:field-prefixes [" " "- required-human-action: "]}
+                           {:field-prefixes ["\t" "- required-human-action: "]}
                            {:output-field-labels []}
                            {:output-field-labels ["IMPLEMENTATION_BLOCKER"
                                                   "IMPLEMENTATION_BLOCKER"]}
