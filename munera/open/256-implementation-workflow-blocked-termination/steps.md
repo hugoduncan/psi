@@ -275,4 +275,5 @@
 
 ## Test review follow-up
 
-- [ ] Add a focused `terminal-contract/terminal-yielded-text` test for a cancelled workflow run that retains an accepted terminal-step result, proving cancellation suppresses that text. The production guard and resolution note cover both failed and cancelled outcomes, but the current regression exercises only failed terminal judges.
+- [x] Add a focused `terminal-contract/terminal-yielded-text` test for a cancelled workflow run that retains an accepted terminal-step result, proving cancellation suppresses that text. The production guard and resolution note cover both failed and cancelled outcomes, but the current regression exercises only failed terminal judges.
+  - Added a pure terminal-contract regression with retained accepted terminal text and a cancelled outcome. Focused Scry: 1 test/2 assertions passed; clj-kondo and `git diff --check` passed.
