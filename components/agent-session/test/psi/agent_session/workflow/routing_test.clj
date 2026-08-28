@@ -357,6 +357,22 @@
                    "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")]
     (is (= "IMPLEMENTATION_BLOCKED"
            (:data (routing/parse-exact-marker-routing (assoc base :text valid)))))
+    (let [complete-base {:marker-label "IMPLEMENTATION_STATUS"
+                         :allowed-routes ["IMPLEMENTATION_COMPLETE"]
+                         :forbidden-field-labels-by-route
+                         {"IMPLEMENTATION_COMPLETE"
+                          ["IMPLEMENTATION_BLOCKER"
+                           "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}
+          complete "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"]
+      (is (= "IMPLEMENTATION_COMPLETE"
+             (:data (routing/parse-exact-marker-routing
+                     (assoc complete-base :text complete)))))
+      (doseq [field ["IMPLEMENTATION_BLOCKER"
+                     "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]]
+        (is (= :unexpected-route-field
+               (:reason (routing/parse-exact-marker-routing
+                         (assoc complete-base :text (str field ": stale\n" complete)))))
+            field)))
     (doseq [[label text reason]
             [["missing"
               "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"

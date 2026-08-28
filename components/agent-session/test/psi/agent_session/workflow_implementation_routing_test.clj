@@ -374,7 +374,15 @@
                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
             :ambiguous-route-marker]
            ["complete branch mismatch" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
-            "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED" :unsupported-route-marker]]]
+            "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED" :unsupported-route-marker]
+           ["complete with blocker" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+            (str "IMPLEMENTATION_BLOCKER: stale blocker\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+            :unexpected-route-field]
+           ["complete with required action" "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+            (str "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: stale action\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+            :unexpected-route-field]]]
     (test-support/with-temp-worktree-session
       (fn [worktree ctx session-id]
         (let [task-path "munera/open/230-x"

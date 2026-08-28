@@ -409,6 +409,32 @@
          (remove #(= :ordinary (:kind %)))
          vec)))
 
+(defn- route-field-labels-errors
+  [allowed-routes field labels-by-route]
+  (cond
+    (nil? labels-by-route)
+    []
+
+    (not (map? labels-by-route))
+    [{:field field
+      :reason :non-map-field-labels-by-route
+      :value labels-by-route}]
+
+    :else
+    (->> labels-by-route
+         (mapcat (fn [[route labels]]
+                   (concat
+                    (when-not (contains? (set allowed-routes) route)
+                      [{:field field
+                        :reason :unsupported-field-labels-route
+                        :value route}])
+                    (when-not (and (vector? labels) (every? route-token? labels))
+                      [{:field field
+                        :reason :invalid-field-labels
+                        :route route
+                        :value labels}]))))
+         vec)))
+
 (defn- required-route-fields-errors
   [{:keys [allowed-routes required-fields-by-route
            required-field-labels-by-route required-fields-source-text]}]
@@ -561,11 +587,16 @@
    args return :invalid-route-marker-args before marker parsing."
   [args]
   (let [errors (into (exact-marker-routing-arg-errors args)
-                     (required-route-fields-errors args))]
+                     (concat (required-route-fields-errors args)
+                             (route-field-labels-errors
+                              (:allowed-routes args)
+                              :forbidden-field-labels-by-route
+                              (:forbidden-field-labels-by-route args))))]
     (if (seq errors)
       (invalid-exact-marker-routing-args-result errors)
       (let [{:keys [text marker-label allowed-routes required-fields-by-route
-                    required-field-labels-by-route required-fields-source-text]} args
+                    required-field-labels-by-route required-fields-source-text
+                    forbidden-field-labels-by-route]} args
             candidates (route-marker-candidates args)]
         (cond
           (empty? candidates)
@@ -595,9 +626,11 @@
                                             (mapcat keys)
                                             (remove #(contains? required-fields %))
                                             set)
+                    forbidden-labels (into other-route-labels
+                                           (get forbidden-field-labels-by-route route []))
                     field-result (if (= (count source-labels) (count source-fields))
                                    (validate-required-route-fields text required-fields
-                                                                   other-route-labels)
+                                                                   forbidden-labels)
                                    {:status :error
                                     :reason :invalid-required-fields-source
                                     :message "Required route fields source is missing exact fields"

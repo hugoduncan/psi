@@ -52,7 +52,10 @@
            :args {:text {:from {:step "final-summary-complete", :output :final-llm-reply}},
                   :marker-label "IMPLEMENTATION_STATUS",
                   :allowed-routes ["IMPLEMENTATION_COMPLETE"],
-                  :required-fields-by-route {"IMPLEMENTATION_COMPLETE" {}}}},
+                  :forbidden-field-labels-by-route
+                  {"IMPLEMENTATION_COMPLETE"
+                   ["IMPLEMENTATION_BLOCKER"
+                    "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}},
    :on {"IMPLEMENTATION_COMPLETE" {:goto :done}}}
   {:name "final-summary-blocked",
    :type :session,

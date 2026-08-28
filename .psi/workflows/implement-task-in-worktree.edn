@@ -44,7 +44,11 @@
                   :operation "workflow/exact-marker-routing"
                   :args {:text {:from {:step "summary" :output :final-llm-reply}}
                          :marker-label "IMPLEMENTATION_STATUS"
-                         :allowed-routes ["IMPLEMENTATION_COMPLETE"]}}
+                         :allowed-routes ["IMPLEMENTATION_COMPLETE"]
+                         :forbidden-field-labels-by-route
+                         {"IMPLEMENTATION_COMPLETE"
+                          ["IMPLEMENTATION_BLOCKER"
+                           "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}}
           :on {"IMPLEMENTATION_COMPLETE" {:goto :done}}}
          {:name "summary-implementation-blocked"
           :type :session

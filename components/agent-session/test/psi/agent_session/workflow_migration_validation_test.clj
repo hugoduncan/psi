@@ -208,6 +208,9 @@
              (get-in complete-summary [:judge :operation])))
       (is (= "workflow/exact-marker-routing"
              (get-in blocked-summary [:judge :operation])))
+      (is (= ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]
+             (get-in complete-summary [:judge :args :forbidden-field-labels-by-route
+                                       "IMPLEMENTATION_COMPLETE"])))
       (is (= ["IMPLEMENTATION_BLOCKED"]
              (get-in blocked-summary [:judge :args :allowed-routes])))
       (is (= ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]

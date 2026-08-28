@@ -545,7 +545,15 @@
             :ambiguous-route-marker]
            ["branch mismatch"
             "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
-            :unsupported-route-marker]]]
+            :unsupported-route-marker]
+           ["blocked-only blocker"
+            (str "IMPLEMENTATION_BLOCKER: stale blocker\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+            :unexpected-route-field]
+           ["blocked-only action"
+            (str "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: stale action\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+            :unexpected-route-field]]]
     (let [[result run] (execute-checked-in-worktree-wrapper-complete! handback label)]
       (is (= :failed (:status result)) label)
       (is (= reason (get-in run [:terminal-outcome :reason])) label)
