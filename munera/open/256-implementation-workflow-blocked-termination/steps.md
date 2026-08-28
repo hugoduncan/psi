@@ -188,3 +188,7 @@
   - The malformed case now starts with ordinary implementation notes and appends its incomplete record only in response to the checked-in implementation-pass prompt; the route rejects that fresh malformed suffix.
 - [x] Extract the duplicated workflow execution fixtures shared by `workflow_implementation_callers_test.clj` and `workflow_task_lifecycle_implementation_gate_test.clj`—routing-operation registration, session/terminal child definition builders, checked-in workflow compilation, and run creation—into focused shared test support. Keep workflow-specific topology and response setup local so the helper compresses ceremony without hiding intent.
   - Added `workflow-implementation-test-support`; workflow-specific definitions and response classification remain local. Focused Scry: 23 tests/225 assertions passed; clj-kondo and `git diff --check` passed.
+
+## Test review follow-up
+
+- [ ] Replace the duplicate routing-operation registration, checked-in workflow compilation, and run-creation fixtures in `workflow_implementation_routing_test.clj` with `workflow-implementation-test-support`. Keep the synthetic implementation topology and response classification local; use the same shared execution-fixture abstraction across all three blocked-workflow execution namespaces to prevent fixture drift.
