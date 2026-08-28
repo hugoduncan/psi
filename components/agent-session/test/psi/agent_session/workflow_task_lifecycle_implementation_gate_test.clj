@@ -177,6 +177,33 @@
                                                 :run-id run-id
                                                 :workflow-input workflow-input})))))
 
+(defn- checked-in-lifecycle-prompt-type
+  [prompt]
+  (cond
+    (= "PASS_STATUS: REVIEW_COMPLETE" prompt) :review
+    (= "plan created" prompt) :plan
+    (= "knowledge extracted" prompt) :knowledge-extraction
+    (.contains prompt "Execute the next concrete implementation slice for the task.") :implementation-pass
+    (.contains prompt "Produce the user-facing blocked handback for the specific Munera task") :implementation-blocked-summary
+    (.contains prompt "Produce the user-facing final result for the specific Munera task") :implementation-complete-summary
+    (.contains prompt "Produce the user-facing blocked handback for the Munera task lifecycle") :lifecycle-blocked-summary
+    (.contains prompt "Produce the user-facing final result for the Munera task lifecycle") :lifecycle-complete-summary
+    (.contains prompt "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED") :delegated-blocked-implementation
+    :else (throw (ex-info "Unexpected checked-in task-lifecycle prompt"
+                          {:unexpected-prompt prompt}))))
+
+(deftest checked-in-lifecycle-prompt-dispatch-fails-fast-test
+  ;; Tests authored-topology drift fails at the response boundary with the
+  ;; unmatched lifecycle prompt available directly to the failure report.
+  (let [prompt "Unexpected authored lifecycle step"
+        error (try
+                (checked-in-lifecycle-prompt-type prompt)
+                nil
+                (catch clojure.lang.ExceptionInfo e
+                  e))]
+    (is (= "Unexpected checked-in task-lifecycle prompt" (ex-message error)))
+    (is (= {:unexpected-prompt prompt} (ex-data error)))))
+
 (defn- execute-checked-in-blocked-lifecycle!
   [ctx session-id]
   (let [definition (checked-in-lifecycle-definition (System/getProperty "user.dir"))
@@ -201,16 +228,19 @@
     (create-lifecycle-run! ctx definition run-id {:input task-path})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
-        {:execution-result/assistant-message
-         {:role "assistant"
-          :content [{:type :text
-                     :text (if (.contains prompt "Produce the user-facing blocked handback")
-                             (str "lifecycle blocked handback\n"
-                                  "IMPLEMENTATION_BLOCKER: validated blocker\n"
-                                  "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
-                                  "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-                             prompt)}]
-          :stop-reason :stop}})
+        (let [text (case (checked-in-lifecycle-prompt-type prompt)
+                     :review "PASS_STATUS: REVIEW_COMPLETE"
+                     :plan "plan created"
+                     :delegated-blocked-implementation prompt
+                     :lifecycle-blocked-summary
+                     (str "lifecycle blocked handback\n"
+                          "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                          "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                          "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))]
+          {:execution-result/assistant-message
+           {:role "assistant"
+            :content [{:type :text :text text}]
+            :stop-reason :stop}}))
       (let [result (workflow-execution/execute-run! ctx session-id run-id)]
         [result (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]))))
 
@@ -265,31 +295,30 @@
     (create-lifecycle-run! ctx lifecycle run-id {:input task-path})
     (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
-        (let [text (cond
-                     (.contains prompt "Execute the next concrete implementation slice for the task.")
+        (let [text (case (checked-in-lifecycle-prompt-type prompt)
+                     :review "PASS_STATUS: REVIEW_COMPLETE"
+                     :plan "plan created"
+                     :knowledge-extraction "knowledge extracted"
+                     :implementation-pass
                      (do (when (= :blocked outcome)
                            (spit (str worktree "/" task-path "/implementation.md")
                                  (str "initial notes\n" (implementation-blocker-record))))
                          (str "PASS_STATUS: " (if (= :blocked outcome)
                                                 "IMPLEMENTATION_BLOCKED"
                                                 "IMPLEMENTATION_COMPLETE")))
-
-                     (.contains prompt "Produce the user-facing blocked handback for the specific Munera task")
+                     :implementation-blocked-summary
                      (str "implement blocked terminal\n"
                           "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
                           "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
                           "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-
-                     (.contains prompt "Produce the user-facing final result for the specific Munera task")
+                     :implementation-complete-summary
                      "implement complete terminal\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
-
-                     (.contains prompt "Produce the user-facing blocked handback for the Munera task lifecycle")
+                     :lifecycle-blocked-summary
                      (str "lifecycle blocked handback\n"
                           "IMPLEMENTATION_BLOCKER: awaiting product decision\n"
                           "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: choose the retention policy\n"
                           "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
-
-                     :else prompt)]
+                     :lifecycle-complete-summary "lifecycle complete handback")]
           {:execution-result/assistant-message
            {:role "assistant"
             :content [{:type :text :text text}]
