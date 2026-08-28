@@ -270,4 +270,5 @@
 
 ## Test review follow-up
 
-- [ ] Assert `terminal-contract/terminal-yielded-text` is `nil` for every rejected standalone blocked handback partition. The new test proves failed outcomes and judge reasons but does not prove the requested absence of a terminal yield; terminal projection is a separate observable contract derived from the accepted terminal result.
+- [x] Assert `terminal-contract/terminal-yielded-text` is `nil` for every rejected standalone blocked handback partition. The new test proves failed outcomes and judge reasons but does not prove the requested absence of a terminal yield; terminal projection is a separate observable contract derived from the accepted terminal result.
+  - Failed or cancelled terminal outcomes no longer project rejected actor text; all five invalid blocked-handback partitions now prove a nil terminal yield. Focused Scry: implementation routing 10 tests/110 assertions and terminal-contract execution 1 test/5 assertions; clj-kondo and `git diff --check` passed.

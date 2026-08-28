@@ -29,10 +29,12 @@
 
 (defn terminal-yielded-text
   [workflow-run]
-  (let [step-id (terminal-step-id workflow-run)
-        step-def (get (effective-steps workflow-run) step-id)
-        accepted-result (get-in workflow-run [:step-runs step-id :accepted-result])]
-    (workflow-ir/step-yield-field-value step-def accepted-result :text)))
+  (when (or (nil? (:terminal-outcome workflow-run))
+            (= :completed (get-in workflow-run [:terminal-outcome :outcome])))
+    (let [step-id (terminal-step-id workflow-run)
+          step-def (get (effective-steps workflow-run) step-id)
+          accepted-result (get-in workflow-run [:step-runs step-id :accepted-result])]
+      (workflow-ir/step-yield-field-value step-def accepted-result :text))))
 
 (defn parse-markdown-handoff-data
   [text]

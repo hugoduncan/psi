@@ -443,7 +443,8 @@
                       (get-in run [:step-runs "final-summary-blocked"
                                    :attempts 0 :judge-output :routing-result])
                       [:status :reason])) label)
-              (is (= :failed (get-in run [:terminal-outcome :outcome])) label))))))))
+              (is (= :failed (get-in run [:terminal-outcome :outcome])) label)
+              (is (nil? (terminal-contract/terminal-yielded-text run)) label))))))))
 
 (deftest checked-in-implement-task-rejects-invalid-terminal-handbacks-test
   ;; Tests checked-in terminal judges reject prompt-noncompliant yielded text.
