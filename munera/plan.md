@@ -2,10 +2,6 @@
 
 ## Open tasks (suggested execution order)
 
-Implemented; awaiting task closure:
-
-- `munera/open/256-implementation-workflow-blocked-termination/` — implementation and review follow-ups complete.
-
 Not yet started:
 
 - `munera/open/249-workflow-resume-validation-error/` — clarify or improve workflow resume behavior when a run is `:running` rather than blocked. Design-only; auto-generated and pending human review.
