@@ -265,4 +265,5 @@
 
 ## Test review follow-up
 
-- [ ] Add checked-in `implement-task` execution coverage proving `final-summary-blocked` rejects missing, malformed, duplicate, branch-mismatched, and validated-snapshot-mismatched terminal fields. The current checked-in test proves one valid blocked handback and invalid completion handbacks, while invalid blocked-handback cases are covered only at outer callers; test the standalone blocked terminal judge directly and assert meaningful failure reasons plus the absence of a completed terminal yield.
+- [x] Add checked-in `implement-task` execution coverage proving `final-summary-blocked` rejects missing, malformed, duplicate, branch-mismatched, and validated-snapshot-mismatched terminal fields. The current checked-in test proves one valid blocked handback and invalid completion handbacks, while invalid blocked-handback cases are covered only at outer callers; test the standalone blocked terminal judge directly and assert meaningful failure reasons plus the absence of a completed terminal yield.
+  - The checked-in standalone workflow now rejects all five invalid blocked-handback partitions with their exact structured reasons and a failed terminal outcome. Focused Scry: 10 tests/105 assertions passed; clj-kondo and `git diff --check` passed.

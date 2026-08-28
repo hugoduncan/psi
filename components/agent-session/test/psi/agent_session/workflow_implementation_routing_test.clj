@@ -376,6 +376,75 @@
             (is (= "complete handback\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"
                    (terminal-contract/terminal-yielded-text run)))))))))
 
+(deftest checked-in-implement-task-rejects-invalid-blocked-terminal-handbacks-test
+  ;; Tests the checked-in standalone blocked terminal judge rejects every
+  ;; invalid export partition without exposing a completed terminal yield.
+  (doseq [[label handback expected-reason]
+          [["missing status"
+            (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action")
+            :missing-route-marker]
+           ["malformed status"
+            (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                 "IMPLEMENTATION_STATUS:IMPLEMENTATION_BLOCKED")
+            :malformed-route-marker]
+           ["duplicate blocker"
+            (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+            :ambiguous-route-field]
+           ["branch mismatch"
+            (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+            :unsupported-route-marker]
+           ["snapshot mismatch"
+            (str "IMPLEMENTATION_BLOCKER: changed blocker\n"
+                 "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                 "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+            :mismatched-route-field]]]
+    (test-support/with-temp-worktree-session
+      (fn [worktree ctx session-id]
+        (let [task-path "munera/open/230-x"
+              run-id (str "checked-in-blocked-terminal-" label)
+              implementation-path (str worktree "/" task-path "/implementation.md")]
+          (test-support/write-task-artifact! worktree task-path "implementation.md" "notes\n")
+          (implementation-support/register-routing-ops! ctx)
+          (implementation-support/create-run! ctx
+                                              (checked-in-implement-task-definition
+                                               (System/getProperty "user.dir"))
+                                              run-id {:input task-path})
+          (test-support/with-workflow-prompt-execution-result [ctx]
+            (fn [_ctx _child-session-id prompt]
+              (let [text (case (checked-in-implement-task-prompt-type prompt)
+                           :implementation-pass
+                           (do
+                             (spit implementation-path
+                                   (artifact-content
+                                    {:blocker "validated blocker"
+                                     :required-human-action "validated action"})
+                                   :append true)
+                             "PASS_STATUS: IMPLEMENTATION_BLOCKED")
+
+                           :blocked-summary handback)]
+                {:execution-result/assistant-message
+                 {:role "assistant"
+                  :content [{:type :text :text text}]
+                  :stop-reason :stop}}))
+            (let [result (workflow-execution/execute-run! ctx session-id run-id)
+                  run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+              (is (= :failed (:status result)) label)
+              (is (= expected-reason (get-in run [:terminal-outcome :reason])) label)
+              (is (= 1 (count (get-in run [:step-runs "final-summary-blocked" :attempts]))) label)
+              (is (= {:status :error :reason expected-reason}
+                     (select-keys
+                      (get-in run [:step-runs "final-summary-blocked"
+                                   :attempts 0 :judge-output :routing-result])
+                      [:status :reason])) label)
+              (is (= :failed (get-in run [:terminal-outcome :outcome])) label))))))))
+
 (deftest checked-in-implement-task-rejects-invalid-terminal-handbacks-test
   ;; Tests checked-in terminal judges reject prompt-noncompliant yielded text.
   (doseq [[label pass-reply summary-reply expected-reason]
