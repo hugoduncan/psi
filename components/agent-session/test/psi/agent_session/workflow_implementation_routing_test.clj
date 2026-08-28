@@ -106,6 +106,27 @@
   [prompt]
   (.contains prompt "Produce the user-facing blocked handback for the specific Munera task"))
 
+(defn- checked-in-implement-task-prompt-type
+  [prompt]
+  (cond
+    (implementation-pass-prompt? prompt) :implementation-pass
+    (complete-summary-prompt? prompt) :complete-summary
+    (blocked-summary-prompt? prompt) :blocked-summary
+    :else (throw (ex-info "Unexpected checked-in implement-task prompt"
+                          {:unexpected-prompt prompt}))))
+
+(deftest checked-in-implement-task-prompt-dispatch-fails-fast-test
+  ;; Tests authored-topology drift fails at the response boundary with the
+  ;; unmatched prompt available directly to the test failure report.
+  (let [prompt "Unexpected authored workflow step"
+        error (try
+                (checked-in-implement-task-prompt-type prompt)
+                nil
+                (catch clojure.lang.ExceptionInfo e
+                  e))]
+    (is (= "Unexpected checked-in implement-task prompt" (ex-message error)))
+    (is (= {:unexpected-prompt prompt} (ex-data error)))))
+
 (deftest implement-task-implementation-complete-routes-to-final-summary-test
   (testing "IMPLEMENTATION_COMPLETE terminates the implementation loop deterministically"
     (let [[ctx session-id] (support/create-session-context {:persist? false})
@@ -187,8 +208,8 @@
         (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id prompt]
             (swap! prompts* conj prompt)
-            (let [text (cond
-                         (implementation-pass-prompt? prompt)
+            (let [text (case (checked-in-implement-task-prompt-type prompt)
+                         :implementation-pass
                          (do
                            (spit (str worktree "/" task-path "/implementation.md")
                                  (str (artifact-content {:blocker "earlier decision"
@@ -197,7 +218,7 @@
                                                          :required-human-action "choose the retention policy"})))
                            "PASS_STATUS: IMPLEMENTATION_BLOCKED")
 
-                         (blocked-summary-prompt? prompt)
+                         :blocked-summary
                          (do
                            (spit (str worktree "/" task-path "/implementation.md")
                                  (artifact-content
@@ -349,13 +370,13 @@
                                     run-id task-path)
         (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id prompt]
-            (let [text (cond
-                         (implementation-pass-prompt? prompt)
+            (let [text (case (checked-in-implement-task-prompt-type prompt)
+                         :implementation-pass
                          (case (swap! implementation-pass-count* inc)
                            1 "PASS_STATUS: MORE_WORK_REMAINS"
                            2 "PASS_STATUS: IMPLEMENTATION_COMPLETE")
 
-                         (complete-summary-prompt? prompt)
+                         :complete-summary
                          "complete handback\nIMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")]
               {:execution-result/assistant-message
                {:role "assistant"
@@ -414,9 +435,9 @@
               {:execution-result/assistant-message
                {:role "assistant"
                 :content [{:type :text
-                           :text (cond
-                                   (implementation-pass-prompt? prompt) pass-reply
-                                   (complete-summary-prompt? prompt) summary-reply)}]
+                           :text (case (checked-in-implement-task-prompt-type prompt)
+                                   :implementation-pass pass-reply
+                                   :complete-summary summary-reply)}]
                 :stop-reason :stop}})
             (let [result (workflow-execution/execute-run! ctx session-id run-id)
                   run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]

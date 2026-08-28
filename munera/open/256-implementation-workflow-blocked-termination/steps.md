@@ -164,4 +164,5 @@
 
 ## Test review follow-up
 
-- [ ] Make the checked-in `implement-task` prompt-response dispatchers fail immediately with the unexpected prompt in the error data when no known pass or branch-summary predicate matches. Their current `cond` expressions return `nil`, turning authored-topology drift into an indirect execution failure with poor diagnostic signal; add a focused regression assertion for the fail-fast response boundary.
+- [x] Make the checked-in `implement-task` prompt-response dispatchers fail immediately with the unexpected prompt in the error data when no known pass or branch-summary predicate matches. Their current `cond` expressions return `nil`, turning authored-topology drift into an indirect execution failure with poor diagnostic signal; add a focused regression assertion for the fail-fast response boundary.
+  - Added a shared local prompt classifier that throws with `:unexpected-prompt`; all checked-in response dispatchers use it, and focused boundary proof covers the diagnostic data. Focused Scry: 9 tests, 80 assertions passed; clj-kondo and `git diff --check` passed.
