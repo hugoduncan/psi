@@ -1,7 +1,6 @@
 (ns psi.agent-session.workflow-task-lifecycle-implementation-gate-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.context :as session-context]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
@@ -10,8 +9,7 @@
    [psi.workflow-loader.compiler :as workflow-compiler]
    [psi.workflow-loader.parser :as workflow-parser]
    [psi.workflow-registry.registry :as workflow-registry]
-   [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]))
+   [psi.workflow-runtime.core :as workflow-runtime]))
 
 (defn- register-routing-ops!
   [ctx]
@@ -26,25 +24,6 @@
                        :query-session (fn [& _] nil)
                        :mutate (fn [& _] nil)
                        :mutate-session (fn [& _] nil)}))
-
-(defn- with-workflow-prompt-execution-result-fn
-  [ctx prompt-execution-result-fn]
-  (let [ctx (assoc ctx :workflow-prompt-execution-result-fn
-                   (fn
-                     ([workflow-ctx child-session-id prompt]
-                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
-                     ([workflow-ctx child-session-id prompt _images]
-                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
-                     ([workflow-ctx child-session-id prompt _images _opts]
-                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))))]
-    (assoc ctx workflow-execution-adapter/adapter-key
-           (session-context/workflow-execution-adapter ctx))))
-
-(defmacro with-workflow-prompt-execution-result
-  [[ctx] prompt-execution-result-fn & body]
-  `(let [~ctx (with-workflow-prompt-execution-result-fn
-                ~ctx ~prompt-execution-result-fn)]
-     ~@body))
 
 (defn- session-step
   [name prompt]
@@ -220,7 +199,7 @@
                      state
                      definitions)))
     (create-lifecycle-run! ctx definition run-id {:input task-path})
-    (with-workflow-prompt-execution-result [ctx]
+    (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
          {:role "assistant"
@@ -242,7 +221,7 @@
     (register-routing-ops! ctx)
     (register-definitions! ctx implementation-status)
     (create-lifecycle-run! ctx lifecycle-definition run-id {})
-    (with-workflow-prompt-execution-result [ctx]
+    (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
          {:role "assistant"
@@ -285,7 +264,7 @@
                      state
                      definitions)))
     (create-lifecycle-run! ctx lifecycle run-id {:input task-path})
-    (with-workflow-prompt-execution-result [ctx]
+    (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         (let [reply-number (swap! reply-number* inc)
               text (cond
@@ -439,7 +418,7 @@
                      state
                      definitions)))
     (create-lifecycle-run! ctx definition (str caller-name "-blocked") {})
-    (with-workflow-prompt-execution-result [ctx]
+    (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
          {:role "assistant"
@@ -479,7 +458,7 @@
                      state
                      [implement-task wrapper])))
     (create-lifecycle-run! ctx wrapper run-id {:input "worktree_path: /tmp/worktree\nmunera_task_path: munera/open/256-task"})
-    (with-workflow-prompt-execution-result [ctx]
+    (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
          {:role "assistant"
@@ -522,7 +501,7 @@
     (create-lifecycle-run! ctx wrapper run-id
                            {:input (str "worktree_path: /tmp/worktree\n"
                                         "munera_task_path: munera/open/256-task")})
-    (with-workflow-prompt-execution-result [ctx]
+    (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
          {:role "assistant"
@@ -607,7 +586,7 @@
                        state
                        [implementation definition])))
       (create-lifecycle-run! ctx definition run-id {:input "munera/open/256-task"})
-      (with-workflow-prompt-execution-result [ctx]
+      (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id prompt]
           (swap! prompts* conj prompt)
           {:execution-result/assistant-message
@@ -662,7 +641,7 @@
                      state
                      [wrapper review builder definition])))
     (create-lifecycle-run! ctx definition run-id {})
-    (with-workflow-prompt-execution-result [ctx]
+    (test-support/with-workflow-prompt-execution-result [ctx]
       (fn [_ctx _child-session-id prompt]
         {:execution-result/assistant-message
          {:role "assistant"
@@ -731,7 +710,7 @@
                        state
                        [wrapper review builder definition])))
       (create-lifecycle-run! ctx definition run-id {})
-      (with-workflow-prompt-execution-result [ctx]
+      (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id prompt]
           {:execution-result/assistant-message
            {:role "assistant"

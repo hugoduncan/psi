@@ -1,7 +1,6 @@
 (ns psi.agent-session.workflow-implementation-routing-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.context :as session-context]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-execution-test-support :as support]
@@ -10,7 +9,6 @@
    [psi.workflow-loader.compiler :as workflow-compiler]
    [psi.workflow-loader.parser :as workflow-parser]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-runtime.terminal-contract :as terminal-contract]))
 
 (defn- register-review-routing-ops!
@@ -89,25 +87,6 @@
                        %)
                     steps)))))
 
-(defn- with-workflow-prompt-execution-result-fn
-  [ctx prompt-execution-result-fn]
-  (let [ctx (assoc ctx :workflow-prompt-execution-result-fn
-                   (fn
-                     ([workflow-ctx child-session-id prompt]
-                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
-                     ([workflow-ctx child-session-id prompt _images]
-                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
-                     ([workflow-ctx child-session-id prompt _images _opts]
-                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))))]
-    (assoc ctx workflow-execution-adapter/adapter-key
-           (session-context/workflow-execution-adapter ctx))))
-
-(defmacro with-workflow-prompt-execution-result
-  [[ctx] prompt-execution-result-fn & body]
-  `(let [~ctx (with-workflow-prompt-execution-result-fn
-                ~ctx ~prompt-execution-result-fn)]
-     ~@body))
-
 (defn- artifact-content
   [block]
   (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
@@ -121,7 +100,7 @@
           prompts* (atom [])]
       (register-review-routing-ops! ctx)
       (create-implement-task-run! ctx implement-task-definition "run-implement-complete" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
-      (with-workflow-prompt-execution-result [ctx]
+      (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx child-session-id prompt]
           (swap! prompts* conj {:session-id child-session-id :prompt prompt})
           {:execution-result/assistant-message
@@ -154,7 +133,7 @@
           prompts* (atom [])]
       (register-review-routing-ops! ctx)
       (create-implement-task-run! ctx implement-task-definition "run-implement-blocked" "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
-      (with-workflow-prompt-execution-result [ctx]
+      (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id prompt]
           (swap! prompts* conj prompt)
           {:execution-result/assistant-message
@@ -194,7 +173,7 @@
         (create-implement-task-run! ctx
                                     (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                     run-id task-path)
-        (with-workflow-prompt-execution-result [ctx]
+        (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id prompt]
             (swap! prompts* conj prompt)
             (let [reply-number (swap! replies* inc)]
@@ -255,7 +234,7 @@
         (create-implement-task-run! ctx
                                     (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                     run-id task-path)
-        (with-workflow-prompt-execution-result [ctx]
+        (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id _prompt]
             {:execution-result/assistant-message
              {:role "assistant"
@@ -284,7 +263,7 @@
           (create-implement-task-run! ctx
                                       (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                       run-id task-path)
-          (with-workflow-prompt-execution-result [ctx]
+          (test-support/with-workflow-prompt-execution-result [ctx]
             (fn [_ctx _child-session-id _prompt]
               {:execution-result/assistant-message
                {:role "assistant"
@@ -312,7 +291,7 @@
             run-id (str "run-implement-" label)]
         (register-review-routing-ops! ctx)
         (create-implement-task-run! ctx implement-task-definition run-id "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
-        (with-workflow-prompt-execution-result [ctx]
+        (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id _prompt]
             {:execution-result/assistant-message
              {:role "assistant"
@@ -329,7 +308,7 @@
           run-id "run-implement-repeat-limit"]
       (register-review-routing-ops! ctx)
       (create-implement-task-run! ctx implement-task-definition run-id "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows")
-      (with-workflow-prompt-execution-result [ctx]
+      (test-support/with-workflow-prompt-execution-result [ctx]
         (fn [_ctx _child-session-id _prompt]
           {:execution-result/assistant-message
            {:role "assistant"
@@ -355,7 +334,7 @@
         (create-implement-task-run! ctx
                                     (checked-in-implement-task-definition (System/getProperty "user.dir"))
                                     run-id task-path)
-        (with-workflow-prompt-execution-result [ctx]
+        (test-support/with-workflow-prompt-execution-result [ctx]
           (fn [_ctx _child-session-id _prompt]
             {:execution-result/assistant-message
              {:role "assistant"
@@ -414,7 +393,7 @@
                                       (checked-in-implement-task-definition
                                        (System/getProperty "user.dir"))
                                       run-id task-path)
-          (with-workflow-prompt-execution-result [ctx]
+          (test-support/with-workflow-prompt-execution-result [ctx]
             (fn [_ctx _child-session-id _prompt]
               {:execution-result/assistant-message
                {:role "assistant"

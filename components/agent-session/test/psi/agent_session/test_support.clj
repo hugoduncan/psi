@@ -304,6 +304,28 @@
          workflow-execution-adapter/adapter-key
          (merge (get ctx workflow-execution-adapter/adapter-key) overrides)))
 
+(defn with-workflow-prompt-execution-result-fn
+  "Inject a workflow prompt execution result function and rebuild the named
+   execution adapter so workflow tests use the injected context seam."
+  [ctx prompt-execution-result-fn]
+  (let [ctx (assoc ctx :workflow-prompt-execution-result-fn
+                   (fn
+                     ([workflow-ctx child-session-id prompt]
+                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
+                     ([workflow-ctx child-session-id prompt _images]
+                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))
+                     ([workflow-ctx child-session-id prompt _images _opts]
+                      (prompt-execution-result-fn workflow-ctx child-session-id prompt))))]
+    (assoc ctx workflow-execution-adapter/adapter-key
+           (session-context/workflow-execution-adapter ctx))))
+
+(defmacro with-workflow-prompt-execution-result
+  "Bind `ctx` to a context using the supplied local prompt response function."
+  [[ctx] prompt-execution-result-fn & body]
+  `(let [~ctx (with-workflow-prompt-execution-result-fn
+                ~ctx ~prompt-execution-result-fn)]
+     ~@body))
+
 (defn make-session-ctx
   "Create a minimal canonical-root-backed session-like context for tests.
    Returns [ctx session-id] where session-id is the initial session id.
