@@ -141,3 +141,4 @@ No implementation has started. The existing implementation loop currently recogn
 - addressed 1 documentation review step
 - documentation review added 1 step to be addressed
 - addressed 1 review step
+- code-shaper review added 3 new follow-ups

@@ -287,3 +287,9 @@
 
 - [x] Correct the stale standalone non-converging review description in `doc/workflows.md`: completed workflows now project yielded text from `:terminal-outcome :step-id`, so `review-task-design` and `review-task-plan` surface the executed `final-summary-not-converged` handback rather than empty text selected from the last declared step.
   - Documented terminal-outcome projection and the standalone/lifecycle visibility of the executed non-convergence handback.
+
+## Code-shaper review follow-up
+
+- [ ] Validate `workflow/task-artifact-content-read` arguments before resolving an artifact, and route its read through the same `read-task-artifact-content` boundary as the final-block handlers. The public operation currently accepts blank or non-string `task-path`/`artifact` values and bypasses the injectable read seam, making the three artifact operations inconsistent and allowing malformed authored input to cross the resolver boundary; add handler-level regressions proving malformed schemas perform no read.
+- [ ] Make an empty `:required-field-labels-by-route` schema compose as the identity in `workflow/exact-marker-routing` (or reject it explicitly as an empty schema). The current truthiness checks require a string `:required-fields-source-text` whenever the optional map is `{}` or contains only empty label vectors, so adding a semantically empty optional map changes otherwise valid marker routing into `:invalid-route-marker-args`; add focused regression coverage for the chosen contract.
+- [ ] Reject duplicate labels in `:forbidden-field-labels-by-route` during `workflow/exact-marker-routing` argument validation. Required source-derived labels are already required to be distinct, while forbidden labels such as `["FIELD" "FIELD"]` are accepted, leaving two analogous route-field schema vectors with inconsistent enforceable invariants; add focused invalid-argument coverage.
