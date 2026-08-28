@@ -421,4 +421,3 @@
           (is (zero? (count (get-in run [:step-runs "review" :attempts]))) label)
           (is (zero? (count (get-in run [:step-runs "push" :attempts]))) label)
           (is (zero? (count (get-in run [:step-runs "edit-labels" :attempts]))) label))))))
-

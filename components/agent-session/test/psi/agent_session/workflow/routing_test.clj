@@ -421,6 +421,21 @@
       (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
       (is (= "workflow/exact-marker-routing args are invalid" (:message result))
           (pr-str result))))
+  (testing "direct and source-derived required fields are both validated"
+    (let [result (routing/parse-exact-marker-routing
+                  {:text "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+                   :marker-label "IMPLEMENTATION_STATUS"
+                   :allowed-routes ["IMPLEMENTATION_BLOCKED"]
+                   :required-fields-by-route []
+                   :required-fields-source-text "IMPLEMENTATION_BLOCKER: blocker"
+                   :required-field-labels-by-route
+                   {"IMPLEMENTATION_BLOCKED" ["IMPLEMENTATION_BLOCKER"]}})]
+      (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+      (is (= [{:field :required-fields-by-route
+               :reason :non-map-required-fields-by-route
+               :value []}]
+             (get-in result [:details :errors]))
+          (pr-str result))))
   (testing "required invalid arg cases"
     (doseq [[args expected-errors]
             [[{} [{:field :text :reason :missing-text}
