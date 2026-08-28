@@ -210,29 +210,45 @@
        :data proceed-route
        :summary proceed-route})))
 
+(defn valid-route-token?
+  "True when `value` is an unambiguous authored workflow route token."
+  [value]
+  (and (string? value)
+       (boolean (re-matches route-token-pattern value))))
+
+(defn valid-field-prefixes?
+  "True when `field-prefixes` is a non-empty vector of distinct, non-empty strings."
+  [field-prefixes]
+  (and (vector? field-prefixes)
+       (seq field-prefixes)
+       (every? #(and (string? %) (seq %)) field-prefixes)
+       (apply distinct? field-prefixes)))
+
 (defn- complete-authored-blocks
   [content start-delimiter field-prefixes end-delimiter]
-  (let [lines (str/split-lines (or content ""))]
-    (loop [remaining lines
-           blocks []]
-      (if-let [line (first remaining)]
-        (if (= start-delimiter line)
-          (let [field-lines (take (count field-prefixes) (rest remaining))
-                end-line (nth remaining (inc (count field-prefixes)) nil)
-                values (mapv (fn [prefix field-line]
-                               (when (and field-line
-                                          (str/starts-with? field-line prefix))
-                                 (let [value (subs field-line (count prefix))]
-                                   (when (seq (str/trim value)) value))))
-                             field-prefixes field-lines)
-                complete? (and (= end-delimiter end-line)
-                               (= (count field-prefixes) (count values))
-                               (every? some? values))]
-            (recur (rest remaining)
-                   (cond-> blocks
-                     complete? (conj (zipmap field-prefixes values)))))
-          (recur (rest remaining) blocks))
-        blocks))))
+  (if-not (valid-field-prefixes? field-prefixes)
+    []
+    (let [lines (str/split-lines (or content ""))]
+      (loop [remaining lines
+             blocks []]
+        (if-let [line (first remaining)]
+          (if (= start-delimiter line)
+            (let [field-lines (take (count field-prefixes) (rest remaining))
+                  end-line (nth remaining (inc (count field-prefixes)) nil)
+                  values (mapv (fn [prefix field-line]
+                                 (when (and field-line
+                                            (str/starts-with? field-line prefix))
+                                   (let [value (subs field-line (count prefix))]
+                                     (when (seq (str/trim value)) value))))
+                               field-prefixes field-lines)
+                  complete? (and (= end-delimiter end-line)
+                                 (= (count field-prefixes) (count values))
+                                 (every? some? values))]
+              (recur (rest remaining)
+                     (cond-> blocks
+                       complete? (conj (zipmap field-prefixes values)))))
+            (recur (rest remaining) blocks))
+          blocks)))))
 
 (defn parse-final-complete-block
   "Return the last syntactically complete authored block in `content`.
@@ -257,8 +273,7 @@
                     start-delimiter field-prefixes end-delimiter)))))
 
 (defn- route-token? [value]
-  (and (string? value)
-       (boolean (re-matches route-token-pattern value))))
+  (valid-route-token? value))
 
 (defn- marker-label-errors
   [args]

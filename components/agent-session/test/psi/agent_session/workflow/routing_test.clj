@@ -59,6 +59,16 @@
                  content
                  "<!-- IMPLEMENTATION_BLOCKER: START -->"
                  ["- blocker: " "- required-human-action: "]
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->")))))
+  (testing "empty and duplicate field-prefix schemas are rejected"
+    (doseq [field-prefixes [[] ["- blocker: " "- blocker: "]]]
+      (is (nil? (routing/parse-final-complete-block
+                 (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                      "- blocker: first\n"
+                      "- blocker: second\n"
+                      "<!-- IMPLEMENTATION_BLOCKER: END -->\n")
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->"
+                 field-prefixes
                  "<!-- IMPLEMENTATION_BLOCKER: END -->"))))))
 
 (deftest final-complete-block-appended-test

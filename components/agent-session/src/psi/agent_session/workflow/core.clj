@@ -165,14 +165,15 @@
         valid-args? (and (string? task-path)
                          (string? artifact)
                          (string? start-delimiter)
-                         (vector? field-prefixes)
-                         (every? string? field-prefixes)
+                         (routing/valid-field-prefixes? field-prefixes)
                          (string? end-delimiter)
-                         (string? valid-route)
+                         (routing/valid-route-token? valid-route)
                          (or (nil? output-field-labels)
                              (and (vector? output-field-labels)
                                   (= (count field-prefixes) (count output-field-labels))
-                                  (every? string? output-field-labels))))]
+                                  (seq output-field-labels)
+                                  (every? routing/valid-route-token? output-field-labels)
+                                  (apply distinct? output-field-labels))))]
     (if-not valid-args?
       {:status :error
        :reason :invalid-final-complete-block-routing-args

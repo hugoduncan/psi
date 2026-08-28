@@ -105,6 +105,27 @@
                             :args (assoc blocker-routing-args :task-path "munera/open/230-x")}
                            runtime/invoke-operation)))))))))
 
+(deftest final-complete-block-routing-rejects-ambiguous-schema-test
+  ;; The operation rejects schemas that cannot produce exact-marker-compatible fields.
+  (let [base-args (assoc blocker-routing-args :task-path "munera/open/230-x")
+        invalid-overrides [{:field-prefixes []}
+                           {:field-prefixes ["- blocker: " "- blocker: "]}
+                           {:field-prefixes ["" "- required-human-action: "]}
+                           {:output-field-labels []}
+                           {:output-field-labels ["IMPLEMENTATION_BLOCKER"
+                                                  "IMPLEMENTATION_BLOCKER"]}
+                           {:output-field-labels ["" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
+                           {:output-field-labels ["implementation_blocker"
+                                                  "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}
+                           {:valid-route ""}
+                           {:valid-route "IMPLEMENTATION BLOCKED"}]]
+    (doseq [override invalid-overrides]
+      (let [result (#'workflow-core/final-complete-block-routing-result
+                    (merge base-args override) "")]
+        (is (= :error (:status result)) (pr-str override result))
+        (is (= :invalid-final-complete-block-routing-args (:reason result))
+            (pr-str override result))))))
+
 (deftest fresh-final-complete-block-routing-uses-one-artifact-revision-test
   ;; The fresh gate must derive validity and freshness from one resolved content.
   (let [before-content "prior implementation notes\n"
