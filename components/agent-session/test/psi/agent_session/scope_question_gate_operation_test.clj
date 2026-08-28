@@ -137,6 +137,36 @@
         (is (= :invalid-final-complete-block-routing-args (:reason result))
             (pr-str override result))))))
 
+(deftest task-artifact-content-read-validates-before-artifact-read-test
+  ;; The public capture operation shares the injectable artifact-read boundary.
+  (let [reads (atom [])
+        ctx {:workflow-task-artifact-content-read-fn
+             (fn [& read-args]
+               (swap! reads conj read-args)
+               "captured content")}
+        invocation {:ctx ctx :session-id "session-1"}]
+    (testing "malformed identifiers fail without reading"
+      (doseq [args [{:task-path nil :artifact "implementation.md"}
+                    {:task-path 42 :artifact "implementation.md"}
+                    {:task-path "" :artifact "implementation.md"}
+                    {:task-path "   " :artifact "implementation.md"}
+                    {:task-path "munera/open/230-x" :artifact nil}
+                    {:task-path "munera/open/230-x" :artifact 42}
+                    {:task-path "munera/open/230-x" :artifact ""}
+                    {:task-path "munera/open/230-x" :artifact "   "}]]
+        (let [result (artifact-routing/task-artifact-content-read
+                      (assoc invocation :args args))]
+          (is (= :invalid-task-artifact-content-read-args (:reason result))
+              (pr-str args result))
+          (is (empty? @reads) (pr-str args @reads)))))
+    (testing "valid identifiers use the injectable read boundary"
+      (let [args {:task-path "munera/open/230-x" :artifact "implementation.md"}
+            result (artifact-routing/task-artifact-content-read
+                    (assoc invocation :args args))]
+        (is (= {:status :ok :data "captured content" :summary "DONE"} result))
+        (is (= [["session-1" "munera/open/230-x" "implementation.md"]]
+               @reads))))))
+
 (deftest complete-block-routing-handlers-validate-before-artifact-read-test
   ;; Public handlers reject malformed schemas before crossing the resolver boundary.
   (let [reads (atom [])

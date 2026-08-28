@@ -117,20 +117,24 @@
                                               (:task-path args) (:artifact args))]
       (final-complete-block-routing-result args content))))
 
+(defn- valid-task-artifact-content-read-args?
+  [{:keys [task-path artifact]}]
+  (and (string? task-path)
+       (not (str/blank? task-path))
+       (string? artifact)
+       (not (str/blank? artifact))))
+
 (defn task-artifact-content-read
   "Read a task artifact as an invoke-step value for authored workflow policy."
   [{:keys [args ctx parent-session-id session-id]}]
-  (let [{:keys [task-path artifact]} args
-        task-dir (routing/normalize-open-task-path task-path)
-        content (when task-dir
-                  (:psi.munera/task-artifact-content
-                   (resolvers/query-in
-                    ctx
-                    [:psi.munera/task-artifact-content]
-                    {:psi.agent-session/session-id (or parent-session-id session-id)
-                     :psi.munera/task-path task-dir
-                     :psi.munera/artifact-name artifact})))]
-    {:status :ok :data content :summary "DONE"}))
+  (if-not (valid-task-artifact-content-read-args? args)
+    {:status :error
+     :reason :invalid-task-artifact-content-read-args
+     :message "workflow/task-artifact-content-read args are invalid"
+     :details {:args args}}
+    (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
+                                              (:task-path args) (:artifact args))]
+      {:status :ok :data content :summary "DONE"})))
 
 (defn- fresh-final-complete-block-routing-result
   [args content]
