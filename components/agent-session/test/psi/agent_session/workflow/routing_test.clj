@@ -410,7 +410,14 @@
                 {"IMPLEMENTATION_BLOCKED"
                  ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}]
       (is (= "IMPLEMENTATION_BLOCKED"
-             (:data (routing/parse-exact-marker-routing args)))))))
+             (:data (routing/parse-exact-marker-routing args))))
+      (doseq [blank-value ["" "   "]]
+        (let [blank-source (str "IMPLEMENTATION_BLOCKER: " blank-value "\n"
+                                "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action")]
+          (is (= :invalid-required-fields-source
+                 (:reason (routing/parse-exact-marker-routing
+                           (assoc args :required-fields-source-text blank-source))))
+              (pr-str blank-value)))))))
 
 (deftest exact-marker-routing-invalid-args-test
   ;; Tests exact-marker operation arguments are validated before marker parsing

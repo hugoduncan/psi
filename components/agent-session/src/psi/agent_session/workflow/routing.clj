@@ -525,10 +525,12 @@
 (defn- exact-field-value
   [text label]
   (let [candidates (required-field-candidates text label)
-        prefix (str label ": ")]
-    (when (and (= 1 (count candidates))
-               (str/starts-with? (first candidates) prefix))
-      (subs (first candidates) (count prefix)))))
+        prefix (str label ": ")
+        value (when (and (= 1 (count candidates))
+                         (str/starts-with? (first candidates) prefix))
+                (subs (first candidates) (count prefix)))]
+    (when-not (str/blank? value)
+      value)))
 
 (defn- source-required-fields
   [text labels]
