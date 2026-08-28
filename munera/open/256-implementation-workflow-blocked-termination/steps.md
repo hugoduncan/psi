@@ -262,3 +262,7 @@
 
 - [x] Remove the extra trailing blank line from `components/agent-session/src/psi/agent_session/workflow/artifact_routing.clj`; the cumulative task diff currently fails `git diff --check` at line 178.
   - Removed the extra terminal blank line; targeted clj-kondo and `git diff --check` pass.
+
+## Test review follow-up
+
+- [ ] Add checked-in `implement-task` execution coverage proving `final-summary-blocked` rejects missing, malformed, duplicate, branch-mismatched, and validated-snapshot-mismatched terminal fields. The current checked-in test proves one valid blocked handback and invalid completion handbacks, while invalid blocked-handback cases are covered only at outer callers; test the standalone blocked terminal judge directly and assert meaningful failure reasons plus the absence of a completed terminal yield.
