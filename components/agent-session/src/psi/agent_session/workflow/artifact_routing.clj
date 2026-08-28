@@ -175,4 +175,3 @@
     (let [content (read-task-artifact-content ctx (or parent-session-id session-id)
                                               (:task-path args) (:artifact args))]
       (fresh-final-complete-block-routing-result args content))))
-

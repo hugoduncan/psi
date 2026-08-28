@@ -260,4 +260,5 @@
 
 ## Implementation review follow-up
 
-- [ ] Remove the extra trailing blank line from `components/agent-session/src/psi/agent_session/workflow/artifact_routing.clj`; the cumulative task diff currently fails `git diff --check` at line 178.
+- [x] Remove the extra trailing blank line from `components/agent-session/src/psi/agent_session/workflow/artifact_routing.clj`; the cumulative task diff currently fails `git diff --check` at line 178.
+  - Removed the extra terminal blank line; targeted clj-kondo and `git diff --check` pass.
