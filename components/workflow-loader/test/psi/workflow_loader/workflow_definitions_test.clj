@@ -476,29 +476,48 @@
      (testing "loads without error"
        (is (empty? errors))
        (is (contains? definitions "implement-task")))
-     (let [steps (get-in definitions ["implement-task" :steps])]
-       (testing "has 2 steps with correct names and types"
-         (is (= 2 (count steps)))
-         (is (= ["implement-pass" "final-summary"] (mapv :name steps)))
-         (is (= [:session :session] (mapv :type steps))))
-       (let [wired-steps (remove #(= "final-summary" (:name %)) steps)
-             final-step (first (filter #(= "final-summary" (:name %)) steps))]
-         (testing "wired (non-final-summary) steps have {{input}} wired to :workflow-input"
-           (doseq [step wired-steps]
-             (is (step-has-input-var-wired? step)
-                 (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
-         (testing "final-summary step is inline (not prompt-workflow wired)"
-           ;; final-summary carries :source contributions with :workflow-original and
-           ;; implement-pass step-output yield refs; intentionally kept inline
-           (is (some? final-step) "final-summary step should exist")
-           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
-       (let [pass-step (first (filter #(= "implement-pass" (:name %)) steps))]
-         (testing "implement-pass routes deterministically from PASS_STATUS"
-           (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))
-           (is (= {:type :invoke
-                   :operation "workflow/pass-status-routing"
-                   :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}}}
-                  (:judge pass-step)))))))))
+     (let [steps (get-in definitions ["implement-task" :steps])
+           step-by-name (into {} (map (juxt :name identity) steps))
+           capture-step (get step-by-name "capture-implementation-before-pass")
+           pass-step (get step-by-name "implement-pass")
+           blocker-step (get step-by-name "validate-implementation-blocker")
+           complete-step (get step-by-name "final-summary-complete")
+           blocked-step (get step-by-name "final-summary-blocked")]
+       (testing "has explicit capture, pass, blocker-validation, and terminal branches"
+         (is (= ["capture-implementation-before-pass"
+                 "implement-pass"
+                 "validate-implementation-blocker"
+                 "final-summary-complete"
+                 "final-summary-blocked"]
+                (mapv :name steps)))
+         (is (= [:invoke :session :invoke :session :session]
+                (mapv :type steps))))
+       (testing "the capture and blocker-validation operations receive canonical task input"
+         (is (= {:from :workflow-input :path [:input]}
+                (get-in capture-step [:args :task-path])))
+         (is (= "implementation.md" (get-in capture-step [:args :artifact])))
+         (is (= "workflow/fresh-final-complete-block-routing" (:operation blocker-step)))
+         (is (= {:from :workflow-input :path [:input]}
+                (get-in blocker-step [:args :task-path]))))
+       (testing "implementation pass routes all three authored outcomes"
+         (is (= {"MORE_WORK_REMAINS" {:goto "capture-implementation-before-pass" :max-iterations 20}
+                 "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"}
+                 "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}
+                (:on pass-step)))
+         (is (= {:type :invoke
+                 :operation "workflow/exact-marker-routing"
+                 :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}
+                        :marker-label "PASS_STATUS"
+                        :allowed-routes ["MORE_WORK_REMAINS"
+                                         "IMPLEMENTATION_COMPLETE"
+                                         "IMPLEMENTATION_BLOCKED"]}}
+                (:judge pass-step))))
+       (testing "both terminal summaries are inline and validate their distinct exports"
+         (doseq [step [complete-step blocked-step]]
+           (is (seq (:contributions step))
+               (str (:name step) " should have inline contributions")))
+         (is (= {"IMPLEMENTATION_COMPLETE" {:goto :done}} (:on complete-step)))
+         (is (= {"IMPLEMENTATION_BLOCKED" {:goto :done}} (:on blocked-step))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-implementation-in-worktree
