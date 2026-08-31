@@ -36,6 +36,28 @@
    :on
    {"DONE" {:goto "review-task-design"},
     "REPEAT" {:goto "terminal-stop-malformed-task-path"}}}
+  {:name "terminal-stop-implementation-blocked"
+   :type :session
+   :tools ["read" "bash"]
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :template,
+     :text
+     "Produce the terminal blocked handback for `reduce-incidental-complexity` at {{input}}. Read committed task artifacts for completed work and verification only. Implementation stopped blocked; do not describe it as completed. The `implement-task` handback contains exactly one column-zero `IMPLEMENTATION_BLOCKER: <text>` line and one column-zero `IMPLEMENTATION_REQUIRED_HUMAN_ACTION: <text>` line selected from the artifact snapshot that passed deterministic validation. Reproduce both lines and values verbatim; do not re-read or select a blocker record from `implementation.md`. End with the two validated blocker/action lines verbatim and exactly one column-zero `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED` line. Summarize completed work and verification, and say that a human must resolve the recorded action before freshly re-invoking `reduce-incidental-complexity`. Do not run or claim validation, implementation review, proof synchronization, or final summary ran.",
+     :vars {"input" {:from {:step "extract-task-path", :yield :text}}}}]
+   :judge {:type :invoke,
+           :operation "workflow/exact-marker-routing",
+           :args {:text {:from {:step "terminal-stop-implementation-blocked", :output :final-llm-reply}},
+                  :marker-label "IMPLEMENTATION_STATUS",
+                  :allowed-routes ["IMPLEMENTATION_BLOCKED"],
+                  :required-fields-source-text {:from {:step "implement-task", :yield :text}},
+                  :required-field-labels-by-route
+                  {"IMPLEMENTATION_BLOCKED"
+                   ["IMPLEMENTATION_BLOCKER"
+                    "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}},
+   :on {"IMPLEMENTATION_BLOCKED" {:goto :done}}}
   {:name "terminal-stop-malformed-task-path",
    :type :session,
    :tools ["read" "bash"],
@@ -310,6 +332,18 @@
     {:type :source, :from {:step "select-and-create", :yield :text}}
     {:type :source, :from {:step "extract-task-path", :yield :text}}
     {:type :source, :from {:step "diff-gate", :yield :text}}]}
+  {:name "check-implementation-status"
+   :type :invoke
+   :operation "workflow/constant-routing"
+   :args {:route "DONE"}
+   :judge {:type :invoke
+           :operation "workflow/exact-marker-routing"
+           :args {:text {:from {:step "implement-task", :yield :text}}
+                  :marker-label "IMPLEMENTATION_STATUS"
+                  :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                                   "IMPLEMENTATION_BLOCKED"]}}
+   :on {"IMPLEMENTATION_COMPLETE" {:goto "review-task-implementation"}
+        "IMPLEMENTATION_BLOCKED" {:goto "terminal-stop-implementation-blocked"}}}
   {:name "review-task-implementation",
    :type :delegate,
    :target "review-task-implementation",

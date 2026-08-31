@@ -63,6 +63,19 @@
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
    :context [{:type :source, :from :workflow-original}]}
+  {:name "check-implementation-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
+   :judge
+   {:type :invoke,
+    :operation "workflow/exact-marker-routing",
+    :args {:text {:from {:step "implement-task", :yield :text}},
+           :marker-label "IMPLEMENTATION_STATUS",
+           :allowed-routes ["IMPLEMENTATION_COMPLETE"
+                            "IMPLEMENTATION_BLOCKED"]}},
+   :on {"IMPLEMENTATION_COMPLETE" {:goto "review-task-implementation"},
+        "IMPLEMENTATION_BLOCKED" {:goto "final-summary-implementation-blocked"}}}
   {:name "review-task-implementation",
    :type :delegate,
    :target "review-task-implementation-core",
@@ -147,6 +160,33 @@
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
    :on {"DONE" {:goto :done}}}
+  {:name "final-summary-implementation-blocked",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :template,
+     :text "Produce the user-facing blocked handback for the Munera task lifecycle described by {{input}}. Independently inspect the specific task artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, for completed work and verification only. The lifecycle stopped because implementation yielded `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED`; it did not complete implementation.
+
+The `implement-task` yielded handback contains exactly one column-zero `IMPLEMENTATION_BLOCKER: <text>` line and one column-zero `IMPLEMENTATION_REQUIRED_HUMAN_ACTION: <text>` line selected from the artifact snapshot that passed deterministic validation. Reproduce those two values verbatim. Do not re-read or select a blocker record from `implementation.md`; a later artifact revision is not authoritative for this handback. End with the two validated blocker/action lines verbatim and exactly one column-zero `IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED` line.
+
+Output a compact Markdown summary with headings `## Implementation Blocked`, `## Completed Work and Verification`, and `## Required Human Action`. State completed work, current checklist state, task artifacts updated, and verification already performed. Explicitly state that `review-task-implementation` and `extract-task-knowledge` did not run. Tell the human to take the recorded required action and then freshly re-invoke `task-lifecycle`; do not resolve, guess, or bypass the blocker and do not write mementum knowledge here.
+
+Input:
+{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/exact-marker-routing",
+           :args {:text {:from {:step "final-summary-implementation-blocked", :output :final-llm-reply}},
+                  :marker-label "IMPLEMENTATION_STATUS",
+                  :allowed-routes ["IMPLEMENTATION_BLOCKED"],
+                  :required-fields-source-text {:from {:step "implement-task", :yield :text}},
+                  :required-field-labels-by-route
+                  {"IMPLEMENTATION_BLOCKED"
+                   ["IMPLEMENTATION_BLOCKER"
+                    "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}},
+   :on {"IMPLEMENTATION_BLOCKED" {:goto :done}}}
   {:name "final-summary-scope-question-open",
    :type :session,
    :tools ["read" "bash"],

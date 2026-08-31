@@ -182,6 +182,8 @@
            coverage-fix-step (get step-by-name "coverage-fix")
            diff-gate-step (get step-by-name "diff-gate")
            implement-step (get step-by-name "implement-task")
+           implementation-status-step (get step-by-name "check-implementation-status")
+           blocked-handback-step (get step-by-name "terminal-stop-implementation-blocked")
            implementation-review-step (get step-by-name "review-task-implementation")
            validation-capture-step (get step-by-name "incidental-validation-capture")
            validation-disposition-step (get step-by-name "validation-capture-disposition")
@@ -208,6 +210,7 @@
        (testing "expands target-present execution into explicit phased topology"
          (is (= ["select-and-create"
                  "extract-task-path"
+                 "terminal-stop-implementation-blocked"
                  "terminal-stop-malformed-task-path"
                  "terminal-stop-clean-baseline"
                  "terminal-stop-coverage-disposition"
@@ -223,6 +226,7 @@
                  "coverage-fix"
                  "diff-gate"
                  "implement-task"
+                 "check-implementation-status"
                  "review-task-implementation"
                  "incidental-validation-capture"
                  "validation-capture-disposition"
@@ -239,15 +243,17 @@
                  :session
                  :session
                  :session
-                 :delegate
-                 :delegate
-                 :delegate
-                 :session
-                 :session
-                 :session
-                 :session
                  :session
                  :delegate
+                 :delegate
+                 :delegate
+                 :session
+                 :session
+                 :session
+                 :session
+                 :session
+                 :delegate
+                 :invoke
                  :delegate
                  :session
                  :invoke
@@ -525,6 +531,17 @@
          (is (.contains diff-gate-text "commit the task-artifact update"))
          (is (.contains diff-gate-text "PASS_STATUS: REVIEW_COMPLETE"))
          (is (.contains diff-gate-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
+       (testing "implementation status gates review and validation"
+         (is (= "workflow/exact-marker-routing" (:operation (:judge implementation-status-step))))
+         (is (= {:text {:from {:step "implement-task" :yield :text}}
+                 :marker-label "IMPLEMENTATION_STATUS"
+                 :allowed-routes ["IMPLEMENTATION_COMPLETE" "IMPLEMENTATION_BLOCKED"]}
+                (:args (:judge implementation-status-step))))
+         (is (= {"IMPLEMENTATION_COMPLETE" {:goto "review-task-implementation"}
+                 "IMPLEMENTATION_BLOCKED" {:goto "terminal-stop-implementation-blocked"}}
+                (:on implementation-status-step)))
+         (is (= ["read" "bash"] (:tools blocked-handback-step)))
+         (is (.contains (step-template-text blocked-handback-step) "Implementation stopped blocked")))
        (testing "incidental validation capture parse-checks proof artifacts and routes deterministically"
          (is (= "proof-sync" (get-in validation-capture-step [:on "DONE" :goto])))
          (is (= "validation-capture-disposition"

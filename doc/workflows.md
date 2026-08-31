@@ -77,7 +77,6 @@ The current remaining deferred-migration markdown wrappers are:
 - `gh-issue-create-worktree.md`
 - `gh-issue-push-intent.md`
 - `gh-issue-task-intent.md`
-- `implement-task-in-worktree.md`
 
 Those files still begin with legacy EDN workflow maps and are intentionally
 tracked by the repo-corpus validation test as outstanding migration blockers,
@@ -830,17 +829,14 @@ non-converging review to a clean `final-summary-not-converged` summary, which
 `task-lifecycle` consumes as a design/plan-stage handback (below).
 
 **Standalone non-converging output.** The `final-summary-not-converged` summary
-is ordered *before* the converged `final-summary` (so the converged summary stays
-the last step and remains the standalone `/delegate` result). Its
-`PASS_STATUS: ACTIONABLE_FEEDBACK` line is consumed only by the order-independent
-`task-lifecycle` gate, which scans for it regardless of step order. As a result a
-**standalone** non-converging `/delegate review-task-design`/`-plan` run currently
-surfaces **empty** result text: the standalone result-text path reads the last
-step (`(last :step-order)`), which is the never-run converged `final-summary`.
-This replaces the previous standalone hard failure (`:reason
-:iteration-exhausted`) — a non-converging standalone review now stops cleanly but
-emits no summary. The handback summary is observable when the same review runs
-under `task-lifecycle`.
+is declared before the converged `final-summary`, but declaration order does not
+select the result. A completed workflow projects yielded text from the executed
+step recorded in `:terminal-outcome :step-id`. Therefore a standalone
+non-converging `/delegate review-task-design` or `/delegate review-task-plan` run
+stops cleanly and surfaces the executed `final-summary-not-converged` handback,
+including `PASS_STATUS: ACTIONABLE_FEEDBACK`. When either review runs under
+`task-lifecycle`, the same yielded status routes the lifecycle to its matching
+non-convergence handback.
 
 ## Shared review follow-up steps
 
@@ -969,6 +965,47 @@ and proceeds. Detection is a deterministic content scan (no LLM): the workflow
 (`SCOPE_QUESTION:`), and the route labels, while the generic
 `workflow/scope-question-gate-routing` operation reads the artifact through a
 resolver and routes on the checkbox state.
+
+`implement-task` owns three exact `PASS_STATUS` outcomes. `MORE_WORK_REMAINS`
+re-enters the bounded implementation pass (at most 20 entries), and
+`IMPLEMENTATION_COMPLETE` reaches its normal terminal handback. A pass that
+cannot safely progress autonomously instead appends this exact complete record
+to the task's `implementation.md` before returning
+`PASS_STATUS: IMPLEMENTATION_BLOCKED`:
+
+```text
+<!-- IMPLEMENTATION_BLOCKER: START -->
+- blocker: <concise concrete blocker>
+- required-human-action: <safe action or decision>
+<!-- IMPLEMENTATION_BLOCKER: END -->
+```
+
+The blocked route captures `implementation.md` before every implementation pass
+and deterministically validates that the current blocked pass appended a complete
+record. Missing, malformed, or stale records from an earlier attempt fail rather
+than producing an invented handback. When several attempts exist, validation uses
+the final complete record in file order. The standalone blocked handback consumes
+that record from the same validated artifact snapshot, reports its values as
+`IMPLEMENTATION_BLOCKER` and `IMPLEMENTATION_REQUIRED_HUMAN_ACTION` lines, and
+then directs the human to resolve the action and freshly invoke `implement-task`.
+Caller handbacks propagate those validated lines rather than selecting a blocker
+from a later `implementation.md` revision. The normal and blocked terminal
+summaries export exactly one branch-matching `IMPLEMENTATION_STATUS` marker. Terminal handbacks are accepted only when this marker is exact and unique; blocked handbacks must also contain exactly one `IMPLEMENTATION_BLOCKER` and `IMPLEMENTATION_REQUIRED_HUMAN_ACTION` line whose values match the deterministically validated blocker snapshot, while complete handbacks must contain neither blocked-only field. Missing, malformed, duplicate, branch-mismatched, or snapshot-mismatched terminal fields fail the workflow instead of yielding a handback.
+
+`implement-task-in-worktree` is a loadable multi-step `.edn` wrapper that first
+resolves the handed-off worktree, then delegates implementation. Every workflow
+caller gates the delegated terminal export before its normal downstream work. `task-lifecycle` advances to `review-task-implementation` only
+for `IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE`; its blocked handback
+preserves the final blocker record and requires fresh `task-lifecycle` invocation.
+`implement-task-in-worktree` likewise routes blocked output to its own handback
+rather than its success summary, and exports the matching terminal status to its
+callers. `gh-issue-implement` gates that status before review and push; its
+blocked handback also leaves PR labels unchanged. The incidental- and
+architecture-complexity workflows route blocked output to terminal handbacks
+before, respectively, implementation review or validation capture. In every
+blocked route, the human must resolve the recorded action and freshly invoke the
+caller; implementation review, validation, extraction, proof synchronization,
+push, label editing, and success summaries do not run.
 
 `task-lifecycle` gates its final extraction stage after
 `review-task-implementation`. It runs `extract-task-knowledge` only when the

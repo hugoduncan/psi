@@ -475,6 +475,7 @@
         stopped? #(let [run (get-in @(:state* ctx) [:workflows :runs run-id])]
                     (or (nil? run) (= :cancelled (:status run))))]
     (reset! (:state* ctx) initial-state)
+    (workflow-handlers/register! ctx)
     (try
       (psi.agent-session.workflow-judge/execute-judge!
        ctx

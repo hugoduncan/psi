@@ -2,6 +2,7 @@
   "Validate the checked-in workflow corpus against the finalized file-kind
    split contract for `.psi/workflows/`."
   (:require
+   [clojure.edn :as edn]
    [clojure.set :as set]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
@@ -21,6 +22,7 @@
     "prompt-build"
     "lambda-build"
     "implement-task"
+    "implement-task-in-worktree"
     "review-step"})
 
 (defn- path->workflow-name
@@ -135,8 +137,7 @@
               "gh-bug-reproduce"
               "gh-issue-create-worktree"
               "gh-issue-push-intent"
-              "gh-issue-task-intent"
-              "implement-task-in-worktree"]
+              "gh-issue-task-intent"]
              edn-bodied-md-names)
           (str "EDN-bodied markdown blockers drifted: " (pr-str edn-bodied-md-names))))))
 
@@ -149,3 +150,80 @@
       (is (every? #(contains? files-by-name-and-kind %) all-required)
           (str "Required sample workflows missing from corpus: "
                (pr-str (sort (remove #(contains? files-by-name-and-kind %) all-required))))))))
+
+(deftest implement-task-implementation-pass-declares-blocked-handback-contract-test
+  ;; Tests the authored pass prompt owns the implementation-blocked policy.
+  (testing "the implementation pass permits three statuses and requires a durable actionable blocker record"
+    (let [prompt (slurp ".psi/workflows/implement-task-implement-pass.md")
+          status-lines (->> (str/split-lines prompt)
+                            (filter #(str/starts-with? % "PASS_STATUS: "))
+                            vec)]
+      (is (= ["PASS_STATUS: MORE_WORK_REMAINS"
+              "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+              "PASS_STATUS: IMPLEMENTATION_BLOCKED"]
+             status-lines))
+      (is (str/includes? prompt "<!-- IMPLEMENTATION_BLOCKER: START -->"))
+      (is (str/includes? prompt "- blocker: <concise concrete blocker>"))
+      (is (str/includes? prompt "- required-human-action: <safe action or decision>"))
+      (is (str/includes? prompt "<!-- IMPLEMENTATION_BLOCKER: END -->"))
+      (is (str/includes? prompt "concise non-empty text"))
+      (is (< (.indexOf prompt "IMPLEMENTATION_BLOCKER: START")
+             (.indexOf prompt "PASS_STATUS: IMPLEMENTATION_BLOCKED")))
+      (is (str/includes? prompt
+                         "append the complete `IMPLEMENTATION_BLOCKER` block above before emitting that final status line")))))
+
+(deftest implement-task-definition-declares-three-authored-terminal-routes-test
+  ;; Tests the checked-in workflow definition keeps blocked policy authored.
+  (testing "implement-task uses exact marker routing and distinct branch summaries"
+    (let [workflow (edn/read-string (slurp ".psi/workflows/implement-task.edn"))
+          steps (:steps workflow)
+          step-by-name (into {} (map (juxt :name identity)) steps)
+          implement-pass (get step-by-name "implement-pass")
+          complete-summary (get step-by-name "final-summary-complete")
+          blocked-summary (get step-by-name "final-summary-blocked")
+          blocker-validation (get step-by-name "validate-implementation-blocker")
+          blocked-prompt (get-in blocked-summary [:contributions 2 :text])]
+      (is (= "workflow/exact-marker-routing" (get-in implement-pass [:judge :operation])))
+      (is (= {:marker-label "PASS_STATUS"
+              :allowed-routes ["MORE_WORK_REMAINS"
+                               "IMPLEMENTATION_COMPLETE"
+                               "IMPLEMENTATION_BLOCKED"]}
+             (select-keys (get-in implement-pass [:judge :args])
+                          [:marker-label :allowed-routes])))
+      (is (= {"MORE_WORK_REMAINS" {:goto "capture-implementation-before-pass" :max-iterations 20}
+              "IMPLEMENTATION_COMPLETE" {:goto "final-summary-complete"}
+              "IMPLEMENTATION_BLOCKED" {:goto "validate-implementation-blocker"}}
+             (:on implement-pass)))
+      (is (= "workflow/fresh-final-complete-block-routing"
+             (:operation blocker-validation)))
+      (is (= {:type :invoke
+              :operation "workflow/constant-routing"
+              :args {:route "DONE"}}
+             (:judge blocker-validation)))
+      (is (= {"DONE" {:goto "final-summary-blocked"}}
+             (:on blocker-validation)))
+      (is (some? complete-summary))
+      (is (some? blocked-summary))
+      (is (= "workflow/exact-marker-routing"
+             (get-in complete-summary [:judge :operation])))
+      (is (= "workflow/exact-marker-routing"
+             (get-in blocked-summary [:judge :operation])))
+      (is (= ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]
+             (get-in complete-summary [:judge :args :forbidden-field-labels-by-route
+                                       "IMPLEMENTATION_COMPLETE"])))
+      (is (= ["IMPLEMENTATION_BLOCKED"]
+             (get-in blocked-summary [:judge :args :allowed-routes])))
+      (is (= ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]
+             (get-in blocked-summary [:judge :args :required-field-labels-by-route
+                                      "IMPLEMENTATION_BLOCKED"])))
+      (is (str/includes? (get-in complete-summary [:contributions 2 :text])
+                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"))
+      (is (str/includes? blocked-prompt
+                         "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"))
+      (is (str/includes? blocked-prompt
+                         "selected this blocker record from one artifact snapshot"))
+      (is (str/includes? blocked-prompt
+                         "Do not re-read or select a blocker record"))
+      (is (str/includes? blocked-prompt "IMPLEMENTATION_BLOCKER: {{blocker}}"))
+      (is (str/includes? blocked-prompt
+                         "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: {{required-human-action}}")))))

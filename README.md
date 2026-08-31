@@ -172,8 +172,10 @@ Project workflows include:
 
 - `/delegate task-lifecycle <task>` runs a Munera task through design → plan →
   implement → review → extract knowledge. Unresolved `SCOPE_QUESTION:` items halt
-  the lifecycle before plan creation and hand back to the human; see
-  [`doc/workflows.md`](doc/workflows.md).
+  the lifecycle before plan creation. A blocked implementation is a clean human
+  handback: the lifecycle stops before implementation review and knowledge
+  extraction. Resolve the recorded required human action, then freshly re-invoke
+  the workflow; see [`doc/workflows.md`](doc/workflows.md).
 - `/delegate reduce-incidental-complexity` for function/executable-unit
   incidental complexity and `/delegate reduce-architectural-complexity` for
   namespace/family/pair/community architecture targets selected by Gordian.

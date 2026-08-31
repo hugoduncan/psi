@@ -5,8 +5,6 @@
 
 (def ^:private pass-status-prefix "PASS_STATUS:")
 
-(def ^:private route-token-pattern #"^[A-Z_]+$")
-
 (def ^:private known-pass-status->route
   {"REVIEW_COMPLETE" "DONE"
    "ACTIONABLE_FEEDBACK" "REPEAT"
@@ -25,15 +23,20 @@
 
    Open-only and anchored (full-string match), reusing the existing open-task
    grammar: a trimmed input that fully matches `munera/open/NNN-slug` is returned
-   verbatim; a bare anchored `NNN-slug` token becomes `munera/open/<token>`;
-   anything else (free text, a `munera/closed/...` path, a partial/substring
-   match) yields nil so the gate reads no content and proceeds."
+   verbatim; a bare anchored `NNN-slug` token becomes `munera/open/<token>`.
+   A leading `@` task reference marker is accepted and removed before applying
+   either form, matching workflow invocation syntax. Anything else (free text,
+   a `munera/closed/...` path, a partial/substring match) yields nil so the
+   gate reads no content and proceeds."
   [task-path]
   (when (string? task-path)
-    (let [trimmed (str/trim task-path)]
+    (let [trimmed (str/trim task-path)
+          task-token (if (str/starts-with? trimmed "@")
+                       (subs trimmed 1)
+                       trimmed)]
       (cond
-        (re-matches munera-open-task-path-pattern trimmed) trimmed
-        (re-matches bare-task-token-pattern trimmed) (str "munera/open/" trimmed)
+        (re-matches munera-open-task-path-pattern task-token) task-token
+        (re-matches bare-task-token-pattern task-token) (str "munera/open/" task-token)
         :else nil))))
 
 (defn- pass-status-line-value
@@ -210,212 +213,58 @@
        :data proceed-route
        :summary proceed-route})))
 
-(defn- route-token? [value]
-  (and (string? value)
-       (boolean (re-matches route-token-pattern value))))
+(defn valid-field-prefixes?
+  "True when `field-prefixes` is a non-empty vector of distinct, non-blank strings."
+  [field-prefixes]
+  (and (vector? field-prefixes)
+       (seq field-prefixes)
+       (every? #(and (string? %) (not (str/blank? %))) field-prefixes)
+       (apply distinct? field-prefixes)))
 
-(defn- marker-label-errors
-  [args]
-  (cond
-    (not (contains? args :marker-label))
-    [{:field :marker-label :reason :missing-marker-label}]
+(defn- complete-authored-blocks
+  [content start-delimiter field-prefixes end-delimiter]
+  (if-not (valid-field-prefixes? field-prefixes)
+    []
+    (let [lines (str/split-lines (or content ""))]
+      (loop [remaining lines
+             blocks []]
+        (if-let [line (first remaining)]
+          (if (= start-delimiter line)
+            (let [field-lines (take (count field-prefixes) (rest remaining))
+                  end-line (nth remaining (inc (count field-prefixes)) nil)
+                  values (mapv (fn [prefix field-line]
+                                 (when (and field-line
+                                            (str/starts-with? field-line prefix))
+                                   (let [value (subs field-line (count prefix))]
+                                     (when (seq (str/trim value)) value))))
+                               field-prefixes field-lines)
+                  complete? (and (= end-delimiter end-line)
+                                 (= (count field-prefixes) (count values))
+                                 (every? some? values))]
+              (recur (rest remaining)
+                     (cond-> blocks
+                       complete? (conj (zipmap field-prefixes values)))))
+            (recur (rest remaining) blocks))
+          blocks)))))
 
-    (not (string? (:marker-label args)))
-    [{:field :marker-label
-      :reason :non-string-marker-label
-      :value (:marker-label args)}]
+(defn parse-final-complete-block
+  "Return the last syntactically complete authored block in `content`.
 
-    (not (route-token? (:marker-label args)))
-    [{:field :marker-label
-      :reason :invalid-marker-label
-      :value (:marker-label args)}]
+   A complete block has one start delimiter, exactly the supplied field prefixes
+   once each in order, and one end delimiter. Malformed and incomplete blocks
+   are ignored so a later complete record remains authoritative. Returns nil
+   when no complete block exists."
+  [content start-delimiter field-prefixes end-delimiter]
+  (peek (complete-authored-blocks content start-delimiter field-prefixes end-delimiter)))
 
-    :else []))
-
-(defn- text-errors
-  [args]
-  (cond
-    (not (contains? args :text))
-    [{:field :text :reason :missing-text}]
-
-    (not (string? (:text args)))
-    [{:field :text
-      :reason :non-string-text
-      :value (:text args)}]
-
-    :else []))
-
-(defn- invalid-allowed-route-entry-errors
-  [allowed-routes]
-  (->> allowed-routes
-       (map-indexed (fn [idx route]
-                      (when-not (route-token? route)
-                        {:field :allowed-routes
-                         :reason :invalid-allowed-route
-                         :index idx
-                         :value route})))
-       (remove nil?)
-       vec))
-
-(defn- duplicate-route-errors
-  [allowed-routes]
-  (->> allowed-routes
-       (map-indexed vector)
-       (group-by second)
-       (keep (fn [[route indexed-routes]]
-               (let [indices (mapv first indexed-routes)]
-                 (when (and (route-token? route)
-                            (> (count indices) 1))
-                   {:field :allowed-routes
-                    :reason :duplicate-allowed-route
-                    :value route
-                    :indices indices}))))
-       vec))
-
-(defn- allowed-routes-errors
-  [args]
-  (cond
-    (not (contains? args :allowed-routes))
-    [{:field :allowed-routes :reason :missing-allowed-routes}]
-
-    (not (vector? (:allowed-routes args)))
-    [{:field :allowed-routes
-      :reason :non-vector-allowed-routes
-      :value (:allowed-routes args)}]
-
-    (empty? (:allowed-routes args))
-    [{:field :allowed-routes :reason :empty-allowed-routes}]
-
-    :else
-    (into (invalid-allowed-route-entry-errors (:allowed-routes args))
-          (duplicate-route-errors (:allowed-routes args)))))
-
-(defn- exact-marker-routing-arg-errors
-  [args]
-  (vec (concat (text-errors args)
-               (marker-label-errors args)
-               (allowed-routes-errors args))))
-
-(defn- invalid-exact-marker-routing-args-result
-  [errors]
-  {:status :error
-   :reason :invalid-route-marker-args
-   :message "workflow/exact-marker-routing args are invalid"
-   :details {:errors errors}})
-
-(defn- marker-line-classification
-  [{:keys [marker-label allowed-routes-set]} line]
-  (let [trimmed-left (str/triml line)
-        marker-prefix (str marker-label ": ")
-        starts-with-label? (str/starts-with? trimmed-left marker-label)
-        after-marker-label (if starts-with-label?
-                             (subs trimmed-left (count marker-label))
-                             "")
-        whitespace-before-colon? (boolean (re-find #"^\s+:" after-marker-label))
-        marker-attempt? (and starts-with-label?
-                             (or (str/starts-with? after-marker-label ":")
-                                 whitespace-before-colon?))]
-    (cond
-      (not marker-attempt?)
-      {:kind :ordinary
-       :line line}
-
-      (not= line trimmed-left)
-      {:kind :malformed
-       :line line
-       :reason :leading-whitespace}
-
-      whitespace-before-colon?
-      {:kind :malformed
-       :line line
-       :reason :whitespace-before-colon}
-
-      (not (str/starts-with? line marker-prefix))
-      {:kind :malformed
-       :line line
-       :reason :missing-space-after-colon}
-
-      :else
-      (let [raw-route (subs line (count marker-prefix))]
-        (cond
-          (not (route-token? raw-route))
-          {:kind :malformed
-           :line line
-           :reason :malformed-route-token
-           :value raw-route}
-
-          (not (contains? allowed-routes-set raw-route))
-          {:kind :unsupported
-           :line line
-           :value raw-route}
-
-          :else
-          {:kind :exact
-           :line line
-           :route raw-route})))))
-
-(defn- route-marker-candidates
-  [{:keys [text marker-label allowed-routes]}]
-  (let [classification-opts {:marker-label marker-label
-                             :allowed-routes-set (set allowed-routes)}]
-    (->> (str/split-lines text)
-         (mapv #(marker-line-classification classification-opts %))
-         (remove #(= :ordinary (:kind %)))
-         vec)))
-
-(defn parse-exact-marker-routing
-  "Parse one exact workflow-owned route marker from text.
-
-   Args must contain string :text, all-caps/underscore :marker-label, and a
-   non-empty vector of distinct all-caps/underscore :allowed-routes. Invalid
-   args return :invalid-route-marker-args before marker parsing."
-  [args]
-  (let [errors (exact-marker-routing-arg-errors args)]
-    (if (seq errors)
-      (invalid-exact-marker-routing-args-result errors)
-      (let [{:keys [text marker-label allowed-routes]} args
-            candidates (route-marker-candidates args)]
-        (cond
-          (empty? candidates)
-          {:status :error
-           :reason :missing-route-marker
-           :message (str marker-label " marker missing")
-           :details {:text text
-                     :marker-label marker-label}}
-
-          (> (count candidates) 1)
-          {:status :error
-           :reason :ambiguous-route-marker
-           :message (str "Multiple " marker-label " marker lines found")
-           :details {:text text
-                     :marker-label marker-label
-                     :route-marker-lines (mapv :line candidates)
-                     :route-marker-candidates candidates}}
-
-          :else
-          (let [{:keys [kind line route value reason]} (first candidates)]
-            (case kind
-              :exact
-              {:status :ok
-               :data route
-               :summary route}
-
-              :unsupported
-              {:status :error
-               :reason :unsupported-route-marker
-               :message (str marker-label " route token is not supported")
-               :details {:text text
-                         :marker-label marker-label
-                         :line line
-                         :value value
-                         :allowed-routes allowed-routes}}
-
-              :malformed
-              {:status :error
-               :reason :malformed-route-marker
-               :message (str marker-label " marker must start at column 0 with exactly one space after colon, one route token, and no trailing text")
-               :details (cond-> {:text text
-                                 :marker-label marker-label
-                                 :line line
-                                 :reason reason}
-                          value (assoc :value value))})))))))
+(defn final-complete-block-appended?
+  "True when `content` preserves `before-content` and appends exactly one complete
+   authored block after it. This proves a blocked pass produced one fresh record
+   instead of reusing an earlier record or appending multiple records."
+  [before-content content start-delimiter field-prefixes end-delimiter]
+  (and (string? before-content)
+       (string? content)
+       (str/starts-with? content before-content)
+       (= 1 (count (complete-authored-blocks
+                    (subs content (count before-content))
+                    start-delimiter field-prefixes end-delimiter)))))

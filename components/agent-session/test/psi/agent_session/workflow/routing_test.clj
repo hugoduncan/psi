@@ -1,6 +1,8 @@
 (ns psi.agent-session.workflow.routing-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.workflow.authored-token :as authored-token]
+   [psi.agent-session.workflow.exact-marker-routing :as exact-marker-routing]
    [psi.agent-session.workflow.routing :as routing]))
 
 (def ^:private example-marker-label "QUALITY_GATE")
@@ -16,7 +18,7 @@
 
 (defn- parse-exact-marker
   [text]
-  (routing/parse-exact-marker-routing (exact-marker-args text)))
+  (exact-marker-routing/parse-exact-marker-routing (exact-marker-args text)))
 
 (defn- assert-route
   [expected-route result]
@@ -30,6 +32,63 @@
   (is (= :error (:status result)) (pr-str result))
   (is (= expected-reason (:reason result)) (pr-str result))
   result)
+
+(deftest final-complete-block-parser-test
+  ;; Tests the final syntactically complete block wins over stale or malformed attempts.
+  (testing "last complete block is authoritative"
+    (is (= {"- blocker: " "current access decision"
+            "- required-human-action: " "grant repository access"}
+           (routing/parse-final-complete-block
+            (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                 "- blocker: stale choice\n"
+                 "- required-human-action: decide stale choice\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                 "- blocker: incomplete\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                 "- blocker: current access decision\n"
+                 "- required-human-action: grant repository access\n"
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->\n")
+            "<!-- IMPLEMENTATION_BLOCKER: START -->"
+            ["- blocker: " "- required-human-action: "]
+            "<!-- IMPLEMENTATION_BLOCKER: END -->"))))
+  (testing "absent, malformed, or whitespace-only records are rejected"
+    (doseq [content ["<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: \n<!-- IMPLEMENTATION_BLOCKER: END -->"
+                     "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker:   \t\n- required-human-action: choose access\n<!-- IMPLEMENTATION_BLOCKER: END -->"
+                     "<!-- IMPLEMENTATION_BLOCKER: START -->\n- blocker: missing access\n- required-human-action:  \t \n<!-- IMPLEMENTATION_BLOCKER: END -->"]]
+      (is (nil? (routing/parse-final-complete-block
+                 content
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->"
+                 ["- blocker: " "- required-human-action: "]
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->")))))
+  (testing "empty, blank, and duplicate field-prefix schemas are rejected"
+    (doseq [field-prefixes [[] [" "] ["- blocker: " "- blocker: "]]]
+      (is (nil? (routing/parse-final-complete-block
+                 (str "<!-- IMPLEMENTATION_BLOCKER: START -->\n"
+                      "- blocker: first\n"
+                      "- blocker: second\n"
+                      "<!-- IMPLEMENTATION_BLOCKER: END -->\n")
+                 "<!-- IMPLEMENTATION_BLOCKER: START -->"
+                 field-prefixes
+                 "<!-- IMPLEMENTATION_BLOCKER: END -->"))))))
+
+(deftest final-complete-block-appended-test
+  ;; A blocked pass must append exactly one complete record after its capture.
+  (let [start "<!-- IMPLEMENTATION_BLOCKER: START -->"
+        fields ["- blocker: " "- required-human-action: "]
+        end "<!-- IMPLEMENTATION_BLOCKER: END -->"
+        before "prior implementation notes\n"
+        block (str start "\n"
+                   "- blocker: awaiting a decision\n"
+                   "- required-human-action: choose the policy\n"
+                   end "\n")]
+    (testing "one newly appended complete block is accepted"
+      (is (routing/final-complete-block-appended?
+           before (str before block) start fields end)))
+    (testing "two newly appended complete blocks are rejected"
+      (is (not (routing/final-complete-block-appended?
+                before (str before block block) start fields end))))))
 
 (deftest pass-status-routing-parser-test
   ;; Tests pure PASS_STATUS final-reply routing grammar without workflow runtime
@@ -177,6 +236,13 @@
     (is (= "munera/open/230-scope-question-lifecycle-gate"
            (routing/normalize-open-task-path
             "\t230-scope-question-lifecycle-gate "))))
+  (testing "workflow @ task references normalize to the same open task path"
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            "@munera/open/230-scope-question-lifecycle-gate")))
+    (is (= "munera/open/230-scope-question-lifecycle-gate"
+           (routing/normalize-open-task-path
+            " @230-scope-question-lifecycle-gate "))))
   (testing "non-open, free-text, partial, malformed, and nil inputs yield nil"
     (doseq [invalid ["munera/closed/230-scope-question-lifecycle-gate"
                      "please run 230-scope-question-lifecycle-gate"
@@ -187,6 +253,29 @@
                      nil]]
       (is (nil? (routing/normalize-open-task-path invalid))
           (pr-str invalid)))))
+
+(deftest authored-route-token-validation-parity-test
+  ;; Producer route tokens and exact-marker route/field labels share one grammar.
+  (doseq [token ["QUALITY_GATE" "APPROVE" "ESCALATE_NOW"]]
+    (testing (str "accepts " (pr-str token) " at every authored-token boundary")
+      (is (true? (authored-token/valid-route-token? token)))
+      (is (= :ok
+             (:status
+              (exact-marker-routing/parse-exact-marker-routing
+               {:text (str token ": " token "\nFIELD_LABEL: value")
+                :marker-label token
+                :allowed-routes [token]
+                :required-fields-by-route {token {"FIELD_LABEL" "value"}}}))))))
+  (doseq [token ["lowercase" "HAS-DASH" "HAS SPACE" "TOKEN1" "" nil]]
+    (testing (str "rejects " (pr-str token) " at every authored-token boundary")
+      (is (false? (authored-token/valid-route-token? token)))
+      (is (= :invalid-route-marker-args
+             (:reason
+              (exact-marker-routing/parse-exact-marker-routing
+               {:text "QUALITY_GATE: APPROVE"
+                :marker-label "QUALITY_GATE"
+                :allowed-routes ["APPROVE"]
+                :required-fields-by-route {"APPROVE" {token "value"}}})))))))
 
 (deftest exact-marker-routing-valid-and-missing-test
   ;; Tests generic exact-marker routing accepts arbitrary workflow-owned marker
@@ -296,15 +385,250 @@
                (get-in result [:details :route-marker-candidates]))
             (pr-str result))))))
 
+(deftest exact-marker-routing-required-fields-test
+  ;; Tests terminal handback fields are exact, unique, branch-specific, and may
+  ;; be derived from a previously validated source handback.
+  (let [base {:marker-label "IMPLEMENTATION_STATUS"
+              :allowed-routes ["IMPLEMENTATION_COMPLETE" "IMPLEMENTATION_BLOCKED"]
+              :required-fields-by-route
+              {"IMPLEMENTATION_BLOCKED"
+               {"IMPLEMENTATION_BLOCKER" "validated blocker"
+                "IMPLEMENTATION_REQUIRED_HUMAN_ACTION" "validated action"}}}
+        valid (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")]
+    (is (= "IMPLEMENTATION_BLOCKED"
+           (:data (exact-marker-routing/parse-exact-marker-routing (assoc base :text valid)))))
+    (let [complete-base {:marker-label "IMPLEMENTATION_STATUS"
+                         :allowed-routes ["IMPLEMENTATION_COMPLETE"]
+                         :forbidden-field-labels-by-route
+                         {"IMPLEMENTATION_COMPLETE"
+                          ["IMPLEMENTATION_BLOCKER"
+                           "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}
+          complete "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE"]
+      (is (= "IMPLEMENTATION_COMPLETE"
+             (:data (exact-marker-routing/parse-exact-marker-routing
+                     (assoc complete-base :text complete)))))
+      (doseq [field ["IMPLEMENTATION_BLOCKER"
+                     "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]]
+        (is (= :unexpected-route-field
+               (:reason (exact-marker-routing/parse-exact-marker-routing
+                         (assoc complete-base :text (str field ": stale\n" complete)))))
+            field)))
+    (doseq [[label text reason]
+            [["missing"
+              "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+              :missing-route-field]
+             ["malformed"
+              "IMPLEMENTATION_BLOCKER:validated blocker\nIMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\nIMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+              :mismatched-route-field]
+             ["duplicate"
+              (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+              :ambiguous-route-field]
+             ["branch mismatch"
+              (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")
+              :unexpected-route-field]
+             ["snapshot mismatch"
+              (str "IMPLEMENTATION_BLOCKER: changed blocker\n"
+                   "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                   "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+              :mismatched-route-field]]]
+      (is (= reason
+             (:reason (exact-marker-routing/parse-exact-marker-routing (assoc base :text text))))
+          label))
+    (let [source (str "IMPLEMENTATION_BLOCKER: validated blocker\n"
+                      "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action\n"
+                      "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED")
+          args {:text valid
+                :marker-label "IMPLEMENTATION_STATUS"
+                :allowed-routes ["IMPLEMENTATION_COMPLETE" "IMPLEMENTATION_BLOCKED"]
+                :required-fields-source-text source
+                :required-field-labels-by-route
+                {"IMPLEMENTATION_BLOCKED"
+                 ["IMPLEMENTATION_BLOCKER" "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]}}]
+      (is (= "IMPLEMENTATION_BLOCKED"
+             (:data (exact-marker-routing/parse-exact-marker-routing args))))
+      (testing "source-derived fields belong only to their route"
+        (doseq [field ["IMPLEMENTATION_BLOCKER"
+                       "IMPLEMENTATION_REQUIRED_HUMAN_ACTION"]]
+          (let [result (exact-marker-routing/parse-exact-marker-routing
+                        (assoc args :text
+                               (str field ": stale\n"
+                                    "IMPLEMENTATION_STATUS: IMPLEMENTATION_COMPLETE")))]
+            (is (= :unexpected-route-field (:reason result)) (pr-str result))
+            (is (= field (get-in result [:details :field-label]))
+                (pr-str result)))))
+      (testing "matching direct and source-derived fields agree"
+        (is (= "IMPLEMENTATION_BLOCKED"
+               (:data (exact-marker-routing/parse-exact-marker-routing
+                       (assoc args :required-fields-by-route
+                              {"IMPLEMENTATION_BLOCKED"
+                               {"IMPLEMENTATION_BLOCKER" "validated blocker"}}))))))
+      (testing "conflicting direct and source-derived fields are invalid"
+        (let [result (exact-marker-routing/parse-exact-marker-routing
+                      (assoc args :required-fields-by-route
+                             {"IMPLEMENTATION_BLOCKED"
+                              {"IMPLEMENTATION_BLOCKER" "different blocker"}}))]
+          (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+          (is (= [{:field :required-fields-by-route
+                   :reason :conflicting-required-field-sources
+                   :route "IMPLEMENTATION_BLOCKED"
+                   :label "IMPLEMENTATION_BLOCKER"
+                   :direct-value "different blocker"
+                   :source-value "validated blocker"}]
+                 (get-in result [:details :errors]))
+              (pr-str result))))
+      (doseq [blank-value ["" "   "]]
+        (let [blank-source (str "IMPLEMENTATION_BLOCKER: " blank-value "\n"
+                                "IMPLEMENTATION_REQUIRED_HUMAN_ACTION: validated action")]
+          (is (= :invalid-required-fields-source
+                 (:reason (exact-marker-routing/parse-exact-marker-routing
+                           (assoc args :required-fields-source-text blank-source))))
+              (pr-str blank-value)))))))
+
 (deftest exact-marker-routing-invalid-args-test
   ;; Tests exact-marker operation arguments are validated before marker parsing
   ;; and return accumulated diagnostics without throwing.
   (testing "invalid args report the tagged invalid-arg result"
-    (let [result (routing/parse-exact-marker-routing {})]
+    (let [result (exact-marker-routing/parse-exact-marker-routing {})]
       (is (= :error (:status result)) (pr-str result))
       (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
       (is (= "workflow/exact-marker-routing args are invalid" (:message result))
           (pr-str result))))
+  (testing "empty source-derived required-field schemas compose as identity"
+    (doseq [required-field-labels-by-route
+            [{} {"APPROVE" []} {"APPROVE" [] "DENY" []}]]
+      (let [result (exact-marker-routing/parse-exact-marker-routing
+                    {:text "QUALITY_GATE: APPROVE"
+                     :marker-label "QUALITY_GATE"
+                     :allowed-routes ["APPROVE" "DENY"]
+                     :required-field-labels-by-route required-field-labels-by-route})]
+        (is (= :ok (:status result)) (pr-str required-field-labels-by-route result))
+        (is (= "APPROVE" (:data result)) (pr-str required-field-labels-by-route result)))))
+  (testing "direct and source-derived required fields are both validated"
+    (let [result (exact-marker-routing/parse-exact-marker-routing
+                  {:text "IMPLEMENTATION_STATUS: IMPLEMENTATION_BLOCKED"
+                   :marker-label "IMPLEMENTATION_STATUS"
+                   :allowed-routes ["IMPLEMENTATION_BLOCKED"]
+                   :required-fields-by-route []
+                   :required-fields-source-text "IMPLEMENTATION_BLOCKER: blocker"
+                   :required-field-labels-by-route
+                   {"IMPLEMENTATION_BLOCKED" ["IMPLEMENTATION_BLOCKER"]}})]
+      (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+      (is (= [{:field :required-fields-by-route
+               :reason :non-map-required-fields-by-route
+               :value []}]
+             (get-in result [:details :errors]))
+          (pr-str result))))
+  (testing "invalid allowed-routes remains structured with optional route fields"
+    (doseq [optional-args
+            [{:required-fields-by-route {"APPROVE" {"FIELD" "value"}}}
+             {:required-fields-source-text "FIELD: value"
+              :required-field-labels-by-route {"APPROVE" ["FIELD"]}}
+             {:forbidden-field-labels-by-route {"APPROVE" ["FIELD"]}}]]
+      (let [result (exact-marker-routing/parse-exact-marker-routing
+                    (merge {:text "QUALITY_GATE: APPROVE"
+                            :marker-label "QUALITY_GATE"
+                            :allowed-routes 1}
+                           optional-args))]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (= [{:field :allowed-routes
+                 :reason :non-vector-allowed-routes
+                 :value 1}]
+               (get-in result [:details :errors]))
+            (pr-str result)))))
+  (testing "duplicate source-derived required labels are invalid arguments"
+    (let [result (exact-marker-routing/parse-exact-marker-routing
+                  {:text "QUALITY_GATE: APPROVE"
+                   :marker-label "QUALITY_GATE"
+                   :allowed-routes ["APPROVE"]
+                   :required-fields-source-text "FIELD: value"
+                   :required-field-labels-by-route {"APPROVE" ["FIELD" "FIELD"]}})]
+      (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+      (is (= [{:field :required-field-labels-by-route
+               :reason :duplicate-required-field-label
+               :route "APPROVE"
+               :value "FIELD"
+               :indices [0 1]}]
+             (get-in result [:details :errors]))
+          (pr-str result))))
+  (testing "duplicate forbidden field labels are invalid arguments"
+    (let [result (exact-marker-routing/parse-exact-marker-routing
+                  {:text "QUALITY_GATE: APPROVE"
+                   :marker-label "QUALITY_GATE"
+                   :allowed-routes ["APPROVE"]
+                   :forbidden-field-labels-by-route {"APPROVE" ["FIELD" "FIELD"]}})]
+      (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+      (is (= [{:field :forbidden-field-labels-by-route
+               :reason :duplicate-field-label
+               :route "APPROVE"
+               :value "FIELD"
+               :indices [0 1]}]
+             (get-in result [:details :errors]))
+          (pr-str result))))
+  (testing "malformed overlapping field labels remain structured invalid arguments"
+    (doseq [label [nil 1]]
+      (let [result (exact-marker-routing/parse-exact-marker-routing
+                    {:text "QUALITY_GATE: APPROVE"
+                     :marker-label "QUALITY_GATE"
+                     :allowed-routes ["APPROVE"]
+                     :required-fields-by-route {"APPROVE" {label "direct"}}
+                     :required-fields-source-text "FIELD: source"
+                     :required-field-labels-by-route {"APPROVE" [label]}})]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (some #(= :invalid-required-field-label (:reason %))
+                  (get-in result [:details :errors]))
+            (pr-str result))
+        (is (some #(= :invalid-required-field-labels (:reason %))
+                  (get-in result [:details :errors]))
+            (pr-str result)))))
+  (testing "a route field cannot be both required and forbidden"
+    (doseq [required-args
+            [{:required-fields-by-route {"APPROVE" {"FIELD" "value"}}}
+             {:required-fields-source-text "FIELD: value"
+              :required-field-labels-by-route {"APPROVE" ["FIELD"]}}]]
+      (let [result (exact-marker-routing/parse-exact-marker-routing
+                    (merge {:text "FIELD: value\nQUALITY_GATE: APPROVE"
+                            :marker-label "QUALITY_GATE"
+                            :allowed-routes ["APPROVE"]
+                            :forbidden-field-labels-by-route {"APPROVE" ["FIELD"]}}
+                           required-args))]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (= [{:field :forbidden-field-labels-by-route
+                 :reason :required-and-forbidden-route-field
+                 :route "APPROVE"
+                 :label "FIELD"}]
+               (get-in result [:details :errors]))
+            (pr-str result)))))
+  (testing "the marker label cannot also be a route field label"
+    (doseq [[field optional-args]
+            [[:required-fields-by-route
+              {:required-fields-by-route
+               {"APPROVE" {"QUALITY_GATE" "APPROVE"}}}]
+             [:required-field-labels-by-route
+              {:required-fields-source-text "QUALITY_GATE: APPROVE"
+               :required-field-labels-by-route
+               {"APPROVE" ["QUALITY_GATE"]}}]
+             [:forbidden-field-labels-by-route
+              {:forbidden-field-labels-by-route
+               {"APPROVE" ["QUALITY_GATE"]}}]]]
+      (let [result (exact-marker-routing/parse-exact-marker-routing
+                    (merge {:text "QUALITY_GATE: APPROVE"
+                            :marker-label "QUALITY_GATE"
+                            :allowed-routes ["APPROVE"]}
+                           optional-args))]
+        (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+        (is (= [{:field field
+                 :reason :marker-label-route-field
+                 :route "APPROVE"
+                 :label "QUALITY_GATE"}]
+               (get-in result [:details :errors]))
+            (pr-str result)))))
   (testing "required invalid arg cases"
     (doseq [[args expected-errors]
             [[{} [{:field :text :reason :missing-text}
@@ -352,7 +676,7 @@
                 :value "APPROVE"
                 :indices [0 3]}]]]]
       (let [result (assert-error :invalid-route-marker-args
-                                 (routing/parse-exact-marker-routing args))]
+                                 (exact-marker-routing/parse-exact-marker-routing args))]
         (is (= expected-errors (get-in result [:details :errors]))
             (pr-str result))))))
 

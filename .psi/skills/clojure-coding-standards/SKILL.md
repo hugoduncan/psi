@@ -86,6 +86,8 @@ clojure -T:deps git-resolve-tags :lib io.github.user/repo
 - **Zero tolerance**: Fix failing/flaky tests immediately
 - **Isolation**: Each test should be independent
 - **Deterministic**: tests should be deterministic and repeatable. no sleeps.
+- No test only code paths in production.
+- Test boundary contracts. Testing implementation details makes tests brittle, and production code harder to change.
 
 Prefer testing-without-mocks.
 
